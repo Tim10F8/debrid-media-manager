@@ -5,3 +5,4 @@ export const defaultTorrentsFilter = '';
 export const defaultMagnetHandlerEnabled = false;
 export const defaultMagnetInstructionsHidden = false;
 export const defaultDownloadMagnets = false;
+export const defaultAvailabilityCheckLimit = '0';

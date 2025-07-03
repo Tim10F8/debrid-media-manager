@@ -422,9 +422,24 @@ const MovieSearch: FunctionComponent = () => {
 			return;
 		}
 
+		// Get availability check limit from settings
+		const availabilityCheckLimit = parseInt(
+			window.localStorage.getItem('settings:availabilityCheckLimit') || '0'
+		);
+
+		// Apply limit if set (0 means no limit)
+		let torrentsToCheck = nonAvailableResults;
+		if (availabilityCheckLimit > 0 && nonAvailableResults.length > availabilityCheckLimit) {
+			torrentsToCheck = nonAvailableResults.slice(0, availabilityCheckLimit);
+			toast.info(
+				`Checking first ${availabilityCheckLimit} torrents out of ${nonAvailableResults.length} (limit set in settings)`,
+				{ duration: 4000 }
+			);
+		}
+
 		setIsCheckingAvailability(true);
 		progressToast = toast.loading(
-			`Starting availability test for ${nonAvailableResults.length} torrents...`
+			`Starting availability test for ${torrentsToCheck.length} torrents...`
 		);
 
 		const processResult = async (result: SearchResult) => {
@@ -465,7 +480,7 @@ const MovieSearch: FunctionComponent = () => {
 
 		try {
 			const results = await processWithConcurrency(
-				nonAvailableResults,
+				torrentsToCheck,
 				processResult,
 				3,
 				onProgress

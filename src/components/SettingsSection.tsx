@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+	defaultAvailabilityCheckLimit,
 	defaultDownloadMagnets,
 	defaultEpisodeSize,
 	defaultMagnetHandlerEnabled,
@@ -31,6 +32,9 @@ export const SettingsSection = () => {
 		defaultDownloadMagnets;
 	const showMassReportButtons =
 		window.localStorage.getItem('settings:showMassReportButtons') === 'true';
+	const availabilityCheckLimit =
+		window.localStorage.getItem('settings:availabilityCheckLimit') ||
+		defaultAvailabilityCheckLimit;
 
 	useEffect(() => {
 		// Check if protocol handler is registered
@@ -76,6 +80,14 @@ export const SettingsSection = () => {
 
 	const handleMassReportButtonsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		window.localStorage.setItem('settings:showMassReportButtons', String(e.target.checked));
+	};
+
+	const handleAvailabilityCheckLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const value = e.target.value;
+		// Only allow numbers
+		if (value === '' || /^\d+$/.test(value)) {
+			window.localStorage.setItem('settings:availabilityCheckLimit', value);
+		}
 	};
 
 	const handleHideInstructions = () => {
@@ -283,6 +295,23 @@ export const SettingsSection = () => {
 								onChange={handleMassReportButtonsChange}
 							/>
 							<label className="font-semibold">Show mass report buttons</label>
+						</div>
+
+						<div className="flex flex-col gap-1">
+							<label className="font-semibold">Availability check limit</label>
+							<input
+								id="dmm-availability-check-limit"
+								type="number"
+								min="0"
+								className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
+								placeholder="0 for no limit"
+								defaultValue={availabilityCheckLimit}
+								onChange={handleAvailabilityCheckLimitChange}
+							/>
+							<span className="text-xs text-gray-400">
+								Maximum torrents to check when using "Check Available" button (0 =
+								no limit)
+							</span>
 						</div>
 					</div>
 				</div>
