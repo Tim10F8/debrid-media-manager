@@ -21,7 +21,7 @@ const getPosterUrl = (imdbId: string | null | undefined): string => {
 	return `https://posters${subdomain}.debridmediamanager.com/${imdbId}-small.jpg`;
 };
 
-const Poster = ({ imdbId, title = 'No poster' }: Record<string, string>) => {
+const Poster = ({ imdbId, title }: Record<string, string>) => {
 	const [posterUrl, setPosterUrl] = useState('');
 	const [fallbackAttempted, setFallbackAttempted] = useState(false);
 
@@ -54,7 +54,8 @@ const Poster = ({ imdbId, title = 'No poster' }: Record<string, string>) => {
 			}
 
 			// Use fakeimg.pl as final fallback
-			const encodedTitle = encodeURIComponent(title);
+			const displayText = title || imdbId || 'No Poster';
+			const encodedTitle = encodeURIComponent(displayText);
 			setPosterUrl(
 				`https://fakeimg.pl/400x600/282828/eae0d0?font_size=40&font=bebas&text=${encodedTitle}&w=640&q=75`
 			);
@@ -68,7 +69,7 @@ const Poster = ({ imdbId, title = 'No poster' }: Record<string, string>) => {
 					fill
 					sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
 					src={posterUrl}
-					alt={`Poster for ${title}`}
+					alt={`Poster for ${title || imdbId || 'unknown'}`}
 					loading="lazy"
 					onError={handleImageError}
 					className="object-cover"
