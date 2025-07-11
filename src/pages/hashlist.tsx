@@ -282,18 +282,47 @@ function HashlistPage() {
 		const yetToDownload = filteredList
 			.filter((t) => !libraryHashes.has(t.hash))
 			.map(wrapDownloadFilesInRdFn);
-		const [results, errors] = await runConcurrentFunctions(yetToDownload, 4, 0);
-		if (errors.length) {
-			toast.error(
-				`Error downloading files on ${errors.length} torrents`,
-				genericToastOptions
-			);
-		}
-		if (results.length) {
-			toast.success(`Started downloading ${results.length} torrents`, genericToastOptions);
-		}
-		if (!errors.length && !results.length) {
+		if (yetToDownload.length === 0) {
 			toast('Everything has been downloaded', { icon: '👏' });
+			return;
+		}
+
+		const progressToast = toast.loading(
+			`Downloading 0/${yetToDownload.length} torrents...`,
+			genericToastOptions
+		);
+
+		const [results, errors] = await runConcurrentFunctions(
+			yetToDownload,
+			4,
+			0,
+			(completed, total, errorCount) => {
+				const message =
+					errorCount > 0
+						? `Downloading ${completed}/${total} torrents (${errorCount} errors)...`
+						: `Downloading ${completed}/${total} torrents...`;
+				toast.loading(message, { id: progressToast });
+			}
+		);
+
+		// Update the progress toast to show final result
+		if (errors.length && results.length) {
+			toast.error(`Downloaded ${results.length} torrents, failed ${errors.length}`, {
+				id: progressToast,
+				...genericToastOptions,
+			});
+		} else if (errors.length) {
+			toast.error(`Failed to download ${errors.length} torrents`, {
+				id: progressToast,
+				...genericToastOptions,
+			});
+		} else if (results.length) {
+			toast.success(`Started downloading ${results.length} torrents`, {
+				id: progressToast,
+				...genericToastOptions,
+			});
+		} else {
+			toast.dismiss(progressToast);
 		}
 	}
 
@@ -305,15 +334,37 @@ function HashlistPage() {
 		const yetToDownload = filteredList
 			.filter((t) => !libraryHashes.has(t.hash))
 			.map(wrapDownloadFilesInAdFn);
-		const [results, errors] = await runConcurrentFunctions(yetToDownload, 4, 0);
-		if (errors.length) {
-			toast.error(`Error downloading files on ${errors.length} torrents`);
-		}
-		if (results.length) {
-			toast.success(`Started downloading ${results.length} torrents`);
-		}
-		if (!errors.length && !results.length) {
+		if (yetToDownload.length === 0) {
 			toast('Everything has been downloaded', { icon: '👏' });
+			return;
+		}
+
+		const progressToast = toast.loading(`Downloading 0/${yetToDownload.length} torrents...`);
+
+		const [results, errors] = await runConcurrentFunctions(
+			yetToDownload,
+			4,
+			0,
+			(completed, total, errorCount) => {
+				const message =
+					errorCount > 0
+						? `Downloading ${completed}/${total} torrents (${errorCount} errors)...`
+						: `Downloading ${completed}/${total} torrents...`;
+				toast.loading(message, { id: progressToast });
+			}
+		);
+
+		// Update the progress toast to show final result
+		if (errors.length && results.length) {
+			toast.error(`Downloaded ${results.length} torrents, failed ${errors.length}`, {
+				id: progressToast,
+			});
+		} else if (errors.length) {
+			toast.error(`Failed to download ${errors.length} torrents`, { id: progressToast });
+		} else if (results.length) {
+			toast.success(`Started downloading ${results.length} torrents`, { id: progressToast });
+		} else {
+			toast.dismiss(progressToast);
 		}
 	}
 

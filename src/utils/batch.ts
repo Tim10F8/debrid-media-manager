@@ -7,11 +7,14 @@ async function sleep(ms: number): Promise<void> {
 export async function runConcurrentFunctions<T>(
 	functions: Array<AsyncFunction<T>>,
 	concurrency: number,
-	delay: number | ((index: number) => Promise<void>)
+	delay: number | ((index: number) => Promise<void>),
+	onProgress?: (completed: number, total: number, errors: number) => void
 ): Promise<[T[], Error[]]> {
 	let currentFunctions: Array<AsyncFunction<T>> = [];
 	const results: T[] = [];
 	const errors: Error[] = [];
+	const total = functions.length;
+	let completed = 0;
 
 	while (functions.length > 0) {
 		if (currentFunctions.length >= concurrency) {
@@ -31,6 +34,10 @@ export async function runConcurrentFunctions<T>(
 				if (typeof delay === 'number') await sleep(delay);
 				const index = currentFunctions.indexOf(nextFunction);
 				currentFunctions.splice(index, 1);
+				completed++;
+				if (onProgress) {
+					onProgress(completed, total, errors.length);
+				}
 			});
 	}
 

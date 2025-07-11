@@ -515,18 +515,54 @@ function TorrentsPage() {
 		)
 			return;
 		const toReinsert = relevantList.map(wrapReinsertFn);
-		const [results, errors] = await runConcurrentFunctions(toReinsert, 4, 0);
-		if (errors.length) {
-			toast.error(`Error reinserting ${errors.length} torrents`, magnetToastOptions);
+
+		if (toReinsert.length === 0) {
+			toast('No torrents to reinsert', magnetToastOptions);
+			return;
 		}
-		if (results.length) {
+
+		const progressToast = toast.loading(
+			`Reinserting 0/${toReinsert.length} torrents...`,
+			magnetToastOptions
+		);
+
+		const [results, errors] = await runConcurrentFunctions(
+			toReinsert,
+			4,
+			0,
+			(completed, total, errorCount) => {
+				const message =
+					errorCount > 0
+						? `Reinserting ${completed}/${total} torrents (${errorCount} errors)...`
+						: `Reinserting ${completed}/${total} torrents...`;
+				toast.loading(message, { id: progressToast });
+			}
+		);
+
+		// Update the progress toast to show final result
+		if (errors.length && results.length) {
+			toast.error(`Reinserted ${results.length} torrents, failed ${errors.length}`, {
+				id: progressToast,
+				...magnetToastOptions,
+			});
 			resetSelection(setSelectedTorrents);
 			await triggerFetchLatestRDTorrents(Math.ceil(relevantList.length * 1.1));
 			await triggerFetchLatestADTorrents();
-			toast.success(`Reinserted ${results.length} torrents`, magnetToastOptions);
-		}
-		if (!errors.length && !results.length) {
-			toast('No torrents to reinsert', magnetToastOptions);
+		} else if (errors.length) {
+			toast.error(`Failed to reinsert ${errors.length} torrents`, {
+				id: progressToast,
+				...magnetToastOptions,
+			});
+		} else if (results.length) {
+			toast.success(`Reinserted ${results.length} torrents`, {
+				id: progressToast,
+				...magnetToastOptions,
+			});
+			resetSelection(setSelectedTorrents);
+			await triggerFetchLatestRDTorrents(Math.ceil(relevantList.length * 1.1));
+			await triggerFetchLatestADTorrents();
+		} else {
+			toast.dismiss(progressToast);
 		}
 	}
 
@@ -671,17 +707,48 @@ function TorrentsPage() {
 
 		// Map duplicates to delete function based on preference
 		const toDelete = dupes.map(wrapDeleteFn);
-		const [results, errors] = await runConcurrentFunctions(toDelete, 4, 0);
 
-		// Handle toast notifications for errors and results
-		if (errors.length) {
-			toast.error(`Error deleting ${errors.length} torrents`, libraryToastOptions);
+		if (toDelete.length === 0) {
+			toast('No duplicate torrents found', libraryToastOptions);
+			return;
 		}
-		if (results.length) {
-			toast.success(`Deleted ${results.length} torrents`, libraryToastOptions);
-		}
-		if (!errors.length && !results.length) {
-			toast('No torrents to delete', libraryToastOptions);
+
+		const progressToast = toast.loading(
+			`Deleting 0/${toDelete.length} torrents...`,
+			libraryToastOptions
+		);
+
+		const [results, errors] = await runConcurrentFunctions(
+			toDelete,
+			4,
+			0,
+			(completed, total, errorCount) => {
+				const message =
+					errorCount > 0
+						? `Deleting ${completed}/${total} torrents (${errorCount} errors)...`
+						: `Deleting ${completed}/${total} torrents...`;
+				toast.loading(message, { id: progressToast });
+			}
+		);
+
+		// Update the progress toast to show final result
+		if (errors.length && results.length) {
+			toast.error(`Deleted ${results.length} torrents, failed to delete ${errors.length}`, {
+				id: progressToast,
+				...libraryToastOptions,
+			});
+		} else if (errors.length) {
+			toast.error(`Failed to delete ${errors.length} torrents`, {
+				id: progressToast,
+				...libraryToastOptions,
+			});
+		} else if (results.length) {
+			toast.success(`Deleted ${results.length} torrents`, {
+				id: progressToast,
+				...libraryToastOptions,
+			});
+		} else {
+			toast.dismiss(progressToast);
 		}
 	}
 
@@ -737,17 +804,48 @@ function TorrentsPage() {
 
 		// Map duplicates to delete function based on preference
 		const toDelete = dupes.map(wrapDeleteFn);
-		const [results, errors] = await runConcurrentFunctions(toDelete, 4, 0);
 
-		// Handle toast notifications for errors and results
-		if (errors.length) {
-			toast.error(`Error deleting ${errors.length} torrents`, libraryToastOptions);
+		if (toDelete.length === 0) {
+			toast('No duplicate torrents found', libraryToastOptions);
+			return;
 		}
-		if (results.length) {
-			toast.success(`Deleted ${results.length} torrents`, libraryToastOptions);
-		}
-		if (!errors.length && !results.length) {
-			toast('No torrents to delete', libraryToastOptions);
+
+		const progressToast = toast.loading(
+			`Deleting 0/${toDelete.length} torrents...`,
+			libraryToastOptions
+		);
+
+		const [results, errors] = await runConcurrentFunctions(
+			toDelete,
+			4,
+			0,
+			(completed, total, errorCount) => {
+				const message =
+					errorCount > 0
+						? `Deleting ${completed}/${total} torrents (${errorCount} errors)...`
+						: `Deleting ${completed}/${total} torrents...`;
+				toast.loading(message, { id: progressToast });
+			}
+		);
+
+		// Update the progress toast to show final result
+		if (errors.length && results.length) {
+			toast.error(`Deleted ${results.length} torrents, failed to delete ${errors.length}`, {
+				id: progressToast,
+				...libraryToastOptions,
+			});
+		} else if (errors.length) {
+			toast.error(`Failed to delete ${errors.length} torrents`, {
+				id: progressToast,
+				...libraryToastOptions,
+			});
+		} else if (results.length) {
+			toast.success(`Deleted ${results.length} torrents`, {
+				id: progressToast,
+				...libraryToastOptions,
+			});
+		} else {
+			toast.dismiss(progressToast);
 		}
 	}
 
@@ -801,17 +899,51 @@ function TorrentsPage() {
 				);
 			}
 		});
-		const [results, errors] = await runConcurrentFunctions(toReinsertAndDelete, 4, 0);
-		if (errors.length) {
-			toast.error(`Error with merging ${errors.length} torrents`, libraryToastOptions);
+		if (toReinsertAndDelete.length === 0) {
+			toast('No torrents to merge', libraryToastOptions);
+			return;
 		}
-		if (results.length) {
+
+		const progressToast = toast.loading(
+			`Merging 0/${toReinsertAndDelete.length} operations...`,
+			libraryToastOptions
+		);
+
+		const [results, errors] = await runConcurrentFunctions(
+			toReinsertAndDelete,
+			4,
+			0,
+			(completed, total, errorCount) => {
+				const message =
+					errorCount > 0
+						? `Merging ${completed}/${total} operations (${errorCount} errors)...`
+						: `Merging ${completed}/${total} operations...`;
+				toast.loading(message, { id: progressToast });
+			}
+		);
+
+		// Update the progress toast to show final result
+		if (errors.length && results.length) {
+			toast.error(`Merged ${results.length} torrents, failed ${errors.length} operations`, {
+				id: progressToast,
+				...libraryToastOptions,
+			});
 			await triggerFetchLatestRDTorrents(Math.ceil(results.length * 1.1));
 			await triggerFetchLatestADTorrents();
-			toast.success(`Merged ${results.length} torrents`, libraryToastOptions);
-		}
-		if (!errors.length && !results.length) {
-			toast('No torrents to merge', libraryToastOptions);
+		} else if (errors.length) {
+			toast.error(`Failed to merge ${errors.length} torrents`, {
+				id: progressToast,
+				...libraryToastOptions,
+			});
+		} else if (results.length) {
+			toast.success(`Merged ${results.length} torrents`, {
+				id: progressToast,
+				...libraryToastOptions,
+			});
+			await triggerFetchLatestRDTorrents(Math.ceil(results.length * 1.1));
+			await triggerFetchLatestADTorrents();
+		} else {
+			toast.dismiss(progressToast);
 		}
 	}
 
@@ -886,8 +1018,16 @@ function TorrentsPage() {
 					const [results, errors] = await runConcurrentFunctions(
 						toAdd,
 						concurrencyCount,
-						0
+						0,
+						(completed, total, errorCount) => {
+							const message =
+								errorCount > 0
+									? `Restoring ${completed}/${total} downloads (${errorCount} errors)...`
+									: `Restoring ${completed}/${total} downloads...`;
+							toast.loading(message, { id: 'restore-progress' });
+						}
 					);
+					toast.dismiss('restore-progress');
 					if (results.length) {
 						await triggerFetchLatestRDTorrents(Math.ceil(results.length * 1.1));
 						await triggerFetchLatestADTorrents();
