@@ -309,8 +309,8 @@ export const SettingsSection = () => {
 								onChange={handleAvailabilityCheckLimitChange}
 							/>
 							<span className="text-xs text-gray-400">
-								Maximum torrents to check when using "Check Available" button (0 =
-								no limit)
+								Maximum torrents to check when using &quot;Check Available&quot;
+								button (0 = no limit)
 							</span>
 						</div>
 					</div>
