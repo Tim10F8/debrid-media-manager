@@ -431,7 +431,7 @@ const MovieSearch: FunctionComponent = () => {
 		let torrentsToCheck = nonAvailableResults;
 		if (availabilityCheckLimit > 0 && nonAvailableResults.length > availabilityCheckLimit) {
 			torrentsToCheck = nonAvailableResults.slice(0, availabilityCheckLimit);
-			toast.info(
+			toast(
 				`Checking first ${availabilityCheckLimit} torrents out of ${nonAvailableResults.length} (limit set in settings)`,
 				{ duration: 4000 }
 			);
