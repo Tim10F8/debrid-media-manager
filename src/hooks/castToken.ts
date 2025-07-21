@@ -44,8 +44,11 @@ export function useCastToken() {
 								`Migration complete! ${migrationData.migratedCasts} casted items preserved.`
 							);
 						} else if (migrationData.totalCasts > 0) {
-							toast.warning(
-								`Migration complete, but only links with downloads could be preserved.`
+							toast(
+								`Migration complete, but only links with downloads could be preserved.`,
+								{
+									icon: '⚠️',
+								}
 							);
 						}
 					} catch (error) {
