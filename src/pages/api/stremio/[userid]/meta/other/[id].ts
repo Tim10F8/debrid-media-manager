@@ -1,5 +1,6 @@
 import { getToken } from '@/services/realDebrid';
 import { Repository } from '@/services/repository';
+import { isLegacyToken } from '@/utils/castApiHelpers';
 import { getDMMTorrent } from '@/utils/castCatalogHelper';
 import { NextApiRequest, NextApiResponse } from 'next';
 
@@ -19,6 +20,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	if (req.method === 'OPTIONS') {
 		res.setHeader('access-control-allow-origin', '*');
 		return res.status(200).end();
+	}
+
+	// Check for legacy 5-character token
+	if (isLegacyToken(userid)) {
+		res.setHeader('access-control-allow-origin', '*');
+		res.status(200).json({
+			meta: {
+				id: id,
+				type: 'other',
+				name: '⚠️ DMM Cast Update Required',
+				description:
+					'Your DMM Cast addon needs to be reinstalled for improved security.\n\nPlease visit https://debridmediamanager.com/stremio to get your new install link.\n\nThis update provides better security with longer tokens.',
+				poster: 'https://static.debridmediamanager.com/dmmcast.png',
+				background: 'https://static.debridmediamanager.com/background.png',
+			},
+		});
+		return;
 	}
 
 	const torrentID = id.replaceAll(/^dmm:/g, '').replaceAll(/\.json$/g, '');

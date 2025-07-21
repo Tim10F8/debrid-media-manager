@@ -43,6 +43,39 @@ export const generateUserId = async (token: string): Promise<string> => {
 			throw new Error('Invalid username');
 		}
 
+		// Use environment variable for salt, with a secure fallback
+		const salt =
+			process.env.DMMCAST_SALT ??
+			'piyeJUVdDoLLf3q&i9NRkrfVmTDg$&KYZ5CEJmswjv5yetjwsyxrMHqdNuvw^$a7mZh^bgqg8K4kMKptFFEp4*RcQ!&Dmd9uvnqAF&zRqts4YwRzTqjGErp9j4wHVVTw';
+
+		// Use SHA-256 with HMAC for better security
+		const hmac = crypto.createHmac('sha256', salt).update(username).digest('base64url'); // base64url is URL-safe (no +, /, or =)
+
+		// Return 12 characters for much better collision resistance
+		// With 62^12 possible values, collision probability is effectively 0 for millions of users
+		return hmac.slice(0, 12);
+	} catch (error) {
+		throw new Error('Failed to generate user ID');
+	}
+};
+
+// Legacy 5-character token generator for backward compatibility during migration
+export const generateLegacyUserId = async (token: string): Promise<string> => {
+	try {
+		const headers = {
+			Authorization: `Bearer ${token}`,
+		};
+
+		const response = await axios.get<UserResponse>(
+			'https://app.real-debrid.com/rest/1.0/user',
+			{ headers }
+		);
+
+		const username = response.data.username;
+		if (!username) {
+			throw new Error('Invalid username');
+		}
+
 		const salt =
 			process.env.DMMCAST_SALT ??
 			'piyeJUVdDoLLf3q&i9NRkrfVmTDg$&KYZ5CEJmswjv5yetjwsyxrMHqdNuvw^$a7mZh^bgqg8K4kMKptFFEp4*RcQ!&Dmd9uvnqAF&zRqts4YwRzTqjGErp9j4wHVVTw';
@@ -59,6 +92,12 @@ export const generateUserId = async (token: string): Promise<string> => {
 	} catch (error) {
 		throw new Error('Failed to generate user ID');
 	}
+};
+
+export const isLegacyToken = (token: string): boolean => {
+	// Legacy tokens are exactly 5 characters long
+	// New tokens are 12 characters long
+	return token.length === 5;
 };
 
 export const handleApiError = (error: any, res: NextApiResponse, customMessage?: string) => {

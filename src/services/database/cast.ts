@@ -261,4 +261,34 @@ export class CastService extends DatabaseClient {
 			throw new Error(`Failed to delete casted link: ${error.message}`);
 		}
 	}
+
+	public async getAllUserCasts(userId: string): Promise<
+		{
+			imdbId: string;
+			hash: string;
+			url: string;
+			link: string | null;
+			size: number;
+		}[]
+	> {
+		const casts = await this.prisma.cast.findMany({
+			where: {
+				userId: userId,
+			},
+			select: {
+				imdbId: true,
+				hash: true,
+				url: true,
+				link: true,
+				size: true,
+			},
+		});
+		return casts.map((cast) => ({
+			imdbId: cast.imdbId,
+			hash: cast.hash,
+			url: cast.url,
+			link: cast.link,
+			size: Number(cast.size),
+		}));
+	}
 }

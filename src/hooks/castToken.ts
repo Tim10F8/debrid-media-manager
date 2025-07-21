@@ -1,4 +1,5 @@
 import { saveCastProfile } from '@/utils/castApiClient';
+import { isLegacyToken } from '@/utils/castApiHelpers';
 import { useEffect } from 'react';
 import toast from 'react-hot-toast';
 import useLocalStorage from './localStorage';
@@ -13,6 +14,13 @@ export function useCastToken() {
 	useEffect(() => {
 		// Only run if we don't have a token but have all required credentials
 		if (!clientId || !clientSecret || !refreshToken || !accessToken) return;
+
+		// If we have a legacy 5-character token, clear it to trigger regeneration
+		if (dmmCastToken && isLegacyToken(dmmCastToken)) {
+			setDmmCastToken(''); // Clear the legacy token
+			return; // Let the next render cycle handle regeneration
+		}
+
 		if (dmmCastToken) return;
 
 		const fetchToken = async () => {
@@ -22,6 +30,28 @@ export function useCastToken() {
 				if (data.status !== 'error') {
 					saveCastProfile(clientId, clientSecret, refreshToken);
 					setDmmCastToken(data.id);
+
+					// Trigger migration for existing users
+					try {
+						const migrationRes = await fetch('/api/stremio/migrate', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ token: accessToken }),
+						});
+						const migrationData = await migrationRes.json();
+						if (migrationData.migratedCasts > 0) {
+							toast.success(
+								`Migration complete! ${migrationData.migratedCasts} casted items preserved.`
+							);
+						} else if (migrationData.totalCasts > 0) {
+							toast.warning(
+								`Migration complete, but only links with downloads could be preserved.`
+							);
+						}
+					} catch (error) {
+						// Migration is optional, don't fail if it errors
+						console.error('Migration error:', error);
+					}
 				}
 			} catch (error) {
 				toast.error('failed to fetch DMM Cast token');

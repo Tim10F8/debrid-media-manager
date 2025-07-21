@@ -1,5 +1,6 @@
 import { getToken } from '@/services/realDebrid';
 import { Repository } from '@/services/repository';
+import { isLegacyToken } from '@/utils/castApiHelpers';
 import { NextApiRequest, NextApiResponse } from 'next';
 
 const db = new Repository();
@@ -20,6 +21,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	if (req.method === 'OPTIONS') {
 		res.setHeader('access-control-allow-origin', '*');
 		return res.status(200).end();
+	}
+
+	// Check for legacy 5-character token
+	if (isLegacyToken(userid)) {
+		res.setHeader('access-control-allow-origin', '*');
+		res.status(200).json({
+			streams: [
+				{
+					name: '⚠️ Update Required',
+					title: 'DMM Cast security update required\n\n1. Visit https://debridmediamanager.com/stremio\n2. Reinstall the addon\n3. Your casted content will be preserved',
+					externalUrl: 'https://debridmediamanager.com/stremio',
+				},
+			],
+			cacheMaxAge: 0,
+		});
+		return;
 	}
 
 	let profile: {

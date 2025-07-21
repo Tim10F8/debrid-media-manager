@@ -224,6 +224,10 @@ export class Repository {
 		return this.castService.deleteCastedLink(imdbId, userId, hash);
 	}
 
+	public getAllUserCasts(userId: string) {
+		return this.castService.getAllUserCasts(userId);
+	}
+
 	// Report Service Methods
 	public reportContent(
 		hash: string,

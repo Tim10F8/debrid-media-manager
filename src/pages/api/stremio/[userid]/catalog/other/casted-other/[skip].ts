@@ -1,3 +1,4 @@
+import { isLegacyToken } from '@/utils/castApiHelpers';
 import { getDMMLibrary, PAGE_SIZE } from '@/utils/castCatalogHelper';
 import { NextApiRequest, NextApiResponse } from 'next';
 
@@ -9,6 +10,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	const skipNum = skip.replaceAll(/^skip=/g, '').replaceAll(/\.json$/g, '');
 	const page = Math.floor(Number(skipNum) / PAGE_SIZE) + 1;
+
+	// Check for legacy 5-character token
+	if (isLegacyToken(userid as string)) {
+		res.setHeader('access-control-allow-origin', '*');
+		return res.status(200).json({
+			metas: [
+				{
+					id: 'dmm:update-required',
+					type: 'other',
+					name: '⚠️ DMM Cast Update Required',
+					description:
+						'Please reinstall the addon from https://debridmediamanager.com/stremio\n\nYour casted content will be preserved.',
+					poster: 'https://static.debridmediamanager.com/dmmcast.png',
+				},
+			],
+		});
+	}
 
 	const result = await getDMMLibrary(userid as string, page);
 
