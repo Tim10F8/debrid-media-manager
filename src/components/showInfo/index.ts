@@ -28,6 +28,7 @@ declare global {
 		selectAllVideos: () => void;
 		unselectAll: () => void;
 		resetSelection?: () => void;
+		updateSelectionCount?: () => void;
 		triggerFetchLatestRDTorrents: (limit?: number) => Promise<void>;
 	}
 }
@@ -180,28 +181,42 @@ export const showInfoForRD = async (
 						const fileId = checkbox.dataset.fileId;
 						checkbox.checked = fileId ? initialSelection[fileId] : false;
 					});
+					window.updateSelectionCount();
+				};
+
+				window.updateSelectionCount = () => {
+					const checkboxes =
+						document.querySelectorAll<HTMLInputElement>('.file-selector');
+					const checkedCount = Array.from(checkboxes).filter((cb) => cb.checked).length;
+					const totalCount = checkboxes.length;
+					const countElement = document.getElementById('selection-count');
+					if (countElement) {
+						countElement.textContent = `${checkedCount}/${totalCount} files selected`;
+					}
 				};
 
 				return `
-				<div class="m-2 flex gap-2 justify-center">
-					<button
-						class="px-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
-						onclick="window.selectAllVideos()"
-					>
-						🎥 Select All Videos
-					</button>
-					<button
-						class="px-2 bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
-						onclick="window.unselectAll()"
-					>
-						❌ Unselect All
-					</button>
-					<button
-						class="px-2 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
-						onclick="window.resetSelection()"
-					>
-						↩️ Reset Selection
-					</button>
+				<div class="m-2 text-center">
+					<div id="selection-count" class="text-sm text-cyan-400 mb-2">${info.files.filter((f: ApiTorrentFile) => f.selected === 1).length}/${info.files.length} files selected</div>
+					<div class="flex gap-2 justify-center">
+						<button
+							class="px-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
+							onclick="window.selectAllVideos(); window.updateSelectionCount();"
+						>
+							🎥 Select All Videos
+						</button>
+						<button
+							class="px-2 bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
+							onclick="window.unselectAll(); window.updateSelectionCount();"
+						>
+							❌ Unselect All
+						</button>
+						<button
+							class="px-2 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
+							onclick="window.resetSelection()"
+						>
+							↩️ Reset Selection
+						</button>
 					<button
 						class="px-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
 						onclick="(async () => {
@@ -223,6 +238,7 @@ export const showInfoForRD = async (
 					>
 						💾 Save File Selection
 					</button>
+					</div>
 				</div>
 			`;
 			})()

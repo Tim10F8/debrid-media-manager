@@ -45,6 +45,7 @@ export const renderFileRow = (file: FileRowProps, showCheckbox: boolean = false)
                 data-file-id="${file.id}"
                 data-file-path="${file.path}"
                 ${file.isSelected ? 'checked' : ''}
+                onchange="if (window.updateSelectionCount) window.updateSelectionCount();"
             />
         </td>
     `

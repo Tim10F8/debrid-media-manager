@@ -1193,6 +1193,11 @@ function TorrentsPage() {
 						totalBytes={totalBytes}
 						isLoading={rdSyncing || adSyncing}
 					/>
+					{selectedTorrents.size > 0 && (
+						<span className="ml-2 text-sm font-normal text-cyan-400">
+							({selectedTorrents.size}/{filteredList.length} selected)
+						</span>
+					)}
 				</h1>
 
 				<Link
