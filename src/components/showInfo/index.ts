@@ -181,7 +181,9 @@ export const showInfoForRD = async (
 						const fileId = checkbox.dataset.fileId;
 						checkbox.checked = fileId ? initialSelection[fileId] : false;
 					});
-					window.updateSelectionCount();
+					if (window.updateSelectionCount) {
+						window.updateSelectionCount();
+					}
 				};
 
 				window.updateSelectionCount = () => {
