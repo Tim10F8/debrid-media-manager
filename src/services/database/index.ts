@@ -5,6 +5,7 @@ import { DatabaseClient } from './client';
 import { ReportService } from './report';
 import { ScrapedService } from './scraped';
 import { SearchService } from './search';
+import { TrackerStatsService } from './trackerStats';
 
 export {
 	AnimeService,
@@ -14,4 +15,5 @@ export {
 	ReportService,
 	ScrapedService,
 	SearchService,
+	TrackerStatsService,
 };

@@ -35,6 +35,8 @@ export const SettingsSection = () => {
 	const availabilityCheckLimit =
 		window.localStorage.getItem('settings:availabilityCheckLimit') ||
 		defaultAvailabilityCheckLimit;
+	const includeTrackerStats =
+		window.localStorage.getItem('settings:includeTrackerStats') === 'true';
 
 	useEffect(() => {
 		// Check if protocol handler is registered
@@ -88,6 +90,10 @@ export const SettingsSection = () => {
 		if (value === '' || /^\d+$/.test(value)) {
 			window.localStorage.setItem('settings:availabilityCheckLimit', value);
 		}
+	};
+
+	const handleIncludeTrackerStatsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		window.localStorage.setItem('settings:includeTrackerStats', String(e.target.checked));
 	};
 
 	const handleHideInstructions = () => {
@@ -311,6 +317,26 @@ export const SettingsSection = () => {
 							<span className="text-xs text-gray-400">
 								Maximum torrents to check when using &quot;Check Available&quot;
 								button (0 = no limit)
+							</span>
+						</div>
+
+						<div className="flex flex-col gap-1">
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-include-tracker-stats"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									defaultChecked={includeTrackerStats}
+									onChange={handleIncludeTrackerStatsChange}
+								/>
+								<label className="font-semibold">
+									Include tracker stats in availability check
+								</label>
+							</div>
+							<span className="text-xs text-gray-400">
+								When enabled, also fetches seeders, leechers, and download counts
+								from trackers during availability checks. This provides more
+								detailed information but may slow down the check process.
 							</span>
 						</div>
 					</div>

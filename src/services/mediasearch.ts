@@ -25,6 +25,13 @@ export type SearchResult = {
 	biggestFileSize: number;
 	videoCount: number;
 	imdbId?: string;
+	// tracker stats (optional)
+	trackerStats?: {
+		seeders: number;
+		leechers: number;
+		downloads: number;
+		hasActivity: boolean;
+	};
 };
 
 export interface Hashlist {

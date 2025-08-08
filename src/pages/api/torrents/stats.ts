@@ -1,3 +1,4 @@
+import { TrackerStatsService } from '@/services/database/trackerStats';
 import { torrentScraper } from '@/utils/torrentScraper';
 import { NextApiHandler } from 'next';
 
@@ -42,6 +43,22 @@ const handler: NextApiHandler = async (req, res) => {
 
 		// Scrape torrent stats
 		const stats = await torrentScraper.scrapeTorrent(hash);
+
+		// Store the stats in the database for future use
+		try {
+			const trackerStatsService = new TrackerStatsService();
+			await trackerStatsService.upsertTrackerStats({
+				hash: hash.toLowerCase(),
+				seeders: stats.seeders,
+				leechers: stats.leechers,
+				downloads: stats.downloads,
+				successfulTrackers: stats.successfulTrackers,
+				totalTrackers: stats.totalTrackers,
+			});
+		} catch (dbError) {
+			console.error('Failed to store tracker stats in database:', dbError);
+			// Continue with the response even if database storage fails
+		}
 
 		// Return the stats
 		return res.status(200).json({

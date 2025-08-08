@@ -252,16 +252,31 @@ const MovieSearchResults = ({
 										<span className="ml-2">
 											Total: {fileSize(r.fileSize)} GB; Biggest:{' '}
 											{fileSize(r.biggestFileSize)} GB
+											{r.trackerStats?.hasActivity && !r.rdAvailable && (
+												<span className="text-green-400">
+													{' '}
+													• Has seeders
+												</span>
+											)}
 										</span>
 									) : (
 										<span className="ml-2">
 											Total: {fileSize(r.fileSize)} GB
+											{r.trackerStats?.hasActivity && !r.rdAvailable && (
+												<span className="text-green-400">
+													{' '}
+													• Has seeders
+												</span>
+											)}
 										</span>
 									)}
 								</div>
 							) : (
 								<div className="text-xs text-gray-300">
 									Total: {fileSize(r.fileSize)} GB
+									{r.trackerStats?.hasActivity && !r.rdAvailable && (
+										<span className="text-green-400"> • Has seeders</span>
+									)}
 								</div>
 							)}
 

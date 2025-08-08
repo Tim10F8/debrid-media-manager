@@ -30,6 +30,7 @@ import { isVideo } from '@/utils/selectable';
 import { defaultMovieSize, defaultPlayer } from '@/utils/settings';
 import { castToastOptions, searchToastOptions } from '@/utils/toastOptions';
 import { generateTokenAndHash } from '@/utils/token';
+import { getCachedTrackerStats, shouldIncludeTrackerStats } from '@/utils/trackerStats';
 import { withAuth } from '@/utils/withAuth';
 import axios from 'axios';
 import getConfig from 'next/config';
@@ -144,6 +145,93 @@ const MovieSearch: FunctionComponent = () => {
 			isMounted.current = false;
 		};
 	}, []);
+
+	// Fetch tracker stats for uncached torrents after availability check
+	useEffect(() => {
+		async function fetchTrackerStatsForUncached() {
+			if (!shouldIncludeTrackerStats() || !isMounted.current || searchState !== 'loaded') {
+				return;
+			}
+
+			// Get uncached torrents that don't have tracker stats yet
+			const uncachedResults = searchResults.filter(
+				(r) => !r.rdAvailable && !r.adAvailable && !r.tbAvailable && !r.trackerStats
+			);
+
+			if (uncachedResults.length === 0) {
+				return;
+			}
+
+			const toastId = toast.loading(
+				`Checking tracker stats for ${uncachedResults.length} uncached torrents...`
+			);
+
+			try {
+				// Fetch tracker stats in batches to avoid overwhelming the API
+				const batchSize = 5;
+				let processedCount = 0;
+
+				for (let i = 0; i < uncachedResults.length; i += batchSize) {
+					const batch = uncachedResults.slice(i, i + batchSize);
+
+					const statsPromises = batch.map(async (result) => {
+						try {
+							const stats = await getCachedTrackerStats(result.hash, 24);
+							return { hash: result.hash, stats };
+						} catch (error) {
+							console.error(`Failed to get tracker stats for ${result.hash}:`, error);
+							return { hash: result.hash, stats: null };
+						}
+					});
+
+					const batchResults = await Promise.all(statsPromises);
+					processedCount += batch.length;
+
+					// Update search results with tracker stats
+					if (isMounted.current) {
+						setSearchResults((prevResults) => {
+							return prevResults.map((r) => {
+								const statsResult = batchResults.find((sr) => sr.hash === r.hash);
+								if (statsResult && statsResult.stats) {
+									return {
+										...r,
+										trackerStats: {
+											seeders: statsResult.stats.seeders,
+											leechers: statsResult.stats.leechers,
+											downloads: statsResult.stats.downloads,
+											hasActivity:
+												statsResult.stats.seeders >= 1 &&
+												statsResult.stats.leechers +
+													statsResult.stats.downloads >=
+													1,
+										},
+									};
+								}
+								return r;
+							});
+						});
+
+						// Update toast with progress
+						if (processedCount < uncachedResults.length) {
+							toast.loading(
+								`Checking tracker stats... (${processedCount}/${uncachedResults.length})`,
+								{ id: toastId }
+							);
+						}
+					}
+				}
+
+				toast.success(`Tracker stats checked for ${uncachedResults.length} torrents`, {
+					id: toastId,
+				});
+			} catch (error) {
+				console.error('Error fetching tracker stats:', error);
+				toast.error('Failed to fetch some tracker stats', { id: toastId });
+			}
+		}
+
+		fetchTrackerStatsForUncached();
+	}, [searchResults, searchState]);
 
 	async function fetchData(imdbId: string, page: number = 0) {
 		const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
@@ -578,6 +666,44 @@ const MovieSearch: FunctionComponent = () => {
 			} else {
 				await addRd(result.hash, true); // Pass flag to indicate this is a check
 				await deleteRd(result.hash);
+			}
+
+			// Check if user wants tracker stats and torrent is not cached
+			if (shouldIncludeTrackerStats() && !result.rdAvailable) {
+				toast.loading('Checking tracker stats...', { id: toastId });
+
+				try {
+					const trackerStats = await getCachedTrackerStats(result.hash, 24);
+					if (trackerStats) {
+						// Update the search result with tracker stats
+						const updatedResults = searchResults.map((r) => {
+							if (r.hash === result.hash) {
+								return {
+									...r,
+									trackerStats: {
+										seeders: trackerStats.seeders,
+										leechers: trackerStats.leechers,
+										downloads: trackerStats.downloads,
+										hasActivity:
+											trackerStats.seeders >= 1 &&
+											trackerStats.leechers + trackerStats.downloads >= 1,
+									},
+								};
+							}
+							return r;
+						});
+						setSearchResults(updatedResults);
+						setFilteredResults(
+							updatedResults.filter((r) =>
+								onlyShowCached
+									? r.rdAvailable || r.adAvailable || r.tbAvailable
+									: true
+							)
+						);
+					}
+				} catch (error) {
+					console.error('Failed to get tracker stats:', error);
+				}
 			}
 
 			toast.success('Availability check complete', { id: toastId });

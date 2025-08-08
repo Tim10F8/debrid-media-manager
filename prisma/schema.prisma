@@ -147,3 +147,15 @@ model Report {
   @@index([imdbId])
   @@index([hash])
 }
+
+model TrackerStats {
+  hash               String   @id
+  seeders            Int      @default(0)
+  leechers           Int      @default(0)
+  downloads          Int      @default(0)
+  successfulTrackers Int      @default(0)
+  totalTrackers      Int      @default(0)
+  lastChecked        DateTime @default(now())
+
+  @@index([lastChecked])
+}

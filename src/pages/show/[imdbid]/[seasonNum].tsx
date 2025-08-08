@@ -27,6 +27,7 @@ import { isVideo } from '@/utils/selectable';
 import { defaultEpisodeSize, defaultPlayer } from '@/utils/settings';
 import { castToastOptions, searchToastOptions } from '@/utils/toastOptions';
 import { generateTokenAndHash } from '@/utils/token';
+import { getCachedTrackerStats, shouldIncludeTrackerStats } from '@/utils/trackerStats';
 import { withAuth } from '@/utils/withAuth';
 import axios, { AxiosError } from 'axios';
 import Head from 'next/head';
@@ -261,6 +262,71 @@ const TvSearch: FunctionComponent = () => {
 		setFilteredResults(filteredResults);
 	}, [query, searchResults]);
 
+	// Automatically fetch tracker stats for uncached torrents on page load
+	useEffect(() => {
+		async function fetchTrackerStatsForUncached() {
+			if (!shouldIncludeTrackerStats() || !isMounted.current || searchState !== 'loaded') {
+				return;
+			}
+
+			// Find uncached results that don't have tracker stats yet
+			const uncachedResults = searchResults.filter(
+				(r) => !r.rdAvailable && !r.adAvailable && !r.tbAvailable && !r.trackerStats
+			);
+
+			if (uncachedResults.length === 0) {
+				return;
+			}
+
+			// Process in batches of 10
+			const batchSize = 10;
+			for (let i = 0; i < uncachedResults.length; i += batchSize) {
+				if (!isMounted.current) break;
+
+				const batch = uncachedResults.slice(i, i + batchSize);
+				const promises = batch.map(async (result) => {
+					try {
+						const trackerStats = await getCachedTrackerStats(result.hash, 24);
+						return { hash: result.hash, trackerStats };
+					} catch (error) {
+						console.error(`Failed to get tracker stats for ${result.hash}:`, error);
+						return { hash: result.hash, trackerStats: null };
+					}
+				});
+
+				const batchResults = await Promise.all(promises);
+
+				if (!isMounted.current) break;
+
+				// Update search results with tracker stats
+				setSearchResults((prev) => {
+					const updated = [...prev];
+					batchResults.forEach(({ hash, trackerStats }) => {
+						if (trackerStats) {
+							const index = updated.findIndex((r) => r.hash === hash);
+							if (index !== -1) {
+								updated[index] = {
+									...updated[index],
+									trackerStats: {
+										seeders: trackerStats.seeders,
+										leechers: trackerStats.leechers,
+										downloads: trackerStats.downloads,
+										hasActivity:
+											trackerStats.seeders >= 1 &&
+											trackerStats.leechers + trackerStats.downloads >= 1,
+									},
+								};
+							}
+						}
+					});
+					return updated;
+				});
+			}
+		}
+
+		fetchTrackerStatsForUncached();
+	}, [searchResults, searchState]);
+
 	async function fetchHashAndProgress(hash?: string) {
 		const torrents = await torrentDB.all();
 		const records: Record<string, number> = {};
@@ -415,6 +481,42 @@ const TvSearch: FunctionComponent = () => {
 			} else {
 				await addRd(result.hash, true); // Pass flag to indicate this is a check
 				await deleteRd(result.hash);
+			}
+
+			// Check if user wants tracker stats and torrent is not cached
+			if (shouldIncludeTrackerStats() && !result.rdAvailable) {
+				toast.loading('Checking tracker stats...', { id: toastId });
+
+				try {
+					const trackerStats = await getCachedTrackerStats(result.hash, 24);
+					if (trackerStats) {
+						// Update the search result with tracker stats
+						const updatedResults = searchResults.map((r) => {
+							if (r.hash === result.hash) {
+								return {
+									...r,
+									trackerStats: {
+										seeders: trackerStats.seeders,
+										leechers: trackerStats.leechers,
+										downloads: trackerStats.downloads,
+										hasActivity:
+											trackerStats.seeders >= 1 &&
+											trackerStats.leechers + trackerStats.downloads >= 1,
+									},
+								};
+							}
+							return r;
+						});
+						setSearchResults(updatedResults);
+						setFilteredResults(
+							updatedResults.filter((r) =>
+								onlyShowCached ? r.rdAvailable || r.adAvailable : true
+							)
+						);
+					}
+				} catch (error) {
+					console.error('Failed to get tracker stats:', error);
+				}
 			}
 
 			toast.success('Availability check complete', { id: toastId });
