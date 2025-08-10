@@ -27,7 +27,11 @@ import { isVideo } from '@/utils/selectable';
 import { defaultEpisodeSize, defaultPlayer } from '@/utils/settings';
 import { castToastOptions, searchToastOptions } from '@/utils/toastOptions';
 import { generateTokenAndHash } from '@/utils/token';
-import { getCachedTrackerStats, shouldIncludeTrackerStats } from '@/utils/trackerStats';
+import {
+	getCachedTrackerStats,
+	getMultipleTrackerStats,
+	shouldIncludeTrackerStats,
+} from '@/utils/trackerStats';
 import { withAuth } from '@/utils/withAuth';
 import axios, { AxiosError } from 'axios';
 import Head from 'next/head';
@@ -52,6 +56,7 @@ const torrentDB = new UserTorrentDB();
 
 const TvSearch: FunctionComponent = () => {
 	const isMounted = useRef(true);
+	const hasLoadedTrackerStats = useRef(false);
 	const player = window.localStorage.getItem('settings:player') || defaultPlayer;
 	const episodeMaxSize =
 		window.localStorage.getItem('settings:episodeMaxSize') || defaultEpisodeSize;
@@ -262,13 +267,9 @@ const TvSearch: FunctionComponent = () => {
 		setFilteredResults(filteredResults);
 	}, [query, searchResults]);
 
-	// Automatically fetch tracker stats for uncached torrents on page load
+	// Load cached tracker stats from database for uncached torrents
 	useEffect(() => {
-		async function fetchTrackerStatsForUncached() {
-			if (!shouldIncludeTrackerStats() || !isMounted.current || searchState !== 'loaded') {
-				return;
-			}
-
+		async function loadCachedTrackerStats() {
 			// Find uncached results that don't have tracker stats yet
 			const uncachedResults = searchResults.filter(
 				(r) => !r.rdAvailable && !r.adAvailable && !r.tbAvailable && !r.trackerStats
@@ -278,54 +279,56 @@ const TvSearch: FunctionComponent = () => {
 				return;
 			}
 
-			// Process in batches of 10
-			const batchSize = 10;
-			for (let i = 0; i < uncachedResults.length; i += batchSize) {
-				if (!isMounted.current) break;
+			try {
+				// Bulk fetch existing tracker stats from database (no new scraping)
+				const hashes = uncachedResults.map((r) => r.hash);
+				const trackerStatsArray = await getMultipleTrackerStats(hashes);
 
-				const batch = uncachedResults.slice(i, i + batchSize);
-				const promises = batch.map(async (result) => {
-					try {
-						const trackerStats = await getCachedTrackerStats(result.hash, 24);
-						return { hash: result.hash, trackerStats };
-					} catch (error) {
-						console.error(`Failed to get tracker stats for ${result.hash}:`, error);
-						return { hash: result.hash, trackerStats: null };
-					}
-				});
+				if (!isMounted.current) return;
 
-				const batchResults = await Promise.all(promises);
-
-				if (!isMounted.current) break;
-
-				// Update search results with tracker stats
-				setSearchResults((prev) => {
-					const updated = [...prev];
-					batchResults.forEach(({ hash, trackerStats }) => {
-						if (trackerStats) {
-							const index = updated.findIndex((r) => r.hash === hash);
-							if (index !== -1) {
-								updated[index] = {
-									...updated[index],
+				// Update search results with cached tracker stats
+				if (trackerStatsArray.length > 0) {
+					setSearchResults((prev) => {
+						return prev.map((r) => {
+							const stats = trackerStatsArray.find((s) => s.hash === r.hash);
+							if (stats) {
+								return {
+									...r,
 									trackerStats: {
-										seeders: trackerStats.seeders,
-										leechers: trackerStats.leechers,
-										downloads: trackerStats.downloads,
+										seeders: stats.seeders,
+										leechers: stats.leechers,
+										downloads: stats.downloads,
 										hasActivity:
-											trackerStats.seeders >= 1 &&
-											trackerStats.leechers + trackerStats.downloads >= 1,
+											stats.seeders >= 1 &&
+											stats.leechers + stats.downloads >= 1,
 									},
 								};
 							}
-						}
+							return r;
+						});
 					});
-					return updated;
-				});
+				}
+				// Mark that we've loaded tracker stats
+				hasLoadedTrackerStats.current = true;
+			} catch (error) {
+				console.error('Error loading cached tracker stats:', error);
 			}
 		}
 
-		fetchTrackerStatsForUncached();
-	}, [searchResults, searchState]);
+		// Only run once when search is loaded and we haven't loaded stats yet
+		if (
+			searchState === 'loaded' &&
+			searchResults.length > 0 &&
+			!hasLoadedTrackerStats.current
+		) {
+			loadCachedTrackerStats();
+		}
+	}, [searchState, searchResults.length]); // Depend on searchState and length only
+
+	// Reset the tracker stats flag when season changes
+	useEffect(() => {
+		hasLoadedTrackerStats.current = false;
+	}, [imdbid, seasonNum]);
 
 	async function fetchHashAndProgress(hash?: string) {
 		const torrents = await torrentDB.all();
@@ -483,12 +486,19 @@ const TvSearch: FunctionComponent = () => {
 				await deleteRd(result.hash);
 			}
 
-			// Check if user wants tracker stats and torrent is not cached
+			// Check if user wants tracker stats during availability check
 			if (shouldIncludeTrackerStats() && !result.rdAvailable) {
 				toast.loading('Checking tracker stats...', { id: toastId });
 
 				try {
-					const trackerStats = await getCachedTrackerStats(result.hash, 24);
+					// For single torrent checks, force refresh if it was previously dead
+					// This ensures we always check if dead torrents have come back to life
+					const currentStats = result.trackerStats;
+					const forceRefresh = currentStats && currentStats.seeders === 0;
+
+					// Use cached stats if fresh, otherwise scrape new ones
+					// Dead torrents have 1-hour cache, live torrents have 24-hour cache
+					const trackerStats = await getCachedTrackerStats(result.hash, 24, forceRefresh);
 					if (trackerStats) {
 						// Update the search result with tracker stats
 						const updatedResults = searchResults.map((r) => {
@@ -607,6 +617,28 @@ const TvSearch: FunctionComponent = () => {
 				) {
 					realtimeAvailableCount++;
 				}
+
+				// Check if user wants tracker stats during availability check
+				if (shouldIncludeTrackerStats() && !result.rdAvailable) {
+					try {
+						// For bulk checks, use 72-hour cache to reduce load
+						// Only force refresh if stats don't exist or are older than 72 hours
+						const trackerStats = await getCachedTrackerStats(result.hash, 72, false);
+						if (trackerStats) {
+							// Update the search result with tracker stats
+							result.trackerStats = {
+								seeders: trackerStats.seeders,
+								leechers: trackerStats.leechers,
+								downloads: trackerStats.downloads,
+								hasActivity:
+									trackerStats.seeders >= 1 &&
+									trackerStats.leechers + trackerStats.downloads >= 1,
+							};
+						}
+					} catch (error) {
+						console.error(`Failed to get tracker stats for ${result.title}:`, error);
+					}
+				}
 			} catch (error) {
 				console.error(`Failed to process ${result.title}:`, error);
 				throw error;
@@ -651,6 +683,22 @@ const TvSearch: FunctionComponent = () => {
 					setSearchResults,
 					sortByMedian
 				);
+			}
+
+			// Update search results with tracker stats for succeeded items
+			if (succeeded.length > 0 && isMounted.current) {
+				setSearchResults((prevResults) => {
+					return prevResults.map((r) => {
+						const processedResult = succeeded.find((s) => s.item.hash === r.hash);
+						if (processedResult && processedResult.item.trackerStats) {
+							return {
+								...r,
+								trackerStats: processedResult.item.trackerStats,
+							};
+						}
+						return r;
+					});
+				});
 			}
 
 			if (failed.length > 0) {

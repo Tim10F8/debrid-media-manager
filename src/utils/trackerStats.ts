@@ -139,27 +139,33 @@ export function formatTrackerStats(stats: TrackerStatsResponse): string {
 	return `🌱 ${seeders} seeders • 📥 ${leechers} leechers • 📊 ${downloads} downloads • ✅ ${successRate}% trackers`;
 }
 
-// Helper function to get tracker stats with caching
+// Helper function to get tracker stats with caching (used only during availability checks)
 export async function getCachedTrackerStats(
 	hash: string,
-	maxAgeHours: number = 24
+	maxAgeHours: number = 24,
+	forceRefresh: boolean = false
 ): Promise<TrackerStatsResponse | null> {
 	try {
 		// First, try to get stored stats
 		const stored = await getTrackerStats(hash);
 
-		if (stored) {
+		if (stored && !forceRefresh) {
 			const lastChecked = new Date(stored.lastChecked);
 			const now = new Date();
 			const ageHours = (now.getTime() - lastChecked.getTime()) / (1000 * 60 * 60);
 
+			// For dead torrents (0 seeders), use shorter cache time (1 hour)
+			// This allows checking if dead torrents have come back to life
+			const effectiveMaxAge = stored.seeders === 0 ? 1 : maxAgeHours;
+
 			// If stats are fresh enough, return them
-			if (ageHours < maxAgeHours) {
+			if (ageHours < effectiveMaxAge) {
 				return stored;
 			}
 		}
 
-		// If no stored stats or they're stale, fetch fresh ones
+		// If no stored stats, they're stale, or force refresh is requested, fetch fresh ones
+		// This should only be called during availability checks when the setting is enabled
 		const fresh = await submitTrackerStats(hash);
 		return {
 			hash: fresh.hash,
