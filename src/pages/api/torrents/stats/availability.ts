@@ -51,9 +51,9 @@ const handler: NextApiHandler = async (req, res) => {
 		const now = new Date();
 		const cutoffTime = new Date(now.getTime() - maxAgeHours * 60 * 60 * 1000);
 
-		const available = [];
-		const stale = [];
-		const missing = [];
+		const available: any[] = [];
+		const stale: string[] = [];
+		const missing: string[] = [];
 
 		// Categorize each hash
 		for (const hash of hashes) {
