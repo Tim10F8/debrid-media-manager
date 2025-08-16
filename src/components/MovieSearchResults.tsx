@@ -254,7 +254,7 @@ const MovieSearchResults = ({
 											{fileSize(r.biggestFileSize)} GB
 											{r.trackerStats &&
 												!r.rdAvailable &&
-												(r.trackerStats.hasActivity ? (
+												(r.trackerStats.seeders > 0 ? (
 													<span className="text-green-400">
 														{' '}
 														• Has seeders
@@ -271,7 +271,7 @@ const MovieSearchResults = ({
 											Total: {fileSize(r.fileSize)} GB
 											{r.trackerStats &&
 												!r.rdAvailable &&
-												(r.trackerStats.hasActivity ? (
+												(r.trackerStats.seeders > 0 ? (
 													<span className="text-green-400">
 														{' '}
 														• Has seeders
@@ -290,7 +290,7 @@ const MovieSearchResults = ({
 									Total: {fileSize(r.fileSize)} GB
 									{r.trackerStats &&
 										!r.rdAvailable &&
-										(r.trackerStats.hasActivity ? (
+										(r.trackerStats.seeders > 0 ? (
 											<span className="text-green-400"> • Has seeders</span>
 										) : (
 											<span className="text-red-400"> • No seeders</span>

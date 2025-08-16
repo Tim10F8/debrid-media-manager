@@ -234,7 +234,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 												{fileSize(r.medianFileSize)} GB
 												{r.trackerStats &&
 													!r.rdAvailable &&
-													(r.trackerStats.hasActivity ? (
+													(r.trackerStats.seeders > 0 ? (
 														<span className="text-green-400">
 															{' '}
 															• Has seeders
