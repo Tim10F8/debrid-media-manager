@@ -1,7 +1,8 @@
-export interface ProcessResult<T> {
+export interface ProcessResult<T, R = void> {
 	item: T;
 	success: boolean;
 	error?: Error;
+	result?: R;
 }
 
 /**
@@ -12,15 +13,15 @@ export interface ProcessResult<T> {
  * @param onProgress Optional callback for progress updates
  * @returns Promise that resolves with results for all items
  */
-export async function processWithConcurrency<T>(
+export async function processWithConcurrency<T, R = void>(
 	items: T[],
-	processor: (item: T) => Promise<void>,
+	processor: (item: T) => Promise<R>,
 	concurrency: number,
 	onProgress?: (completed: number, total: number) => void
-): Promise<ProcessResult<T>[]> {
+): Promise<ProcessResult<T, R>[]> {
 	const queue = items.map((item, index) => ({ item, index }));
-	const results: ProcessResult<T>[] = new Array(items.length);
-	const inProgress = new Map<Promise<{ result: ProcessResult<T>; index: number }>, number>();
+	const results: ProcessResult<T, R>[] = new Array(items.length);
+	const inProgress = new Map<Promise<{ result: ProcessResult<T, R>; index: number }>, number>();
 	let completed = 0;
 	const total = items.length;
 
@@ -29,9 +30,12 @@ export async function processWithConcurrency<T>(
 		while (inProgress.size < concurrency && queue.length > 0) {
 			const { item, index } = queue.shift()!;
 			const promise = processor(item)
-				.then(() => ({ result: { item, success: true } as ProcessResult<T>, index }))
+				.then((result) => ({
+					result: { item, success: true, result } as ProcessResult<T, R>,
+					index,
+				}))
 				.catch((error) => ({
-					result: { item, success: false, error } as ProcessResult<T>,
+					result: { item, success: false, error } as ProcessResult<T, R>,
 					index,
 				}))
 				.finally(() => {

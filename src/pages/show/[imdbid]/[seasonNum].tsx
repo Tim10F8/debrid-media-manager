@@ -477,20 +477,36 @@ const TvSearch: FunctionComponent = () => {
 		const toastId = toast.loading('Checking availability...');
 
 		try {
-			// Check if torrent is in progress
-			if (`rd:${result.hash}` in hashAndProgress) {
-				await deleteRd(result.hash);
-				await addRd(result.hash, true); // Pass flag to indicate this is a check
-			} else {
-				await addRd(result.hash, true); // Pass flag to indicate this is a check
-				await deleteRd(result.hash);
-			}
+			// Run both checks in parallel
+			const [rdCheckResult, trackerStatsResult] = await Promise.allSettled([
+				// RD availability check
+				(async () => {
+					let addRdResponse: any;
+					// Check if torrent is in progress
+					if (`rd:${result.hash}` in hashAndProgress) {
+						await deleteRd(result.hash);
+						addRdResponse = await addRd(result.hash, true); // Pass flag to indicate this is a check
+					} else {
+						addRdResponse = await addRd(result.hash, true); // Pass flag to indicate this is a check
+						await deleteRd(result.hash);
+					}
 
-			// Check if user wants tracker stats during availability check
-			if (shouldIncludeTrackerStats() && !result.rdAvailable) {
-				toast.loading('Checking tracker stats...', { id: toastId });
+					// Check if addRd found it cached (returns response with ID)
+					const isCachedInRD =
+						addRdResponse &&
+						addRdResponse.id &&
+						addRdResponse.status === 'downloaded' &&
+						addRdResponse.progress === 100;
 
-				try {
+					return { addRdResponse, isCachedInRD };
+				})(),
+
+				// Tracker stats check (only if enabled and not already RD available)
+				(async () => {
+					if (!shouldIncludeTrackerStats() || result.rdAvailable) {
+						return null;
+					}
+
 					// For single torrent checks, force refresh if it was previously dead
 					// This ensures we always check if dead torrents have come back to life
 					const currentStats = result.trackerStats;
@@ -498,35 +514,51 @@ const TvSearch: FunctionComponent = () => {
 
 					// Use cached stats if fresh, otherwise scrape new ones
 					// Dead torrents have 1-hour cache, live torrents have 24-hour cache
-					const trackerStats = await getCachedTrackerStats(result.hash, 24, forceRefresh);
-					if (trackerStats) {
-						// Update the search result with tracker stats
-						const updatedResults = searchResults.map((r) => {
-							if (r.hash === result.hash) {
-								return {
-									...r,
-									trackerStats: {
-										seeders: trackerStats.seeders,
-										leechers: trackerStats.leechers,
-										downloads: trackerStats.downloads,
-										hasActivity:
-											trackerStats.seeders >= 1 &&
-											trackerStats.leechers + trackerStats.downloads >= 1,
-									},
-								};
-							}
-							return r;
-						});
-						setSearchResults(updatedResults);
-						setFilteredResults(
-							updatedResults.filter((r) =>
-								onlyShowCached ? r.rdAvailable || r.adAvailable : true
-							)
-						);
+					return await getCachedTrackerStats(result.hash, 24, forceRefresh);
+				})(),
+			]);
+
+			// Process RD check result
+			let isCachedInRD = false;
+			if (rdCheckResult.status === 'fulfilled') {
+				isCachedInRD = rdCheckResult.value.isCachedInRD;
+			} else {
+				console.error('RD availability check failed:', rdCheckResult.reason);
+			}
+
+			// Process tracker stats result (only if not cached in RD)
+			if (
+				trackerStatsResult.status === 'fulfilled' &&
+				trackerStatsResult.value &&
+				!isCachedInRD
+			) {
+				const trackerStats = trackerStatsResult.value;
+
+				// Update the search result with tracker stats
+				const updatedResults = searchResults.map((r) => {
+					if (r.hash === result.hash) {
+						return {
+							...r,
+							trackerStats: {
+								seeders: trackerStats.seeders,
+								leechers: trackerStats.leechers,
+								downloads: trackerStats.downloads,
+								hasActivity:
+									trackerStats.seeders >= 1 &&
+									trackerStats.leechers + trackerStats.downloads >= 1,
+							},
+						};
 					}
-				} catch (error) {
-					console.error('Failed to get tracker stats:', error);
-				}
+					return r;
+				});
+				setSearchResults(updatedResults);
+				setFilteredResults(
+					updatedResults.filter((r) =>
+						onlyShowCached ? r.rdAvailable || r.adAvailable : true
+					)
+				);
+			} else if (trackerStatsResult.status === 'rejected' && !isCachedInRD) {
+				console.error('Failed to get tracker stats:', trackerStatsResult.reason);
 			}
 
 			toast.success('Availability check complete', { id: toastId });
@@ -597,74 +629,159 @@ const TvSearch: FunctionComponent = () => {
 			`Starting availability test for ${torrentsToCheck.length} torrents...`
 		);
 
-		const processResult = async (result: SearchResult) => {
-			try {
-				let addRdResponse: any;
-				if (`rd:${result.hash}` in hashAndProgress) {
-					await deleteRd(result.hash);
-					addRdResponse = await addRd(result.hash, true); // Pass flag for availability test
-				} else {
-					addRdResponse = await addRd(result.hash, true); // Pass flag for availability test
-					await deleteRd(result.hash);
-				}
+		// Track progress for both operations
+		let rdProgress = { completed: 0, total: torrentsToCheck.length };
+		let statsProgress = { completed: 0, total: 0 };
+		let torrentsWithSeeds = 0;
 
-				// Check if addRd returned a response with an ID AND is truly available
-				if (
-					addRdResponse &&
-					addRdResponse.id &&
-					addRdResponse.status === 'downloaded' &&
-					addRdResponse.progress === 100
-				) {
-					realtimeAvailableCount++;
-				}
+		const updateProgressMessage = () => {
+			let message = '';
 
-				// Check if user wants tracker stats during availability check
-				if (shouldIncludeTrackerStats() && !result.rdAvailable) {
-					try {
-						// For bulk checks, use 72-hour cache to reduce load
-						// Only force refresh if stats don't exist or are older than 72 hours
-						const trackerStats = await getCachedTrackerStats(result.hash, 72, false);
-						if (trackerStats) {
-							// Update the search result with tracker stats
-							result.trackerStats = {
-								seeders: trackerStats.seeders,
-								leechers: trackerStats.leechers,
-								downloads: trackerStats.downloads,
-								hasActivity:
-									trackerStats.seeders >= 1 &&
-									trackerStats.leechers + trackerStats.downloads >= 1,
-							};
-						}
-					} catch (error) {
-						console.error(`Failed to get tracker stats for ${result.title}:`, error);
-					}
-				}
-			} catch (error) {
-				console.error(`Failed to process ${result.title}:`, error);
-				throw error;
+			// RD progress
+			if (rdProgress.total > 0) {
+				message =
+					realtimeAvailableCount > 0
+						? `RD: ${rdProgress.completed}/${rdProgress.total} (${realtimeAvailableCount} found)`
+						: `RD: ${rdProgress.completed}/${rdProgress.total}`;
 			}
-		};
 
-		const onProgress = (completed: number, total: number) => {
-			const message =
-				realtimeAvailableCount > 0
-					? `Testing availability: ${completed}/${total} (${realtimeAvailableCount} found)`
-					: `Testing availability: ${completed}/${total}`;
-			if (progressToast && isMounted.current) {
+			// Tracker stats progress (only show if enabled and has items)
+			if (shouldIncludeTrackerStats() && statsProgress.total > 0) {
+				if (message) message += ' | ';
+				message +=
+					torrentsWithSeeds > 0
+						? `Tracker Stats: ${statsProgress.completed}/${statsProgress.total} (${torrentsWithSeeds} with seeds)`
+						: `Tracker Stats: ${statsProgress.completed}/${statsProgress.total}`;
+			}
+
+			if (progressToast && isMounted.current && message) {
 				toast.loading(message, { id: progressToast });
 			}
 		};
 
 		try {
-			const results = await processWithConcurrency(
-				torrentsToCheck,
-				processResult,
-				3,
-				onProgress
+			// Run RD checks and tracker stats completely in parallel
+			const [rdCheckResults, trackerStatsResults] = await Promise.all([
+				// RD availability checks with concurrency limit
+				processWithConcurrency(
+					torrentsToCheck,
+					async (result: SearchResult) => {
+						try {
+							let addRdResponse: any;
+							if (`rd:${result.hash}` in hashAndProgress) {
+								await deleteRd(result.hash);
+								addRdResponse = await addRd(result.hash, true); // Pass flag for availability test
+							} else {
+								addRdResponse = await addRd(result.hash, true); // Pass flag for availability test
+								await deleteRd(result.hash);
+							}
+
+							// Check if addRd returned a response with an ID AND is truly available
+							const isCachedInRD =
+								addRdResponse &&
+								addRdResponse.id &&
+								addRdResponse.status === 'downloaded' &&
+								addRdResponse.progress === 100;
+
+							if (isCachedInRD) {
+								realtimeAvailableCount++;
+							}
+
+							return { result, isCachedInRD };
+						} catch (error) {
+							console.error(`Failed RD check for ${result.title}:`, error);
+							throw error;
+						}
+					},
+					3,
+					(completed: number, total: number) => {
+						rdProgress = { completed, total };
+						updateProgressMessage();
+					}
+				),
+
+				// Tracker stats checks (only for non-RD available torrents)
+				(async () => {
+					if (!shouldIncludeTrackerStats()) {
+						return [];
+					}
+
+					// Filter out torrents that are already RD available
+					const torrentsNeedingStats = torrentsToCheck.filter((t) => !t.rdAvailable);
+
+					if (torrentsNeedingStats.length === 0) {
+						return [];
+					}
+
+					statsProgress.total = torrentsNeedingStats.length;
+					updateProgressMessage();
+
+					return processWithConcurrency(
+						torrentsNeedingStats,
+						async (result: SearchResult) => {
+							try {
+								// For bulk checks, use 72-hour cache to reduce load
+								const trackerStats = await getCachedTrackerStats(
+									result.hash,
+									72,
+									false
+								);
+								if (trackerStats) {
+									result.trackerStats = {
+										seeders: trackerStats.seeders,
+										leechers: trackerStats.leechers,
+										downloads: trackerStats.downloads,
+										hasActivity:
+											trackerStats.seeders >= 1 &&
+											trackerStats.leechers + trackerStats.downloads >= 1,
+									};
+
+									// Count torrents with seeds
+									if (trackerStats.seeders > 0) {
+										torrentsWithSeeds++;
+									}
+								}
+								return { result, trackerStats };
+							} catch (error) {
+								console.error(
+									`Failed to get tracker stats for ${result.title}:`,
+									error
+								);
+								return { result, trackerStats: null };
+							}
+						},
+						5, // Higher concurrency for tracker stats since they're lighter
+						(completed: number, total: number) => {
+							statsProgress = { completed, total };
+							updateProgressMessage();
+						}
+					);
+				})(),
+			]);
+
+			// Filter out tracker stats for torrents that turned out to be RD cached
+			const rdCachedHashes = new Set(
+				rdCheckResults
+					.filter((r) => r.success && r.result?.isCachedInRD)
+					.map((r) => r.item.hash)
 			);
 
-			const failed = results.filter((r) => !r.success);
-			const succeeded = results.filter((r) => r.success);
+			// Apply tracker stats only to non-cached torrents
+			trackerStatsResults.forEach((statsResult: any) => {
+				if (
+					statsResult.success &&
+					statsResult.result?.trackerStats &&
+					!rdCachedHashes.has(statsResult.item.hash)
+				) {
+					// Stats will already be set on the result object
+				} else if (statsResult.success && rdCachedHashes.has(statsResult.item.hash)) {
+					// Clear tracker stats for RD cached torrents
+					delete statsResult.item.trackerStats;
+				}
+			});
+
+			const succeeded = rdCheckResults.filter((r) => r.success);
+			const failed = rdCheckResults.filter((r) => !r.success);
 
 			if (progressToast && isMounted.current) {
 				toast.dismiss(progressToast);
@@ -685,15 +802,15 @@ const TvSearch: FunctionComponent = () => {
 				);
 			}
 
-			// Update search results with tracker stats for succeeded items
-			if (succeeded.length > 0 && isMounted.current) {
+			// Update search results with tracker stats for torrents that have them
+			if (isMounted.current) {
 				setSearchResults((prevResults) => {
 					return prevResults.map((r) => {
-						const processedResult = succeeded.find((s) => s.item.hash === r.hash);
-						if (processedResult && processedResult.item.trackerStats) {
+						const torrentWithStats = torrentsToCheck.find((t) => t.hash === r.hash);
+						if (torrentWithStats && torrentWithStats.trackerStats) {
 							return {
 								...r,
-								trackerStats: processedResult.item.trackerStats,
+								trackerStats: torrentWithStats.trackerStats,
 							};
 						}
 						return r;
@@ -701,14 +818,15 @@ const TvSearch: FunctionComponent = () => {
 				});
 			}
 
+			const totalCount = rdCheckResults.length;
 			if (failed.length > 0) {
 				toast.error(
-					`Failed to test ${failed.length} out of ${results.length} torrents. Successfully tested ${succeeded.length} (${availableCount} found).`,
+					`Failed to test ${failed.length} out of ${totalCount} torrents. Successfully tested ${succeeded.length} (${availableCount} found).`,
 					{ duration: 5000 }
 				);
 			} else {
 				toast.success(
-					`Successfully tested all ${results.length} torrents (${availableCount} found)`,
+					`Successfully tested all ${totalCount} torrents (${availableCount} found)`,
 					{
 						duration: 3000,
 					}
