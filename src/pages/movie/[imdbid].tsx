@@ -882,7 +882,7 @@ const MovieSearch: FunctionComponent = () => {
 	}
 
 	const getFirstAvailableRdTorrent = () => {
-		return searchResults.find((r) => r.rdAvailable && !r.noVideos);
+		return filteredResults.find((r) => r.rdAvailable && !r.noVideos);
 	};
 
 	async function handleMassReport(type: 'porn' | 'wrong_imdb' | 'wrong_season') {

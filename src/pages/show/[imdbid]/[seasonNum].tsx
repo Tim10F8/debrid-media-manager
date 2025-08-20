@@ -860,17 +860,17 @@ const TvSearch: FunctionComponent = () => {
 	}
 
 	const getFirstAvailableRdTorrent = () => {
-		return searchResults.find((r) => r.rdAvailable && !r.noVideos);
+		return filteredResults.find((r) => r.rdAvailable && !r.noVideos);
 	};
 
 	const getFirstCompleteSeasonTorrent = () => {
-		return searchResults.find(
+		return filteredResults.find(
 			(r) => r.rdAvailable && !r.noVideos && r.videoCount === expectedEpisodeCount
 		);
 	};
 
 	const getIndividualEpisodeTorrents = () => {
-		return searchResults.filter((r) => r.rdAvailable && !r.noVideos && r.videoCount === 1);
+		return filteredResults.filter((r) => r.rdAvailable && !r.noVideos && r.videoCount === 1);
 	};
 
 	async function handleInstantRdWholeSeason() {
