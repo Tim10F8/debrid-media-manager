@@ -896,24 +896,123 @@ const TvSearch: FunctionComponent = () => {
 			return;
 		}
 
-		// Filter out episodes already in library
-		const episodesToAdd = individualEpisodes.filter(
-			(ep) => !(`rd:${ep.hash}` in hashAndProgress)
-		);
+		// Extract episode numbers from torrents
+		const episodesWithNumbers = individualEpisodes.map((ep) => {
+			// Try to extract episode number from title or filename
+			let episodeNum = 0;
+			const title = ep.title.toLowerCase();
 
-		if (episodesToAdd.length === 0) {
-			toast.success('All individual episodes are already in your Real-Debrid library');
-			return;
-		}
+			// Common patterns: S##E##, ##x##, E##, Episode ##
+			const patterns = [
+				/s\d+e(\d+)/i, // S01E05
+				/\d+x(\d+)/i, // 1x05
+				/episode\s*(\d+)/i, // Episode 5
+				/ep\s*(\d+)/i, // Ep 5
+				/e(\d+)/i, // E05
+				/\s(\d{1,2})\s/, // isolated numbers
+			];
 
-		const toastId = toast.loading(`Adding ${episodesToAdd.length} episodes to Real-Debrid...`);
+			for (const pattern of patterns) {
+				const match = title.match(pattern);
+				if (match && match[1]) {
+					episodeNum = parseInt(match[1]);
+					break;
+				}
+			}
+
+			// If still no match, check first file in torrent
+			if (episodeNum === 0 && ep.files && ep.files.length > 0) {
+				const filename = ep.files[0].filename.toLowerCase();
+				for (const pattern of patterns) {
+					const match = filename.match(pattern);
+					if (match && match[1]) {
+						episodeNum = parseInt(match[1]);
+						break;
+					}
+				}
+			}
+
+			return { ...ep, episodeNum };
+		});
+
+		// Sort by episode number (0 will go to the end)
+		episodesWithNumbers.sort((a, b) => {
+			if (a.episodeNum === 0) return 1;
+			if (b.episodeNum === 0) return -1;
+			return a.episodeNum - b.episodeNum;
+		});
+
+		// Create a map for quick episode lookup
+		const episodeMap = new Map<number, (typeof episodesWithNumbers)[0]>();
+		episodesWithNumbers.forEach((ep) => {
+			if (ep.episodeNum > 0 && !episodeMap.has(ep.episodeNum)) {
+				episodeMap.set(ep.episodeNum, ep);
+			}
+		});
+
+		// Determine the range of episodes to add
+		const maxEpisode = Math.max(expectedEpisodeCount, ...Array.from(episodeMap.keys()));
+
+		const toastId = toast.loading(`Checking episodes 1-${maxEpisode}...`);
+
+		let addedCount = 0;
+		let skippedCount = 0;
+		let notFoundCount = 0;
+		const notFoundEpisodes: number[] = [];
 
 		try {
-			// Add episodes sequentially to avoid overwhelming RD API
-			for (const episode of episodesToAdd) {
+			// Process episodes sequentially from 1 to max
+			for (let epNum = 1; epNum <= maxEpisode; epNum++) {
+				const episode = episodeMap.get(epNum);
+
+				if (!episode) {
+					notFoundCount++;
+					notFoundEpisodes.push(epNum);
+					toast.error(`Episode ${epNum}: Not found`, { duration: 2000 });
+					continue;
+				}
+
+				// Check if already in library
+				if (`rd:${episode.hash}` in hashAndProgress) {
+					skippedCount++;
+					toast(`Episode ${epNum}: Already in library`, { duration: 2000 });
+					continue;
+				}
+
+				// Update progress toast
+				toast.loading(
+					`Adding Episode ${epNum} (${addedCount} added, ${skippedCount} skipped, ${notFoundCount} missing)...`,
+					{ id: toastId }
+				);
+
+				// Add to RD
 				await addRd(episode.hash);
+				addedCount++;
+				toast.success(`Episode ${epNum}: Added successfully`, { duration: 2000 });
 			}
-			toast.success(`Successfully added ${episodesToAdd.length} episodes`, { id: toastId });
+
+			// Final summary
+			toast.dismiss(toastId);
+
+			const summaryParts = [];
+			if (addedCount > 0) summaryParts.push(`${addedCount} added`);
+			if (skippedCount > 0) summaryParts.push(`${skippedCount} already in library`);
+			if (notFoundCount > 0) {
+				summaryParts.push(`${notFoundCount} not found`);
+				if (notFoundEpisodes.length <= 5) {
+					summaryParts.push(`(Episodes ${notFoundEpisodes.join(', ')})`);
+				}
+			}
+
+			const summaryMessage = `Episodes 1-${maxEpisode}: ${summaryParts.join(', ')}`;
+
+			if (notFoundCount === 0) {
+				toast.success(summaryMessage, { duration: 5000 });
+			} else if (addedCount > 0) {
+				toast.success(summaryMessage, { duration: 5000 });
+			} else {
+				toast.error(summaryMessage, { duration: 5000 });
+			}
 		} catch (error) {
 			toast.error('Failed to add some episodes', { id: toastId });
 			console.error('Error adding episodes:', error);
