@@ -1,9 +1,7 @@
 import { flattenAndRemoveDuplicates, sortByFileSize } from '@/services/mediasearch';
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { validateTokenWithHash } from '@/utils/token';
 import { NextApiHandler } from 'next';
-
-const db = new Repository();
 
 // returns scraped results or marks the imdb id as requested
 const handler: NextApiHandler = async (req, res) => {

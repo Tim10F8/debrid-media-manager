@@ -1028,7 +1028,17 @@ const MovieSearch: FunctionComponent = () => {
 								<>
 									<button
 										className="mb-1 mr-2 mt-0 rounded border-2 border-green-500 bg-green-900/30 p-1 text-xs text-green-100 transition-colors hover:bg-green-800/50"
-										onClick={() => addRd(getFirstAvailableRdTorrent()!.hash)}
+										onClick={() => {
+											const firstAvailable = getFirstAvailableRdTorrent()!;
+											// Check if torrent is already in library
+											if (`rd:${firstAvailable.hash}` in hashAndProgress) {
+												toast.success(
+													'This torrent is already in your Real-Debrid library'
+												);
+												return;
+											}
+											addRd(firstAvailable.hash);
+										}}
 									>
 										<b>⚡Instant RD</b>
 									</button>

@@ -1,7 +1,5 @@
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { NextApiRequest, NextApiResponse } from 'next';
-
-const db = new Repository();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	const { userid, imdbid, pingpong, token } = req.query;

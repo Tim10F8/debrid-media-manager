@@ -1,4 +1,4 @@
-import { Repository } from '@/services/repository';
+import { repository } from '@/services/repository';
 import { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -28,14 +28,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			return res.status(400).json({ message: 'Some reports are missing hash or imdbId' });
 		}
 
-		const repository = new Repository();
+		const db = repository;
 		const results = [];
 		const errors = [];
 
 		// Process each report
 		for (const report of reports) {
 			try {
-				await repository.reportContent(
+				await db.reportContent(
 					report.hash,
 					report.imdbId,
 					userId,
@@ -50,9 +50,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				});
 			}
 		}
-
-		// Disconnect repository after all operations
-		await repository.disconnect();
 
 		return res.status(200).json({
 			success: true,

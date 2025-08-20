@@ -1,9 +1,7 @@
 import { getToken } from '@/services/realDebrid';
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { generateUserId } from '@/utils/castApiHelpers';
 import { NextApiRequest, NextApiResponse } from 'next';
-
-const db = new Repository();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	if (req.method !== 'POST') {

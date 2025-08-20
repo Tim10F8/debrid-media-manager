@@ -1,5 +1,5 @@
 import { getTorrentInfo } from '@/services/realDebrid';
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { generateUserId } from '@/utils/castApiHelpers';
 import { padWithZero } from '@/utils/checks';
 import axios from 'axios';
@@ -22,8 +22,6 @@ interface TorrentioResponse {
 		infoHash: string;
 	};
 }
-
-const db = new Repository();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	const { torrentIdPlusHash, rdToken } = req.query;

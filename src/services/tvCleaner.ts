@@ -9,8 +9,8 @@ import {
 } from '@/utils/checks';
 import axios from 'axios';
 import { getMdblistClient } from './mdblistClient';
-import { ScrapeSearchResult, flattenAndRemoveDuplicates, sortByFileSize } from './mediasearch';
-import { Repository } from './repository';
+import { flattenAndRemoveDuplicates, ScrapeSearchResult, sortByFileSize } from './mediasearch';
+import { repository as db, Repository } from './repository';
 
 type TvScrapeJob = {
 	titles: string[];
@@ -23,7 +23,6 @@ type TvScrapeJob = {
 	scrapes: ScrapeSearchResult[];
 };
 
-const db = new Repository();
 const mdblistClient = getMdblistClient();
 const tmdbKey = process.env.TMDB_KEY;
 const getTmdbSearch = (imdbId: string) =>

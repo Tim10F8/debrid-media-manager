@@ -1,12 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Repository } from '../../../services/repository';
+import { repository as db } from '../../../services/repository';
 import { validateTokenWithHash } from '../../../utils/token';
 
 function isValidTorrentHash(hash: string): boolean {
 	return /^[a-fA-F0-9]{40}$/.test(hash);
 }
-
-const db = new Repository();
 
 // fetch availability with hashes, no IMDb ID constraint
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

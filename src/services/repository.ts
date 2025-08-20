@@ -259,3 +259,6 @@ export class Repository {
 		return this.scrapedService.getRequestedCount();
 	}
 }
+
+// Export singleton instance to ensure only one PrismaClient exists
+export const repository = new Repository();

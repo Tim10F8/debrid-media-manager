@@ -1,9 +1,7 @@
 import { getToken } from '@/services/realDebrid';
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { isLegacyToken } from '@/utils/castApiHelpers';
 import { NextApiRequest, NextApiResponse } from 'next';
-
-const db = new Repository();
 
 // lists all available streams for a movie or show
 // note, addon prefix is /api/stremio/${userid}

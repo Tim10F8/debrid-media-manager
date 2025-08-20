@@ -1,8 +1,5 @@
 import { unrestrictLink } from '@/services/realDebrid';
-import { Repository } from '@/services/repository';
 import { NextApiRequest, NextApiResponse } from 'next';
-
-const db = new Repository();
 
 // Unrestrict and play a link
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

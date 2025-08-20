@@ -1,6 +1,6 @@
 import { getMdblistClient } from '@/services/mdblistClient';
 import { cleanMovieScrapes } from '@/services/movieCleaner';
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { cleanTvScrapes } from '@/services/tvCleaner';
 import axios from 'axios';
 import { scrapeMovies } from './movieScraper';
@@ -14,7 +14,6 @@ const getTmdbTvInfo = (tmdbId: string) =>
 const getTmdbMovieInfo = (tmdbId: string) =>
 	`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${tmdbKey}`;
 
-const db = new Repository();
 const mdblistClient = getMdblistClient();
 
 function convertMdbToTmdb(apiResponse: any) {

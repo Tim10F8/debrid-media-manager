@@ -1,7 +1,5 @@
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { NextApiHandler } from 'next';
-
-const db = new Repository();
 
 const handler: NextApiHandler = async (req, res) => {
 	const { keyword } = req.query;

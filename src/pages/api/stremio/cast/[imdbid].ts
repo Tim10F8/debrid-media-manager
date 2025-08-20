@@ -1,9 +1,7 @@
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { generateUserId } from '@/utils/castApiHelpers';
 import { getStreamUrl } from '@/utils/getStreamUrl';
 import { NextApiRequest, NextApiResponse } from 'next';
-
-const db = new Repository();
 
 // cast: unrestricts a selected link and saves it to the database
 // called in the showInfo component

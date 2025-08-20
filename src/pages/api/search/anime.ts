@@ -1,7 +1,6 @@
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { NextApiHandler } from 'next';
 
-const db = new Repository();
 const inMemoryCache: Record<string, number[]> = {};
 
 const handler: NextApiHandler = async (req, res) => {

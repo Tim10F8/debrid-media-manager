@@ -1,5 +1,5 @@
 import { getMdblistClient } from '@/services/mdblistClient';
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import axios from 'axios';
 import { distance } from 'fastest-levenshtein';
 import _ from 'lodash';
@@ -15,7 +15,6 @@ const searchCinemetaSeries = (keyword: string) =>
 	`https://v3-cinemeta.strem.io/catalog/series/top/search=${keyword}.json`;
 const searchCinemetaMovies = (keyword: string) =>
 	`https://v3-cinemeta.strem.io/catalog/movie/top/search=${keyword}.json`;
-const db = new Repository();
 
 export type SearchResult = {
 	id: string;

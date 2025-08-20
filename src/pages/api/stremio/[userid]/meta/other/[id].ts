@@ -1,10 +1,8 @@
 import { getToken } from '@/services/realDebrid';
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { isLegacyToken } from '@/utils/castApiHelpers';
 import { getDMMTorrent } from '@/utils/castCatalogHelper';
 import { NextApiRequest, NextApiResponse } from 'next';
-
-const db = new Repository();
 
 // gets information about a torrent (viewing your library)
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

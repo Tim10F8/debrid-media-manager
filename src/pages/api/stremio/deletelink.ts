@@ -1,4 +1,4 @@
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import {
 	generateUserId,
 	handleApiError,
@@ -6,8 +6,6 @@ import {
 	validateToken,
 } from '@/utils/castApiHelpers';
 import { NextApiRequest, NextApiResponse } from 'next';
-
-const db = new Repository();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	if (!validateMethod(req, res, ['POST'])) return;

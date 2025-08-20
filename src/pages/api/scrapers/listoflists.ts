@@ -1,9 +1,7 @@
 import { ScrapeInput } from '@/scrapers/scrapeInput';
 import { ScrapeResponse, generateScrapeJobs } from '@/scrapers/scrapeJobs';
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { NextApiRequest, NextApiResponse } from 'next';
-
-const db = new Repository();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse<ScrapeResponse>) {
 	if (!process.env.JACKETT || !process.env.PROWLARR) {

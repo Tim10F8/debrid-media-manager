@@ -1,4 +1,4 @@
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import {
 	generateLegacyUserId,
 	generateUserId,
@@ -6,8 +6,6 @@ import {
 	validateToken,
 } from '@/utils/castApiHelpers';
 import { NextApiRequest, NextApiResponse } from 'next';
-
-const db = new Repository();
 
 // Migrates user data from legacy 5-character token to new 12-character token
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

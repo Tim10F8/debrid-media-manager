@@ -1,7 +1,5 @@
-import { Repository } from '@/services/repository';
+import { repository as cache } from '@/services/repository';
 import { NextApiHandler } from 'next';
-
-const cache = new Repository();
 
 const handler: NextApiHandler = async (req, res) => {
 	try {

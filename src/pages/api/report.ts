@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Repository } from '../../services/repository';
+import { repository } from '../../services/repository';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	if (req.method !== 'POST') {
@@ -18,8 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			return res.status(400).json({ message: 'Invalid report type' });
 		}
 
-		const repository = new Repository();
-		await repository.reportContent(
+		const db = repository;
+		await db.reportContent(
 			hash,
 			imdbId,
 			userId,

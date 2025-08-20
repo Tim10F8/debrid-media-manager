@@ -1,9 +1,7 @@
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { generateUserId } from '@/utils/castApiHelpers';
 import { getBiggestFileStreamUrl } from '@/utils/getStreamUrl';
 import { NextApiRequest, NextApiResponse } from 'next';
-
-const db = new Repository();
 
 // MOVIE cast: unrestricts a selected link and saves it to the database
 // called in the movie page

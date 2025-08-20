@@ -1,11 +1,9 @@
 import { addHashAsMagnet, deleteTorrent, getTorrentInfo, selectFiles } from '@/services/realDebrid';
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { TorrentInfoResponse } from '@/services/types';
 import { isVideo } from '@/utils/selectable';
 import { handleDownloadedTorrent } from '@/utils/submitAvailability';
 import { NextApiHandler } from 'next';
-
-const db = new Repository();
 
 interface SearchResult {
 	title: string;

@@ -1,7 +1,5 @@
-import { Repository } from '@/services/repository';
+import { repository as db } from '@/services/repository';
 import { TorrentInfoResponse } from '@/services/types';
-
-const db = new Repository();
 
 export async function handleDownloadedTorrent(
 	torrentInfo: TorrentInfoResponse,

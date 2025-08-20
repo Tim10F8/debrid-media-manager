@@ -863,6 +863,63 @@ const TvSearch: FunctionComponent = () => {
 		return searchResults.find((r) => r.rdAvailable && !r.noVideos);
 	};
 
+	const getFirstCompleteSeasonTorrent = () => {
+		return searchResults.find(
+			(r) => r.rdAvailable && !r.noVideos && r.videoCount === expectedEpisodeCount
+		);
+	};
+
+	const getIndividualEpisodeTorrents = () => {
+		return searchResults.filter((r) => r.rdAvailable && !r.noVideos && r.videoCount === 1);
+	};
+
+	async function handleInstantRdWholeSeason() {
+		const completeSeasonTorrent = getFirstCompleteSeasonTorrent();
+		if (!completeSeasonTorrent) {
+			toast.error('No complete season torrents available');
+			return;
+		}
+
+		// Check if torrent is already in library
+		if (`rd:${completeSeasonTorrent.hash}` in hashAndProgress) {
+			toast.success('This season torrent is already in your Real-Debrid library');
+			return;
+		}
+
+		addRd(completeSeasonTorrent.hash);
+	}
+
+	async function handleInstantRdEveryEpisode() {
+		const individualEpisodes = getIndividualEpisodeTorrents();
+		if (individualEpisodes.length === 0) {
+			toast.error('No individual episode torrents available');
+			return;
+		}
+
+		// Filter out episodes already in library
+		const episodesToAdd = individualEpisodes.filter(
+			(ep) => !(`rd:${ep.hash}` in hashAndProgress)
+		);
+
+		if (episodesToAdd.length === 0) {
+			toast.success('All individual episodes are already in your Real-Debrid library');
+			return;
+		}
+
+		const toastId = toast.loading(`Adding ${episodesToAdd.length} episodes to Real-Debrid...`);
+
+		try {
+			// Add episodes sequentially to avoid overwhelming RD API
+			for (const episode of episodesToAdd) {
+				await addRd(episode.hash);
+			}
+			toast.success(`Successfully added ${episodesToAdd.length} episodes`, { id: toastId });
+		} catch (error) {
+			toast.error('Failed to add some episodes', { id: toastId });
+			console.error('Error adding episodes:', error);
+		}
+	}
+
 	async function handleMassReport(type: 'porn' | 'wrong_imdb' | 'wrong_season') {
 		if (!rdKey) {
 			toast.error('Please login to Real-Debrid first');
@@ -1039,12 +1096,20 @@ const TvSearch: FunctionComponent = () => {
 										: '🕵🏻Check Available'}
 								</b>
 							</button>
-							{getFirstAvailableRdTorrent() && (
+							{getFirstCompleteSeasonTorrent() && (
 								<button
 									className="haptic-sm mb-1 mr-2 mt-0 rounded border-2 border-green-500 bg-green-900/30 p-1 text-xs text-green-100 transition-colors hover:bg-green-800/50"
-									onClick={() => addRd(getFirstAvailableRdTorrent()!.hash)}
+									onClick={handleInstantRdWholeSeason}
 								>
-									<b>⚡Instant RD</b>
+									<b>⚡Instant RD (Whole Season)</b>
+								</button>
+							)}
+							{getIndividualEpisodeTorrents().length > 0 && (
+								<button
+									className="haptic-sm mb-1 mr-2 mt-0 rounded border-2 border-green-500 bg-green-900/30 p-1 text-xs text-green-100 transition-colors hover:bg-green-800/50"
+									onClick={handleInstantRdEveryEpisode}
+								>
+									<b>⚡Instant RD (Every Episode)</b>
 								</button>
 							)}
 							<button
