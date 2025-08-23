@@ -344,7 +344,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 										)}
 
 										{/* TorBox download/delete */}
-										{torboxKey && inLibrary('torbox', r.hash) && (
+										{torboxKey && inLibrary('tb', r.hash) && (
 											<button
 												className={`haptic-sm inline rounded border-2 border-red-500 bg-red-900/30 px-1 text-xs text-red-100 transition-colors hover:bg-red-800/50 ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
 												onClick={() => handleDeleteRd(r.hash)}
@@ -359,10 +359,10 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 												)}
 												{isLoading
 													? 'Removing...'
-													: `TorBox (${hashAndProgress[`torbox:${r.hash}`] + '%'})`}
+													: `TorBox (${hashAndProgress[`tb:${r.hash}`] + '%'})`}
 											</button>
 										)}
-										{torboxKey && notInLibrary('torbox', r.hash) && (
+										{torboxKey && notInLibrary('tb', r.hash) && (
 											<button
 												className={`border-2 border-${btnColor(r.rdAvailable, r.noVideos)}-500 bg-${btnColor(r.rdAvailable, r.noVideos)}-900/30 text-${btnColor(r.rdAvailable, r.noVideos)}-100 hover:bg-${btnColor(r.rdAvailable, r.noVideos)}-800/50 haptic-sm inline rounded px-1 text-xs transition-colors ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
 												onClick={async () => {

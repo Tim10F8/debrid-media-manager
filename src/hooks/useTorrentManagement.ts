@@ -91,6 +91,13 @@ export function useTorrentManagement(
 				const userTorrent = convertToUserTorrent(info);
 				await torrentDB.add(userTorrent);
 				addToCache(userTorrent); // Update global cache
+
+				// Immediately update hashAndProgress state for this torrent
+				setHashAndProgress((prev) => ({
+					...prev,
+					[`${userTorrent.id.substring(0, 3)}${userTorrent.hash}`]: userTorrent.progress,
+				}));
+
 				await fetchHashAndProgress(hash);
 			});
 
@@ -107,7 +114,16 @@ export function useTorrentManagement(
 			await fetchAllDebrid(adKey, async (torrents: UserTorrent[]) => {
 				await torrentDB.addAll(torrents);
 				// Update global cache with new torrents
-				torrents.forEach((torrent) => addToCache(torrent));
+				torrents.forEach((torrent) => {
+					addToCache(torrent);
+					// Immediately update hashAndProgress state for this torrent
+					if (torrent.hash === hash) {
+						setHashAndProgress((prev) => ({
+							...prev,
+							[`${torrent.id.substring(0, 3)}${torrent.hash}`]: torrent.progress,
+						}));
+					}
+				});
 			});
 			await fetchHashAndProgress();
 		},
@@ -121,6 +137,13 @@ export function useTorrentManagement(
 			await handleAddAsMagnetInTb(torboxKey, hash, async (userTorrent: UserTorrent) => {
 				await torrentDB.add(userTorrent);
 				addToCache(userTorrent); // Update global cache
+
+				// Immediately update hashAndProgress state for this torrent
+				setHashAndProgress((prev) => ({
+					...prev,
+					[`${userTorrent.id.substring(0, 3)}${userTorrent.hash}`]: userTorrent.progress,
+				}));
+
 				await fetchHashAndProgress();
 			});
 		},
