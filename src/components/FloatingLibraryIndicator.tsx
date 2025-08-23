@@ -1,5 +1,6 @@
 import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 export default function FloatingLibraryIndicator() {
@@ -48,12 +49,14 @@ export default function FloatingLibraryIndicator() {
 								{isLoading ? 'Loading...' : 'Refreshing...'}
 							</span>
 						) : (
-							<div className="flex items-center gap-1">
-								<span className="font-medium text-white">
-									{libraryItems.length}
-								</span>
-								<span className="hidden text-gray-400 sm:inline">items</span>
-							</div>
+							<Link href="/library">
+								<div className="flex cursor-pointer items-center gap-1 transition-colors hover:text-cyan-400">
+									<span className="font-medium text-white">
+										{libraryItems.length}
+									</span>
+									<span className="hidden text-gray-400 sm:inline">items</span>
+								</div>
+							</Link>
 						)}
 					</span>
 					{!isLoading && !isFetching && lastFetchTime && (
