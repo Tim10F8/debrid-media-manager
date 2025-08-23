@@ -78,13 +78,8 @@ export const sortByBiggest = (searchResults: SearchResult[]): SearchResult[] => 
 			return bSort - aSort;
 		}
 
-		// If sizes are equal, sort by video count
-		if (a.videoCount !== b.videoCount) {
-			return b.videoCount - a.videoCount;
-		}
-
-		// If all else is equal, sort alphabetically (with null check)
-		return (a.title || '').localeCompare(b.title || '');
+		// Third priority: hash (alphabetically)
+		return a.hash.localeCompare(b.hash);
 	});
 	return searchResults;
 };

@@ -1,0 +1,192 @@
+import { SearchResult } from '@/services/mediasearch';
+import { TorrentInfoResponse } from '@/services/types';
+import UserTorrentDB from '@/torrent/db';
+import { UserTorrent } from '@/torrent/userTorrent';
+import {
+	handleAddAsMagnetInAd,
+	handleAddAsMagnetInRd,
+	handleAddAsMagnetInTb,
+} from '@/utils/addMagnet';
+import { removeAvailability, submitAvailability } from '@/utils/availability';
+import {
+	handleDeleteAdTorrent,
+	handleDeleteRdTorrent,
+	handleDeleteTbTorrent,
+} from '@/utils/deleteTorrent';
+import { convertToUserTorrent, fetchAllDebrid } from '@/utils/fetchTorrents';
+import { generateTokenAndHash } from '@/utils/token';
+import { useCallback, useState } from 'react';
+import toast from 'react-hot-toast';
+
+const torrentDB = new UserTorrentDB();
+
+export function useTorrentManagement(
+	rdKey: string | null,
+	adKey: string | null,
+	torboxKey: string | null,
+	imdbId: string,
+	searchResults: SearchResult[],
+	setSearchResults: React.Dispatch<React.SetStateAction<SearchResult[]>>
+) {
+	const [hashAndProgress, setHashAndProgress] = useState<Record<string, number>>({});
+
+	const fetchHashAndProgress = useCallback(async (hash?: string) => {
+		const torrents = await torrentDB.all();
+		const records: Record<string, number> = {};
+		for (const t of torrents) {
+			if (hash && t.hash !== hash) continue;
+			records[`${t.id.substring(0, 3)}${t.hash}`] = t.progress;
+		}
+		setHashAndProgress((prev) => ({ ...prev, ...records }));
+	}, []);
+
+	const addRd = useCallback(
+		async (hash: string, isCheckingAvailability = false): Promise<any> => {
+			if (!rdKey) return;
+
+			// Read searchResults at call time via closure - no need for dependency
+			const torrentResult = searchResults.find((r) => r.hash === hash);
+			const wasMarkedAvailable = torrentResult?.rdAvailable || false;
+			let torrentInfo: TorrentInfoResponse | null = null;
+
+			await handleAddAsMagnetInRd(rdKey, hash, async (info: TorrentInfoResponse) => {
+				torrentInfo = info;
+				const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
+
+				// Only handle false positives for actual usage, not availability checks
+				if (!isCheckingAvailability && wasMarkedAvailable) {
+					// Check for false positive conditions
+					const isFalsePositive =
+						info.status !== 'downloaded' ||
+						info.progress !== 100 ||
+						info.files?.filter((f) => f.selected === 1).length === 0;
+
+					if (isFalsePositive) {
+						// Remove false positive from availability database
+						await removeAvailability(
+							tokenWithTimestamp,
+							tokenHash,
+							hash,
+							`Status: ${info.status}, Progress: ${info.progress}%, Selected files: ${
+								info.files?.filter((f) => f.selected === 1).length || 0
+							}`
+						);
+
+						// Update UI
+						setSearchResults((prev) =>
+							prev.map((r) => (r.hash === hash ? { ...r, rdAvailable: false } : r))
+						);
+
+						toast.error('This torrent was incorrectly marked as available.');
+					}
+				}
+
+				// Only submit availability for truly available torrents
+				if (info.status === 'downloaded' && info.progress === 100) {
+					await submitAvailability(tokenWithTimestamp, tokenHash, info, imdbId);
+				}
+
+				await torrentDB
+					.add(convertToUserTorrent(info))
+					.then(() => fetchHashAndProgress(hash));
+			});
+
+			return isCheckingAvailability ? torrentInfo : undefined;
+		},
+		[rdKey, setSearchResults, imdbId, fetchHashAndProgress]
+	);
+
+	const addAd = useCallback(
+		async (hash: string) => {
+			if (!adKey) return;
+
+			await handleAddAsMagnetInAd(adKey, hash);
+			await fetchAllDebrid(
+				adKey,
+				async (torrents: UserTorrent[]) => await torrentDB.addAll(torrents)
+			);
+			await fetchHashAndProgress();
+		},
+		[adKey, fetchHashAndProgress]
+	);
+
+	const addTb = useCallback(
+		async (hash: string) => {
+			if (!torboxKey) return;
+
+			await handleAddAsMagnetInTb(torboxKey, hash, async (userTorrent: UserTorrent) => {
+				await torrentDB.add(userTorrent);
+				await fetchHashAndProgress();
+			});
+		},
+		[torboxKey, fetchHashAndProgress]
+	);
+
+	const deleteRd = useCallback(
+		async (hash: string) => {
+			if (!rdKey) return;
+
+			const torrents = await torrentDB.getAllByHash(hash);
+			for (const t of torrents) {
+				if (!t.id.startsWith('rd:')) continue;
+				await handleDeleteRdTorrent(rdKey, t.id);
+				await torrentDB.deleteByHash('rd', hash);
+				setHashAndProgress((prev) => {
+					const newHashAndProgress = { ...prev };
+					delete newHashAndProgress[`rd:${hash}`];
+					return newHashAndProgress;
+				});
+			}
+		},
+		[rdKey]
+	);
+
+	const deleteAd = useCallback(
+		async (hash: string) => {
+			if (!adKey) return;
+
+			const torrents = await torrentDB.getAllByHash(hash);
+			for (const t of torrents) {
+				if (!t.id.startsWith('ad:')) continue;
+				await handleDeleteAdTorrent(adKey, t.id);
+				await torrentDB.deleteByHash('ad', hash);
+				setHashAndProgress((prev) => {
+					const newHashAndProgress = { ...prev };
+					delete newHashAndProgress[`ad:${hash}`];
+					return newHashAndProgress;
+				});
+			}
+		},
+		[adKey]
+	);
+
+	const deleteTb = useCallback(
+		async (hash: string) => {
+			if (!torboxKey) return;
+
+			const torrents = await torrentDB.getAllByHash(hash);
+			for (const t of torrents) {
+				if (!t.id.startsWith('tb:')) continue;
+				await handleDeleteTbTorrent(torboxKey, t.id);
+				await torrentDB.deleteByHash('tb', hash);
+				setHashAndProgress((prev) => {
+					const newHashAndProgress = { ...prev };
+					delete newHashAndProgress[`tb:${hash}`];
+					return newHashAndProgress;
+				});
+			}
+		},
+		[torboxKey]
+	);
+
+	return {
+		hashAndProgress,
+		fetchHashAndProgress,
+		addRd,
+		addAd,
+		addTb,
+		deleteRd,
+		deleteAd,
+		deleteTb,
+	};
+}

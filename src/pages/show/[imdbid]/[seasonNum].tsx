@@ -4,34 +4,28 @@ import TvSearchResults from '@/components/TvSearchResults';
 import Poster from '@/components/poster';
 import { showInfoForRD } from '@/components/showInfo';
 import { useAllDebridApiKey, useRealDebridAccessToken } from '@/hooks/auth';
-import { FileData, SearchApiResponse, SearchResult } from '@/services/mediasearch';
+import { useAvailabilityCheck } from '@/hooks/useAvailabilityCheck';
+import { useExternalSources } from '@/hooks/useExternalSources';
+import { useMassReport } from '@/hooks/useMassReport';
+import { useTorrentManagement } from '@/hooks/useTorrentManagement';
+import { SearchApiResponse, SearchResult } from '@/services/mediasearch';
 import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
-import { UserTorrent } from '@/torrent/userTorrent';
-import { handleAddAsMagnetInAd, handleAddAsMagnetInRd } from '@/utils/addMagnet';
-import { removeAvailability, submitAvailability } from '@/utils/availability';
 import { handleCastTvShow } from '@/utils/castApiClient';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
-import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorrent';
 import {
 	getColorScale,
 	getExpectedEpisodeCount,
 	getQueryForEpisodeCount,
 } from '@/utils/episodeUtils';
-import { convertToUserTorrent, fetchAllDebrid } from '@/utils/fetchTorrents';
 import { instantCheckInRd } from '@/utils/instantChecks';
-import { processWithConcurrency } from '@/utils/parallelProcessor';
 import { quickSearch } from '@/utils/quickSearch';
 import { sortByMedian } from '@/utils/results';
 import { isVideo } from '@/utils/selectable';
 import { defaultEpisodeSize, defaultPlayer } from '@/utils/settings';
 import { castToastOptions, searchToastOptions } from '@/utils/toastOptions';
 import { generateTokenAndHash } from '@/utils/token';
-import {
-	getCachedTrackerStats,
-	getMultipleTrackerStats,
-	shouldIncludeTrackerStats,
-} from '@/utils/trackerStats';
+import { getMultipleTrackerStats } from '@/utils/trackerStats';
 import { withAuth } from '@/utils/withAuth';
 import axios, { AxiosError } from 'axios';
 import Head from 'next/head';
@@ -79,9 +73,14 @@ const TvSearch: FunctionComponent = () => {
 	const adKey = useAllDebridApiKey();
 	const [onlyShowCached, setOnlyShowCached] = useState<boolean>(false);
 	const [currentPage, setCurrentPage] = useState(0);
-	const [totalUncachedCount, setTotalUncachedCount] = useState<number>(0);
 	const [hasMoreResults, setHasMoreResults] = useState(true);
-	const [hashAndProgress, setHashAndProgress] = useState<Record<string, number>>({});
+	const [searchCompleteInfo, setSearchCompleteInfo] = useState<{
+		finalResults: number;
+		totalAvailableCount: number;
+		allSourcesCompleted: boolean;
+		pendingAvailabilityChecks: number;
+		isAvailabilityOnly?: boolean;
+	} | null>(null);
 	const [shouldDownloadMagnets] = useState(
 		() =>
 			typeof window !== 'undefined' &&
@@ -92,10 +91,36 @@ const TvSearch: FunctionComponent = () => {
 			typeof window !== 'undefined' &&
 			window.localStorage.getItem('settings:showMassReportButtons') === 'true'
 	);
-	const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
 
 	const router = useRouter();
 	const { imdbid, seasonNum } = router.query;
+
+	// Use shared hooks
+	const { hashAndProgress, fetchHashAndProgress, addRd, addAd, deleteRd, deleteAd } =
+		useTorrentManagement(
+			rdKey,
+			adKey,
+			null, // no torbox in TV show page
+			imdbid as string,
+			searchResults,
+			setSearchResults
+		);
+
+	const { fetchEpisodeFromExternalSource, getEnabledSources } = useExternalSources(rdKey);
+
+	const { isCheckingAvailability, handleCheckAvailability, handleAvailabilityTest } =
+		useAvailabilityCheck(
+			rdKey,
+			imdbid as string,
+			searchResults,
+			setSearchResults,
+			hashAndProgress,
+			addRd,
+			deleteRd,
+			sortByMedian
+		);
+
+	const { handleMassReport } = useMassReport(rdKey, adKey, null, imdbid as string);
 
 	const expectedEpisodeCount = useMemo(
 		() =>
@@ -158,7 +183,6 @@ const TvSearch: FunctionComponent = () => {
 		const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
 		if (page === 0) {
 			setSearchResults([]);
-			setTotalUncachedCount(0);
 		}
 		setErrorMessage('');
 		setSearchState('loading');
@@ -188,20 +212,13 @@ const TvSearch: FunctionComponent = () => {
 					if (completedSources === totalSources) {
 						allSourcesCompleted = true;
 						const finalCount = prevResults.length;
-						if (finalCount === 0) {
-							toast('No results found', searchToastOptions);
-						} else {
-							toast(`Found ${finalCount} unique results`, searchToastOptions);
-						}
 						setSearchState('loaded');
-
-						// If no pending availability checks, show the RD count now
-						if (pendingAvailabilityChecks === 0 && rdKey && totalAvailableCount > 0) {
-							toast(
-								`Found ${totalAvailableCount} available torrents in RD`,
-								searchToastOptions
-							);
-						}
+						setSearchCompleteInfo({
+							finalResults: finalCount,
+							totalAvailableCount,
+							allSourcesCompleted,
+							pendingAvailabilityChecks,
+						});
 					}
 					return prevResults;
 				}
@@ -214,7 +231,12 @@ const TvSearch: FunctionComponent = () => {
 					if (aAvailable !== bAvailable) {
 						return aAvailable ? -1 : 1;
 					}
-					return b.fileSize - a.fileSize;
+					// Second priority: file size (largest first)
+					if (a.fileSize !== b.fileSize) {
+						return b.fileSize - a.fileSize;
+					}
+					// Third priority: hash (alphabetically)
+					return a.hash.localeCompare(b.hash);
 				});
 
 				// Check availability for new non-cached results
@@ -254,10 +276,14 @@ const TvSearch: FunctionComponent = () => {
 							pendingAvailabilityChecks === 0 &&
 							totalAvailableCount > 0
 						) {
-							toast(
-								`Found ${totalAvailableCount} available torrents in RD`,
-								searchToastOptions
-							);
+							// Trigger the toast notification through state
+							setSearchCompleteInfo({
+								finalResults: 0,
+								totalAvailableCount,
+								allSourcesCompleted,
+								pendingAvailabilityChecks,
+								isAvailabilityOnly: true,
+							});
 						}
 					})();
 				}
@@ -265,22 +291,14 @@ const TvSearch: FunctionComponent = () => {
 				// Check if all sources completed
 				if (completedSources === totalSources) {
 					allSourcesCompleted = true;
-					// Show completion toast
 					const finalCount = sorted.length;
-					if (finalCount === 0) {
-						toast('No results found', searchToastOptions);
-					} else {
-						toast(`Found ${finalCount} unique results`, searchToastOptions);
-					}
 					setSearchState('loaded');
-
-					// If no pending availability checks, show the RD count now
-					if (pendingAvailabilityChecks === 0 && rdKey && totalAvailableCount > 0) {
-						toast(
-							`Found ${totalAvailableCount} available torrents in RD`,
-							searchToastOptions
-						);
-					}
+					setSearchCompleteInfo({
+						finalResults: finalCount,
+						totalAvailableCount,
+						allSourcesCompleted,
+						pendingAvailabilityChecks,
+					});
 				}
 
 				return sorted;
@@ -298,54 +316,73 @@ const TvSearch: FunctionComponent = () => {
 				const episodeCount = expectedEpisodeCount || 10;
 
 				// Count external sources
-				const enableTorrentio =
-					window.localStorage.getItem('settings:enableTorrentio') !== 'false';
-				const enableComet = window.localStorage.getItem('settings:enableComet') !== 'false';
-				const enableMediaFusion =
-					window.localStorage.getItem('settings:enableMediaFusion') !== 'false';
-				const enablePeerflix =
-					window.localStorage.getItem('settings:enablePeerflix') !== 'false';
-				const enableTorrentsDB =
-					window.localStorage.getItem('settings:enableTorrentsDB') !== 'false';
-
-				if (enableTorrentio) {
-					totalSources++;
-					externalSourcesActive++;
-				}
-				if (enableComet) {
-					totalSources++;
-					externalSourcesActive++;
-				}
-				if (enableMediaFusion) {
-					totalSources++;
-					externalSourcesActive++;
-				}
-				if (enablePeerflix) {
-					totalSources++;
-					externalSourcesActive++;
-				}
-				if (enableTorrentsDB) {
-					totalSources++;
-					externalSourcesActive++;
-				}
+				const enabledSources = getEnabledSources();
+				totalSources += enabledSources.length;
+				externalSourcesActive = enabledSources.length;
 
 				// Start external fetches
 				if (externalSourcesActive > 0) {
-					fetchExternalTvData(
-						imdbId,
-						seasonNum,
-						episodeCount,
-						(episodeResults, source) => {
-							// Process each episode batch immediately
-							processSourceResults(episodeResults, source);
-						},
-						() => {
-							// Called when each source completes - no need to increment here
-							// as processSourceResults already handles it
+					// Process each source in parallel
+					enabledSources.forEach(async (source) => {
+						try {
+							let episodeNum = 1;
+							let consecutiveEmpty = 0;
+
+							// Keep fetching episodes, 2 at a time
+							while (episodeNum <= episodeCount + 10) {
+								// Allow some buffer beyond expected
+								const batch = [episodeNum, episodeNum + 1];
+								const batchPromises = batch.map((ep) =>
+									fetchEpisodeFromExternalSource(imdbId, seasonNum, ep, source)
+								);
+
+								const batchResults = await Promise.all(batchPromises);
+
+								// Process each episode's results immediately
+								let allEmpty = true;
+								for (let i = 0; i < batchResults.length; i++) {
+									const episodeResults = batchResults[i];
+									if (episodeResults.length > 0) {
+										allEmpty = false;
+										// Send results immediately for progressive display
+										processSourceResults(episodeResults, source);
+									}
+								}
+
+								if (allEmpty) {
+									consecutiveEmpty++;
+									// Stop if we get 2 consecutive empty batches (4 episodes)
+									if (consecutiveEmpty >= 2) {
+										break;
+									}
+								} else {
+									consecutiveEmpty = 0;
+								}
+
+								episodeNum += 2;
+
+								// Add a small delay to avoid hammering the API
+								await new Promise((resolve) => setTimeout(resolve, 100));
+							}
+						} catch (error) {
+							console.error(`Error fetching ${source}:`, error);
+						} finally {
+							// Source completed
+							completedSources++;
+							if (completedSources === totalSources) {
+								allSourcesCompleted = true;
+								setSearchState('loaded');
+								setSearchResults((prevResults) => {
+									setSearchCompleteInfo({
+										finalResults: prevResults.length,
+										totalAvailableCount: 0, // No availability count from external sources
+										allSourcesCompleted,
+										pendingAvailabilityChecks: 0,
+									});
+									return prevResults;
+								});
+							}
 						}
-					).catch((err) => {
-						console.error('External sources error:', err);
-						// Should not happen as individual source errors are caught
 					});
 				}
 			}
@@ -389,14 +426,58 @@ const TvSearch: FunctionComponent = () => {
 		}
 	}
 
-	useEffect(() => {
+	// Derive filtered results and uncached count using useMemo to prevent setState during render
+	const filteredResultsMemo = useMemo(() => {
 		if (searchResults.length === 0) {
-			setFilteredResults([]);
-			return;
+			return [];
 		}
-		const filteredResults = quickSearch(query, searchResults);
-		setFilteredResults(filteredResults);
+		return quickSearch(query, searchResults);
 	}, [query, searchResults]);
+
+	const totalUncachedCount = useMemo(() => {
+		return filteredResultsMemo.filter((r) => !r.rdAvailable && !r.adAvailable && !r.tbAvailable)
+			.length;
+	}, [filteredResultsMemo]);
+
+	// Update filteredResults state when memo changes
+	useEffect(() => {
+		setFilteredResults(filteredResultsMemo);
+	}, [filteredResultsMemo]);
+
+	// Handle toast notifications when search completes
+	useEffect(() => {
+		if (!searchCompleteInfo) return;
+
+		const {
+			finalResults,
+			totalAvailableCount,
+			allSourcesCompleted,
+			pendingAvailabilityChecks,
+			isAvailabilityOnly,
+		} = searchCompleteInfo;
+
+		// Show search results toast (only if this is not an availability-only update)
+		if (!isAvailabilityOnly) {
+			if (finalResults === 0) {
+				toast('No results found', searchToastOptions);
+			} else {
+				toast(`Found ${finalResults} unique results`, searchToastOptions);
+			}
+		}
+
+		// Show availability toast
+		if (
+			allSourcesCompleted &&
+			pendingAvailabilityChecks === 0 &&
+			rdKey &&
+			totalAvailableCount > 0
+		) {
+			toast(`Found ${totalAvailableCount} available torrents in RD`, searchToastOptions);
+		}
+
+		// Clear the info after handling
+		setSearchCompleteInfo(null);
+	}, [searchCompleteInfo, rdKey]);
 
 	// Load cached tracker stats from database for uncached torrents
 	useEffect(() => {
@@ -461,508 +542,6 @@ const TvSearch: FunctionComponent = () => {
 		hasLoadedTrackerStats.current = false;
 	}, [imdbid, seasonNum]);
 
-	async function fetchHashAndProgress(hash?: string) {
-		const torrents = await torrentDB.all();
-		const records: Record<string, number> = {};
-		for (const t of torrents) {
-			if (hash && t.hash !== hash) continue;
-			records[`${t.id.substring(0, 3)}${t.hash}`] = t.progress;
-		}
-		setHashAndProgress((prev) => ({ ...prev, ...records }));
-	}
-
-	// External source functions for TV shows
-	async function getMediaFusionHash(): Promise<string> {
-		// Check if we have a cached hash in localStorage
-		const cacheKey = 'mediafusion_hash';
-		const cachedData = localStorage.getItem(cacheKey);
-
-		if (cachedData) {
-			// Handle old format (JSON object) and new format (plain string)
-			try {
-				const parsed = JSON.parse(cachedData);
-				if (parsed.hash) {
-					// Old format - extract hash and update storage
-					localStorage.setItem(cacheKey, parsed.hash);
-					return parsed.hash;
-				}
-			} catch (e) {
-				// Not JSON, assume it's already a plain string
-				return cachedData;
-			}
-		}
-
-		// Generate new hash
-		try {
-			const config = {
-				streaming_provider: null,
-				selected_catalogs: [],
-				selected_resolutions: [
-					'4k',
-					'2160p',
-					'1440p',
-					'1080p',
-					'720p',
-					'576p',
-					'480p',
-					'360p',
-					'240p',
-					null,
-				],
-				enable_catalogs: true,
-				enable_imdb_metadata: false,
-				max_size: 'inf',
-				max_streams_per_resolution: '10',
-				torrent_sorting_priority: [
-					{ key: 'language', direction: 'desc' },
-					{ key: 'cached', direction: 'desc' },
-					{ key: 'resolution', direction: 'desc' },
-					{ key: 'quality', direction: 'desc' },
-					{ key: 'size', direction: 'desc' },
-					{ key: 'seeders', direction: 'desc' },
-					{ key: 'created_at', direction: 'desc' },
-				],
-				show_full_torrent_name: true,
-				show_language_country_flag: false,
-				nudity_filter: ['Disable'],
-				certification_filter: ['Disable'],
-				language_sorting: [
-					'English',
-					'Tamil',
-					'Hindi',
-					'Malayalam',
-					'Kannada',
-					'Telugu',
-					'Chinese',
-					'Russian',
-					'Arabic',
-					'Japanese',
-					'Korean',
-					'Taiwanese',
-					'Latino',
-					'French',
-					'Spanish',
-					'Portuguese',
-					'Italian',
-					'German',
-					'Ukrainian',
-					'Polish',
-					'Czech',
-					'Thai',
-					'Indonesian',
-					'Vietnamese',
-					'Dutch',
-					'Bengali',
-					'Turkish',
-					'Greek',
-					'Swedish',
-					'Romanian',
-					'Hungarian',
-					'Finnish',
-					'Norwegian',
-					'Danish',
-					'Hebrew',
-					'Lithuanian',
-					'Punjabi',
-					'Marathi',
-					'Gujarati',
-					'Bhojpuri',
-					'Nepali',
-					'Urdu',
-					'Tagalog',
-					'Filipino',
-					'Malay',
-					'Mongolian',
-					'Armenian',
-					'Georgian',
-					null,
-				],
-				quality_filter: ['BluRay/UHD', 'WEB/HD', 'DVD/TV/SAT', 'CAM/Screener', 'Unknown'],
-				api_password: null,
-				mediaflow_config: null,
-				rpdb_config: null,
-				live_search_streams: false,
-				contribution_streams: false,
-				mdblist_config: null,
-			};
-
-			const response = await axios.post(
-				'https://mediafusion.elfhosted.com/encrypt-user-data',
-				config,
-				{
-					headers: { 'content-type': 'application/json' },
-				}
-			);
-
-			if (response.data?.encrypted_str) {
-				// Cache the hash permanently
-				localStorage.setItem(cacheKey, response.data.encrypted_str);
-				return response.data.encrypted_str;
-			}
-		} catch (error) {
-			console.error('Error generating MediaFusion hash:', error);
-		}
-
-		return ''; // Return empty string if generation fails
-	}
-
-	async function fetchExternalEpisodeData(
-		imdbId: string,
-		seasonNum: number,
-		episodeNum: number,
-		source: 'torrentio' | 'comet' | 'mediafusion' | 'peerflix' | 'torrentsdb'
-	): Promise<SearchResult[]> {
-		if (!rdKey) return [];
-
-		try {
-			let url = '';
-			if (source === 'torrentio') {
-				url = `https://torrentio.strem.fun/realdebrid=real-debrid-key/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
-			} else if (source === 'comet') {
-				url = `https://comet.elfhosted.com/realdebrid=real-debrid-key/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
-			} else if (source === 'mediafusion') {
-				const specialHash = await getMediaFusionHash();
-				if (!specialHash) return [];
-				url = `https://mediafusion.elfhosted.com/${specialHash}/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
-			} else if (source === 'peerflix') {
-				url = `https://addon.peerflix.mov/realdebrid=real-debrid-key/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
-			} else if (source === 'torrentsdb') {
-				url = `https://torrentsdb.com/${rdKey}/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
-			}
-
-			const response = await axios.get(url);
-
-			if (response.data?.streams && response.data.streams.length > 0) {
-				// Transform streams to SearchResult format
-				const transformedResults: SearchResult[] = response.data.streams
-					.map((stream: any) => {
-						let cleanTitle = '';
-						let fileSize = 0;
-						let hash = '';
-
-						if (source === 'torrentio') {
-							// Parse Torrentio format
-							cleanTitle = stream.title || stream.name || '';
-							const titleParts = cleanTitle.split('\n');
-							if (titleParts.length > 1) {
-								cleanTitle = titleParts[0].trim();
-							}
-
-							const sizeMatch = stream.title?.match(/💾\s*([\d.]+)\s*(GB|MB|TB)/i);
-							if (sizeMatch) {
-								const size = parseFloat(sizeMatch[1]);
-								if (sizeMatch[2].toUpperCase() === 'TB') {
-									fileSize = size * 1024 * 1024;
-								} else if (sizeMatch[2].toUpperCase() === 'GB') {
-									fileSize = size * 1024;
-								} else {
-									fileSize = size;
-								}
-							}
-
-							const hashMatch = stream.url?.match(/\/([a-f0-9]{40})\//);
-							hash = hashMatch ? hashMatch[1] : '';
-						} else if (source === 'peerflix') {
-							// Parse Peerflix format
-							if (stream.title) {
-								const lines = stream.title.split('\n');
-								if (lines.length > 0) {
-									cleanTitle = lines[0].trim();
-								}
-							}
-							if (!cleanTitle) {
-								cleanTitle = stream.name || '';
-							}
-
-							const sizeMatch = stream.title?.match(/💾\s*([\d.]+)\s*(GB|MB|TB)/i);
-							if (sizeMatch) {
-								const size = parseFloat(sizeMatch[1]);
-								if (sizeMatch[2].toUpperCase() === 'TB') {
-									fileSize = size * 1024 * 1024;
-								} else if (sizeMatch[2].toUpperCase() === 'GB') {
-									fileSize = size * 1024;
-								} else {
-									fileSize = size;
-								}
-							}
-
-							const hashMatch = stream.url?.match(/\/([a-f0-9]{40})\//);
-							hash = hashMatch ? hashMatch[1] : '';
-						} else if (source === 'torrentsdb') {
-							// Parse TorrentsDB format
-							if (stream.title) {
-								const lines = stream.title.split('\n');
-								if (lines.length > 0) {
-									cleanTitle = lines[0].trim();
-								}
-							}
-							if (!cleanTitle && stream.name) {
-								const nameParts = stream.name.split('\n');
-								cleanTitle = nameParts[nameParts.length - 1].trim();
-							}
-
-							const sizeMatch = stream.title?.match(/💾\s*([\d.]+)\s*(GB|MB|TB)/i);
-							if (sizeMatch) {
-								const size = parseFloat(sizeMatch[1]);
-								if (sizeMatch[2].toUpperCase() === 'TB') {
-									fileSize = size * 1024 * 1024;
-								} else if (sizeMatch[2].toUpperCase() === 'GB') {
-									fileSize = size * 1024;
-								} else {
-									fileSize = size;
-								}
-							}
-
-							hash = stream.infoHash || '';
-						} else {
-							// Parse Comet/MediaFusion format
-							if (stream.description) {
-								const lines = stream.description.split('\n');
-								if (lines.length > 0) {
-									cleanTitle = lines[0]
-										.replace(/^\[TORRENT🧲\]\s*/, '')
-										.replace(/^📂\s*/, '')
-										.replace(/^📄\s*/, '')
-										.trim();
-								}
-							}
-							if (!cleanTitle) {
-								cleanTitle = stream.behaviorHints?.filename || stream.name || '';
-							}
-
-							if (stream.behaviorHints?.videoSize) {
-								fileSize = stream.behaviorHints.videoSize / (1024 * 1024);
-							} else if (stream.description) {
-								const sizeMatch = stream.description.match(
-									/💾\s*([\d.]+)\s*(GB|MB|TB)/i
-								);
-								if (sizeMatch) {
-									const size = parseFloat(sizeMatch[1]);
-									if (sizeMatch[2].toUpperCase() === 'TB') {
-										fileSize = size * 1024 * 1024;
-									} else if (sizeMatch[2].toUpperCase() === 'GB') {
-										fileSize = size * 1024;
-									} else {
-										fileSize = size;
-									}
-								}
-							}
-
-							hash = stream.infoHash || '';
-						}
-
-						const filename = stream.behaviorHints?.filename || cleanTitle;
-						const files: FileData[] = [];
-						if (filename) {
-							files.push({
-								fileId: stream.fileIdx || 0,
-								filename: filename,
-								filesize: stream.behaviorHints?.videoSize || fileSize * 1024 * 1024,
-							});
-						}
-
-						return {
-							title: cleanTitle,
-							fileSize: fileSize,
-							hash: hash,
-							rdAvailable: false,
-							adAvailable: false,
-							tbAvailable: false,
-							files: files,
-							noVideos: false,
-							medianFileSize: fileSize,
-							biggestFileSize: fileSize,
-							videoCount: 1,
-							imdbId: imdbId,
-						};
-					})
-					.filter((r: SearchResult) => r.hash);
-
-				return transformedResults;
-			}
-			return [];
-		} catch (error) {
-			// Silently fail - external sources are supplementary
-			return [];
-		}
-	}
-
-	async function fetchExternalTvData(
-		imdbId: string,
-		seasonNum: number,
-		expectedEpisodes: number,
-		onEpisodeResults: (results: SearchResult[], source: string) => void,
-		onSourceComplete?: () => void
-	): Promise<void> {
-		if (!rdKey) return;
-
-		// Check which external sources are enabled
-		const enableTorrentio = window.localStorage.getItem('settings:enableTorrentio') !== 'false';
-		const enableComet = window.localStorage.getItem('settings:enableComet') !== 'false';
-		const enableMediaFusion =
-			window.localStorage.getItem('settings:enableMediaFusion') !== 'false';
-		const enablePeerflix = window.localStorage.getItem('settings:enablePeerflix') !== 'false';
-		const enableTorrentsDB =
-			window.localStorage.getItem('settings:enableTorrentsDB') !== 'false';
-
-		if (
-			!enableTorrentio &&
-			!enableComet &&
-			!enableMediaFusion &&
-			!enablePeerflix &&
-			!enableTorrentsDB
-		) {
-			return;
-		}
-
-		const sources: Array<'torrentio' | 'comet' | 'mediafusion' | 'peerflix' | 'torrentsdb'> =
-			[];
-
-		if (enableTorrentio) sources.push('torrentio');
-		if (enableComet) sources.push('comet');
-		if (enableMediaFusion) sources.push('mediafusion');
-		if (enablePeerflix) sources.push('peerflix');
-		if (enableTorrentsDB) sources.push('torrentsdb');
-
-		// Process each source in parallel
-		const sourcePromises = sources.map(async (source) => {
-			try {
-				let episodeNum = 1;
-				let consecutiveEmpty = 0;
-
-				// Keep fetching episodes, 2 at a time
-				while (episodeNum <= expectedEpisodes + 10) {
-					// Allow some buffer beyond expected
-					const batch = [episodeNum, episodeNum + 1];
-					const batchPromises = batch.map((ep) =>
-						fetchExternalEpisodeData(imdbId, seasonNum, ep, source)
-					);
-
-					const batchResults = await Promise.all(batchPromises);
-
-					// Process each episode's results immediately
-					let allEmpty = true;
-					for (let i = 0; i < batchResults.length; i++) {
-						const episodeResults = batchResults[i];
-						if (episodeResults.length > 0) {
-							allEmpty = false;
-							// Send results immediately for progressive display
-							onEpisodeResults(episodeResults, source);
-						}
-					}
-
-					if (allEmpty) {
-						consecutiveEmpty++;
-						// Stop if we get 2 consecutive empty batches (4 episodes)
-						if (consecutiveEmpty >= 2) {
-							break;
-						}
-					} else {
-						consecutiveEmpty = 0;
-					}
-
-					episodeNum += 2;
-
-					// Add a small delay to avoid hammering the API
-					await new Promise((resolve) => setTimeout(resolve, 100));
-				}
-			} catch (error) {
-				console.error(`Error fetching ${source}:`, error);
-			} finally {
-				// Notify that this source is complete
-				if (onSourceComplete) {
-					onSourceComplete();
-				}
-			}
-		});
-
-		// Wait for all sources to complete
-		await Promise.all(sourcePromises);
-	}
-
-	async function addRd(hash: string, isCheckingAvailability = false): Promise<any> {
-		const torrentResult = searchResults.find((r) => r.hash === hash);
-		const wasMarkedAvailable = torrentResult?.rdAvailable || false;
-		let torrentInfo: TorrentInfoResponse | null = null;
-
-		await handleAddAsMagnetInRd(rdKey!, hash, async (info: TorrentInfoResponse) => {
-			torrentInfo = info;
-			const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
-
-			// Only handle false positives for actual usage, not availability checks
-			if (!isCheckingAvailability && wasMarkedAvailable) {
-				// Check for false positive conditions
-				const isFalsePositive =
-					info.status !== 'downloaded' ||
-					info.progress !== 100 ||
-					info.files?.filter((f) => f.selected === 1).length === 0;
-
-				if (isFalsePositive) {
-					// Remove false positive from availability database
-					await removeAvailability(
-						tokenWithTimestamp,
-						tokenHash,
-						hash,
-						`Status: ${info.status}, Progress: ${info.progress}%, Selected files: ${info.files?.filter((f) => f.selected === 1).length || 0}`
-					);
-
-					// Update UI
-					setSearchResults((prev) =>
-						prev.map((r) => (r.hash === hash ? { ...r, rdAvailable: false } : r))
-					);
-
-					toast.error('This torrent was incorrectly marked as available.');
-				}
-			}
-
-			// Only submit availability for truly available torrents
-			if (info.status === 'downloaded' && info.progress === 100) {
-				await submitAvailability(tokenWithTimestamp, tokenHash, info, imdbid as string);
-			}
-
-			await torrentDB.add(convertToUserTorrent(info)).then(() => fetchHashAndProgress(hash));
-		});
-
-		return isCheckingAvailability ? torrentInfo : undefined;
-	}
-
-	async function addAd(hash: string) {
-		await handleAddAsMagnetInAd(adKey!, hash);
-		await fetchAllDebrid(
-			adKey!,
-			async (torrents: UserTorrent[]) => await torrentDB.addAll(torrents)
-		);
-		await fetchHashAndProgress();
-	}
-
-	async function deleteRd(hash: string) {
-		const torrents = await torrentDB.getAllByHash(hash);
-		for (const t of torrents) {
-			if (!t.id.startsWith('rd:')) continue;
-			await handleDeleteRdTorrent(rdKey!, t.id);
-			await torrentDB.deleteByHash('rd', hash);
-			setHashAndProgress((prev) => {
-				const newHashAndProgress = { ...prev };
-				delete newHashAndProgress[`rd:${hash}`];
-				return newHashAndProgress;
-			});
-		}
-	}
-
-	async function deleteAd(hash: string) {
-		const torrents = await torrentDB.getAllByHash(hash);
-		for (const t of torrents) {
-			if (!t.id.startsWith('ad:')) continue;
-			await handleDeleteAdTorrent(adKey!, t.id);
-			await torrentDB.deleteByHash('ad', hash);
-			setHashAndProgress((prev) => {
-				const newHashAndProgress = { ...prev };
-				delete newHashAndProgress[`ad:${hash}`];
-				return newHashAndProgress;
-			});
-		}
-	}
-
 	const handleShowInfo = (result: SearchResult) => {
 		let files = result.files
 			.filter((file) => isVideo({ path: file.filename }))
@@ -1008,409 +587,33 @@ const TvSearch: FunctionComponent = () => {
 		window.open(`stremio://detail/series/${imdbid}/${imdbid}:${seasonNum}:1`);
 	}
 
-	async function handleCheckAvailability(result: SearchResult) {
-		if (result.rdAvailable) {
-			toast.success('This torrent is already available in Real Debrid');
-			return;
-		}
-
-		const toastId = toast.loading('Checking availability...');
-
-		try {
-			// Run both checks in parallel
-			const [rdCheckResult, trackerStatsResult] = await Promise.allSettled([
-				// RD availability check
-				(async () => {
-					let addRdResponse: any;
-					// Check if torrent is in progress
-					if (`rd:${result.hash}` in hashAndProgress) {
-						await deleteRd(result.hash);
-						addRdResponse = await addRd(result.hash, true); // Pass flag to indicate this is a check
-					} else {
-						addRdResponse = await addRd(result.hash, true); // Pass flag to indicate this is a check
-						await deleteRd(result.hash);
-					}
-
-					// Check if addRd found it cached (returns response with ID)
-					const isCachedInRD =
-						addRdResponse &&
-						addRdResponse.id &&
-						addRdResponse.status === 'downloaded' &&
-						addRdResponse.progress === 100;
-
-					return { addRdResponse, isCachedInRD };
-				})(),
-
-				// Tracker stats check (only if enabled and not already RD available)
-				(async () => {
-					if (!shouldIncludeTrackerStats() || result.rdAvailable) {
-						return null;
-					}
-
-					// For single torrent checks, force refresh if it was previously dead
-					// This ensures we always check if dead torrents have come back to life
-					const currentStats = result.trackerStats;
-					const forceRefresh = currentStats && currentStats.seeders === 0;
-
-					// Use cached stats if fresh, otherwise scrape new ones
-					// Dead torrents have 1-hour cache, live torrents have 24-hour cache
-					return await getCachedTrackerStats(result.hash, 24, forceRefresh);
-				})(),
-			]);
-
-			// Process RD check result
-			let isCachedInRD = false;
-			if (rdCheckResult.status === 'fulfilled') {
-				isCachedInRD = rdCheckResult.value.isCachedInRD;
-			} else {
-				console.error('RD availability check failed:', rdCheckResult.reason);
-			}
-
-			// Process tracker stats result (only if not cached in RD)
-			if (
-				trackerStatsResult.status === 'fulfilled' &&
-				trackerStatsResult.value &&
-				!isCachedInRD
-			) {
-				const trackerStats = trackerStatsResult.value;
-
-				// Update the search result with tracker stats
-				const updatedResults = searchResults.map((r) => {
-					if (r.hash === result.hash) {
-						return {
-							...r,
-							trackerStats: {
-								seeders: trackerStats.seeders,
-								leechers: trackerStats.leechers,
-								downloads: trackerStats.downloads,
-								hasActivity:
-									trackerStats.seeders >= 1 &&
-									trackerStats.leechers + trackerStats.downloads >= 1,
-							},
-						};
-					}
-					return r;
-				});
-				setSearchResults(updatedResults);
-				setFilteredResults(
-					updatedResults.filter((r) =>
-						onlyShowCached ? r.rdAvailable || r.adAvailable : true
-					)
-				);
-			} else if (trackerStatsResult.status === 'rejected' && !isCachedInRD) {
-				console.error('Failed to get tracker stats:', trackerStatsResult.reason);
-			}
-
-			toast.success('Availability check complete', { id: toastId });
-
-			// Refetch data instead of reloading
-			if (isMounted.current) {
-				const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
-				const hashArr = [result.hash];
-				await instantCheckInRd(
-					tokenWithTimestamp,
-					tokenHash,
-					imdbid as string,
-					hashArr,
-					setSearchResults,
-					sortByMedian
-				);
-			}
-
-			// Reload the page after a short delay to show the result
-			setTimeout(() => {
-				if (isMounted.current) {
-					window.location.reload();
-				}
-			}, 1500);
-		} catch (error) {
-			toast.error('Failed to check availability', { id: toastId });
-			console.error('Availability check error:', error);
-
-			// Reload the page after a short delay even on error
-			setTimeout(() => {
-				if (isMounted.current) {
-					window.location.reload();
-				}
-			}, 1500);
-		}
-	}
-
-	async function handleAvailabilityTest() {
-		if (isCheckingAvailability) return;
-
-		const nonAvailableResults = filteredResults.filter((r) => !r.rdAvailable);
-		let progressToast: string | null = null;
-		let realtimeAvailableCount = 0;
-
-		// Show initial toast immediately
-		if (nonAvailableResults.length === 0) {
-			toast.error('No torrents to test for availability');
-			return;
-		}
-
-		// Get availability check limit from settings
-		const availabilityCheckLimit = parseInt(
-			window.localStorage.getItem('settings:availabilityCheckLimit') || '0'
-		);
-
-		// Apply limit if set (0 means no limit)
-		let torrentsToCheck = nonAvailableResults;
-		if (availabilityCheckLimit > 0 && nonAvailableResults.length > availabilityCheckLimit) {
-			torrentsToCheck = nonAvailableResults.slice(0, availabilityCheckLimit);
-			toast(
-				`Checking first ${availabilityCheckLimit} torrents out of ${nonAvailableResults.length} (limit set in settings)`,
-				{ duration: 4000 }
-			);
-		}
-
-		setIsCheckingAvailability(true);
-		progressToast = toast.loading(
-			`Starting availability test for ${torrentsToCheck.length} torrents...`
-		);
-
-		// Track progress for both operations
-		let rdProgress = { completed: 0, total: torrentsToCheck.length };
-		let statsProgress = { completed: 0, total: 0 };
-		let torrentsWithSeeds = 0;
-
-		const updateProgressMessage = () => {
-			let message = '';
-
-			// RD progress
-			if (rdProgress.total > 0) {
-				message =
-					realtimeAvailableCount > 0
-						? `RD: ${rdProgress.completed}/${rdProgress.total} (${realtimeAvailableCount} found)`
-						: `RD: ${rdProgress.completed}/${rdProgress.total}`;
-			}
-
-			// Tracker stats progress (only show if enabled and has items)
-			if (shouldIncludeTrackerStats() && statsProgress.total > 0) {
-				if (message) message += ' | ';
-				message +=
-					torrentsWithSeeds > 0
-						? `Tracker Stats: ${statsProgress.completed}/${statsProgress.total} (${torrentsWithSeeds} with seeds)`
-						: `Tracker Stats: ${statsProgress.completed}/${statsProgress.total}`;
-			}
-
-			if (progressToast && isMounted.current && message) {
-				toast.loading(message, { id: progressToast });
-			}
-		};
-
-		try {
-			// Run RD checks and tracker stats completely in parallel
-			const [rdCheckResults, trackerStatsResults] = await Promise.all([
-				// RD availability checks with concurrency limit
-				processWithConcurrency(
-					torrentsToCheck,
-					async (result: SearchResult) => {
-						try {
-							let addRdResponse: any;
-							if (`rd:${result.hash}` in hashAndProgress) {
-								await deleteRd(result.hash);
-								addRdResponse = await addRd(result.hash, true); // Pass flag for availability test
-							} else {
-								addRdResponse = await addRd(result.hash, true); // Pass flag for availability test
-								await deleteRd(result.hash);
-							}
-
-							// Check if addRd returned a response with an ID AND is truly available
-							const isCachedInRD =
-								addRdResponse &&
-								addRdResponse.id &&
-								addRdResponse.status === 'downloaded' &&
-								addRdResponse.progress === 100;
-
-							if (isCachedInRD) {
-								realtimeAvailableCount++;
-							}
-
-							return { result, isCachedInRD };
-						} catch (error) {
-							console.error(`Failed RD check for ${result.title}:`, error);
-							throw error;
-						}
-					},
-					3,
-					(completed: number, total: number) => {
-						rdProgress = { completed, total };
-						updateProgressMessage();
-					}
-				),
-
-				// Tracker stats checks (only for non-RD available torrents)
-				(async () => {
-					if (!shouldIncludeTrackerStats()) {
-						return [];
-					}
-
-					// Filter out torrents that are already RD available
-					const torrentsNeedingStats = torrentsToCheck.filter((t) => !t.rdAvailable);
-
-					if (torrentsNeedingStats.length === 0) {
-						return [];
-					}
-
-					statsProgress.total = torrentsNeedingStats.length;
-					updateProgressMessage();
-
-					return processWithConcurrency(
-						torrentsNeedingStats,
-						async (result: SearchResult) => {
-							try {
-								// For bulk checks, use 72-hour cache to reduce load
-								const trackerStats = await getCachedTrackerStats(
-									result.hash,
-									72,
-									false
-								);
-								if (trackerStats) {
-									result.trackerStats = {
-										seeders: trackerStats.seeders,
-										leechers: trackerStats.leechers,
-										downloads: trackerStats.downloads,
-										hasActivity:
-											trackerStats.seeders >= 1 &&
-											trackerStats.leechers + trackerStats.downloads >= 1,
-									};
-
-									// Count torrents with seeds
-									if (trackerStats.seeders > 0) {
-										torrentsWithSeeds++;
-									}
-								}
-								return { result, trackerStats };
-							} catch (error) {
-								console.error(
-									`Failed to get tracker stats for ${result.title}:`,
-									error
-								);
-								return { result, trackerStats: null };
-							}
-						},
-						5, // Higher concurrency for tracker stats since they're lighter
-						(completed: number, total: number) => {
-							statsProgress = { completed, total };
-							updateProgressMessage();
-						}
-					);
-				})(),
-			]);
-
-			// Filter out tracker stats for torrents that turned out to be RD cached
-			const rdCachedHashes = new Set(
-				rdCheckResults
-					.filter((r) => r.success && r.result?.isCachedInRD)
-					.map((r) => r.item.hash)
-			);
-
-			// Apply tracker stats only to non-cached torrents
-			trackerStatsResults.forEach((statsResult: any) => {
-				if (
-					statsResult.success &&
-					statsResult.result?.trackerStats &&
-					!rdCachedHashes.has(statsResult.item.hash)
-				) {
-					// Stats will already be set on the result object
-				} else if (statsResult.success && rdCachedHashes.has(statsResult.item.hash)) {
-					// Clear tracker stats for RD cached torrents
-					delete statsResult.item.trackerStats;
-				}
-			});
-
-			const succeeded = rdCheckResults.filter((r) => r.success);
-			const failed = rdCheckResults.filter((r) => !r.success);
-
-			if (progressToast && isMounted.current) {
-				toast.dismiss(progressToast);
-			}
-
-			// Get the final accurate count with a single instant check
-			let availableCount = 0;
-			if (succeeded.length > 0 && isMounted.current) {
-				const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
-				const successfulHashes = succeeded.map((r) => r.item.hash);
-				availableCount = await instantCheckInRd(
-					tokenWithTimestamp,
-					tokenHash,
-					imdbid as string,
-					successfulHashes,
-					setSearchResults,
-					sortByMedian
-				);
-			}
-
-			// Update search results with tracker stats for torrents that have them
-			if (isMounted.current) {
-				setSearchResults((prevResults) => {
-					return prevResults.map((r) => {
-						const torrentWithStats = torrentsToCheck.find((t) => t.hash === r.hash);
-						if (torrentWithStats && torrentWithStats.trackerStats) {
-							return {
-								...r,
-								trackerStats: torrentWithStats.trackerStats,
-							};
-						}
-						return r;
-					});
-				});
-			}
-
-			const totalCount = rdCheckResults.length;
-			if (failed.length > 0) {
-				toast.error(
-					`Failed to test ${failed.length} out of ${totalCount} torrents. Successfully tested ${succeeded.length} (${availableCount} found).`,
-					{ duration: 5000 }
-				);
-			} else {
-				toast.success(
-					`Successfully tested all ${totalCount} torrents (${availableCount} found)`,
-					{
-						duration: 3000,
-					}
-				);
-			}
-
-			// Reload the page after a short delay to show the final result
-			setTimeout(() => {
-				if (isMounted.current) {
-					window.location.reload();
-				}
-			}, 1500);
-		} catch (error) {
-			if (progressToast && isMounted.current) {
-				toast.dismiss(progressToast);
-			}
-			if (isMounted.current) {
-				toast.error('Failed to complete availability test');
-			}
-			console.error('Availability test error:', error);
-
-			// Reload the page after a short delay even on error
-			setTimeout(() => {
-				if (isMounted.current) {
-					window.location.reload();
-				}
-			}, 1500);
-		} finally {
-			setIsCheckingAvailability(false);
-		}
-	}
-
-	const getFirstAvailableRdTorrent = () => {
-		return filteredResults.find((r) => r.rdAvailable && !r.noVideos);
-	};
-
+	// Helper function to find the first complete season torrent
 	const getFirstCompleteSeasonTorrent = () => {
-		return filteredResults.find(
-			(r) => r.rdAvailable && !r.noVideos && r.videoCount === expectedEpisodeCount
-		);
+		// Find torrents that have all or most episodes for the season
+		// A complete season typically has videoCount close to expectedEpisodeCount
+		return filteredResults.find((result) => {
+			// Must be available in RD
+			if (!result.rdAvailable) return false;
+
+			// Check if it has enough videos for a complete season
+			// Allow some flexibility (e.g., season might have 22 episodes but torrent has 20-24)
+			const minEpisodes = Math.max(1, expectedEpisodeCount - 2);
+			const maxEpisodes = expectedEpisodeCount + 2;
+
+			return result.videoCount >= minEpisodes && result.videoCount <= maxEpisodes;
+		});
 	};
 
+	// Helper function to find individual episode torrents
 	const getIndividualEpisodeTorrents = () => {
-		return filteredResults.filter((r) => r.rdAvailable && !r.noVideos && r.videoCount === 1);
+		// Find torrents that are individual episodes (videoCount === 1)
+		return filteredResults.filter((result) => {
+			// Must be available in RD
+			if (!result.rdAvailable) return false;
+
+			// Individual episodes typically have exactly 1 video file
+			return result.videoCount === 1;
+		});
 	};
 
 	async function handleInstantRdWholeSeason() {
@@ -1559,71 +762,6 @@ const TvSearch: FunctionComponent = () => {
 		}
 	}
 
-	async function handleMassReport(type: 'porn' | 'wrong_imdb' | 'wrong_season') {
-		if (!rdKey) {
-			toast.error('Please login to Real-Debrid first');
-			return;
-		}
-
-		if (filteredResults.length === 0) {
-			toast.error('No torrents to report');
-			return;
-		}
-
-		// Confirm with user
-		const typeLabels = {
-			porn: 'pornographic content',
-			wrong_imdb: 'wrong IMDB ID',
-			wrong_season: 'wrong season',
-		};
-		const confirmMessage = `Report ${filteredResults.length} torrents as ${typeLabels[type]}?`;
-		if (!confirm(confirmMessage)) return;
-
-		const toastId = toast.loading(`Reporting ${filteredResults.length} torrents...`);
-
-		try {
-			// Use the RD/AD key as userId, same as individual ReportButton
-			const userId = rdKey || adKey || '';
-
-			// Prepare reports data
-			const reports = filteredResults.map((result) => ({
-				hash: result.hash,
-				imdbId: imdbid as string,
-			}));
-
-			// Send mass report
-			const response = await axios.post('/api/report/mass', {
-				reports,
-				userId,
-				type,
-			});
-
-			if (response.data.success) {
-				toast.success(`Successfully reported ${response.data.reported} torrents`, {
-					id: toastId,
-				});
-				if (response.data.failed > 0) {
-					toast.error(`Failed to report ${response.data.failed} torrents`);
-				}
-			} else {
-				toast.error('Failed to report torrents', { id: toastId });
-			}
-
-			// Reload the page after a short delay to refresh the results
-			setTimeout(() => {
-				window.location.reload();
-			}, 1500);
-		} catch (error) {
-			console.error('Mass report error:', error);
-			toast.error('Failed to report torrents', { id: toastId });
-
-			// Reload the page after a short delay even on error
-			setTimeout(() => {
-				window.location.reload();
-			}, 1500);
-		}
-	}
-
 	const backdropStyle = showInfo?.backdrop
 		? {
 				backgroundImage: `linear-gradient(to bottom, hsl(0, 0%, 12%,0.5) 0%, hsl(0, 0%, 12%,0) 50%, hsl(0, 0%, 12%,0.5) 100%), url(${showInfo.backdrop})`,
@@ -1726,7 +864,7 @@ const TvSearch: FunctionComponent = () => {
 						<>
 							<button
 								className="mb-1 mr-2 mt-0 rounded border-2 border-yellow-500 bg-yellow-900/30 p-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 disabled:cursor-not-allowed disabled:opacity-50"
-								onClick={handleAvailabilityTest}
+								onClick={() => handleAvailabilityTest(filteredResults)}
 								disabled={isCheckingAvailability}
 							>
 								<b>
@@ -1834,21 +972,21 @@ const TvSearch: FunctionComponent = () => {
 					<div className="ml-2 flex gap-2">
 						<span
 							className="cursor-pointer whitespace-nowrap rounded border border-red-500 bg-red-900/30 px-2 py-0.5 text-xs text-red-100 transition-colors hover:bg-red-800/50"
-							onClick={() => handleMassReport('porn')}
+							onClick={() => handleMassReport('porn', filteredResults)}
 							title="Report all filtered torrents as pornographic content"
 						>
 							Report as Porn ({filteredResults.length})
 						</span>
 						<span
 							className="cursor-pointer whitespace-nowrap rounded border border-red-500 bg-red-900/30 px-2 py-0.5 text-xs text-red-100 transition-colors hover:bg-red-800/50"
-							onClick={() => handleMassReport('wrong_imdb')}
+							onClick={() => handleMassReport('wrong_imdb', filteredResults)}
 							title="Report all filtered torrents as wrong IMDB ID"
 						>
 							Report Wrong IMDB ({filteredResults.length})
 						</span>
 						<span
 							className="cursor-pointer whitespace-nowrap rounded border border-red-500 bg-red-900/30 px-2 py-0.5 text-xs text-red-100 transition-colors hover:bg-red-800/50"
-							onClick={() => handleMassReport('wrong_season')}
+							onClick={() => handleMassReport('wrong_season', filteredResults)}
 							title="Report all filtered torrents as wrong season"
 						>
 							Report Wrong Season ({filteredResults.length})
