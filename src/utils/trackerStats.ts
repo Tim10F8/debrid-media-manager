@@ -54,22 +54,41 @@ export async function getTrackerStats(hash: string): Promise<TrackerStatsRespons
 	}
 }
 
+// Helper function to batch arrays into chunks
+function batchArray<T>(array: T[], batchSize: number): T[][] {
+	const batches: T[][] = [];
+	for (let i = 0; i < array.length; i += batchSize) {
+		batches.push(array.slice(i, i + batchSize));
+	}
+	return batches;
+}
+
 export async function getMultipleTrackerStats(hashes: string[]): Promise<TrackerStatsResponse[]> {
 	try {
-		const response = await fetch('/api/torrents/stats/bulk', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ hashes }),
-		});
+		// Batch hashes into groups of 100
+		const batches = batchArray(hashes, 100);
+		const allResults: TrackerStatsResponse[] = [];
 
-		if (!response.ok) {
-			const error = await response.json();
-			throw new Error(error.error || 'Failed to get bulk tracker stats');
+		// Process each batch
+		for (const batch of batches) {
+			const response = await fetch('/api/torrents/stats/bulk', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ hashes: batch }),
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.error || 'Failed to get bulk tracker stats');
+			}
+
+			const batchResults = await response.json();
+			allResults.push(...batchResults);
 		}
 
-		return await response.json();
+		return allResults;
 	} catch (error) {
 		console.error('Error getting bulk tracker stats:', error);
 		throw error;
@@ -78,20 +97,30 @@ export async function getMultipleTrackerStats(hashes: string[]): Promise<Tracker
 
 export async function refreshTrackerStats(hashes: string[]): Promise<TrackerStatsResponse[]> {
 	try {
-		const response = await fetch('/api/torrents/stats/refresh', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ hashes }),
-		});
+		// Batch hashes into groups of 100
+		const batches = batchArray(hashes, 100);
+		const allResults: TrackerStatsResponse[] = [];
 
-		if (!response.ok) {
-			const error = await response.json();
-			throw new Error(error.error || 'Failed to refresh tracker stats');
+		// Process each batch
+		for (const batch of batches) {
+			const response = await fetch('/api/torrents/stats/refresh', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ hashes: batch }),
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.error || 'Failed to refresh tracker stats');
+			}
+
+			const batchResults = await response.json();
+			allResults.push(...batchResults);
 		}
 
-		return await response.json();
+		return allResults;
 	} catch (error) {
 		console.error('Error refreshing tracker stats:', error);
 		throw error;
@@ -104,20 +133,38 @@ export async function checkTrackerStatsAvailability(hashes: string[]): Promise<{
 	stale: string[];
 }> {
 	try {
-		const response = await fetch('/api/torrents/stats/availability', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ hashes }),
-		});
+		// Batch hashes into groups of 100
+		const batches = batchArray(hashes, 100);
+		const allAvailable: TrackerStatsResponse[] = [];
+		const allMissing: string[] = [];
+		const allStale: string[] = [];
 
-		if (!response.ok) {
-			const error = await response.json();
-			throw new Error(error.error || 'Failed to check tracker stats availability');
+		// Process each batch
+		for (const batch of batches) {
+			const response = await fetch('/api/torrents/stats/availability', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ hashes: batch }),
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.error || 'Failed to check tracker stats availability');
+			}
+
+			const batchResult = await response.json();
+			allAvailable.push(...batchResult.available);
+			allMissing.push(...batchResult.missing);
+			allStale.push(...batchResult.stale);
 		}
 
-		return await response.json();
+		return {
+			available: allAvailable,
+			missing: allMissing,
+			stale: allStale,
+		};
 	} catch (error) {
 		console.error('Error checking tracker stats availability:', error);
 		throw error;

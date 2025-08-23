@@ -4,7 +4,7 @@ import SearchTokens from '@/components/SearchTokens';
 import Poster from '@/components/poster';
 import { showInfoForRD } from '@/components/showInfo';
 import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
-import { SearchApiResponse, SearchResult } from '@/services/mediasearch';
+import { FileData, SearchApiResponse, SearchResult } from '@/services/mediasearch';
 import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
 import { UserTorrent } from '@/torrent/userTorrent';
@@ -22,7 +22,7 @@ import {
 	handleDeleteTbTorrent,
 } from '@/utils/deleteTorrent';
 import { convertToUserTorrent, fetchAllDebrid } from '@/utils/fetchTorrents';
-import { instantCheckInAd, instantCheckInRd, wrapLoading } from '@/utils/instantChecks';
+import { instantCheckInRd } from '@/utils/instantChecks';
 import { processWithConcurrency } from '@/utils/parallelProcessor';
 import { quickSearch } from '@/utils/quickSearch';
 import { sortByBiggest } from '@/utils/results';
@@ -220,83 +220,371 @@ const MovieSearch: FunctionComponent = () => {
 		}
 		setErrorMessage('');
 		setSearchState('loading');
-		try {
-			let path = `api/torrents/movie?imdbId=${imdbId}&dmmProblemKey=${tokenWithTimestamp}&solution=${tokenHash}&onlyTrusted=${onlyTrustedTorrents}&maxSize=${movieMaxSize}&page=${page}`;
-			if (config.externalSearchApiHostname) {
-				path = encodeURIComponent(path);
-			}
-			let endpoint = `${config.externalSearchApiHostname || ''}/${path}`;
-			const response = await axios.get<SearchApiResponse>(endpoint);
-			if (response.status !== 200) {
-				setSearchState(response.headers.status ?? 'loaded');
-				return;
-			}
 
-			if (response.data.results?.length && isMounted.current) {
-				const results = response.data.results;
-				setSearchResults((prevResults) => {
-					const newResults = [
-						...prevResults,
-						...results.map((r) => ({
-							...r,
-							rdAvailable: false,
-							adAvailable: false,
-							noVideos: false,
-							files: [],
-						})),
-					];
-					return newResults.sort((a, b) => {
-						const aAvailable = a.rdAvailable || a.adAvailable;
-						const bAvailable = b.rdAvailable || b.adAvailable;
-						if (aAvailable !== bAvailable) {
-							return aAvailable ? -1 : 1;
+		// Track completion of all sources
+		let completedSources = 0;
+		let totalSources = 1; // Start with 1 for DMM
+		const allSourcesResults: SearchResult[][] = [];
+		let totalAvailableCount = 0;
+		let pendingAvailabilityChecks = 0;
+		let allSourcesCompleted = false;
+
+		// Helper function to process results from any source
+		const processSourceResults = async (sourceResults: SearchResult[], sourceName: string) => {
+			if (!isMounted.current) return;
+
+			// Deduplicate with existing results
+			setSearchResults((prevResults) => {
+				const existingHashes = new Set(prevResults.map((r) => r.hash));
+				const newUniqueResults = sourceResults.filter(
+					(r) => r.hash && !existingHashes.has(r.hash)
+				);
+
+				if (newUniqueResults.length === 0) {
+					completedSources++;
+					// Check if all sources completed
+					if (completedSources === totalSources) {
+						allSourcesCompleted = true;
+						const finalResults = prevResults.length;
+						if (finalResults === 0) {
+							toast('No results found', searchToastOptions);
+						} else {
+							toast(`Found ${finalResults} unique results`, searchToastOptions);
 						}
-						return b.fileSize - a.fileSize;
-					});
-				});
-				setHasMoreResults(results.length > 0);
-				toast(`Found ${results.length} results`, searchToastOptions);
+						setSearchState('loaded');
 
-				const hashArr = results.map((r) => r.hash);
-				const instantChecks = [];
-				if (rdKey) {
-					// Generate fresh token for instant checks
-					instantChecks.push(
-						wrapLoading(
-							'RD',
-							(async () => {
-								const [tokenWithTimestamp, tokenHash] =
-									await generateTokenAndHash();
-								return instantCheckInRd(
-									tokenWithTimestamp,
-									tokenHash,
-									imdbId,
-									hashArr,
-									setSearchResults,
-									sortByBiggest
-								);
-							})()
-						)
-					);
+						// If no pending availability checks, show the RD count now
+						if (pendingAvailabilityChecks === 0 && rdKey && totalAvailableCount > 0) {
+							toast(
+								`Found ${totalAvailableCount} available torrents in RD`,
+								searchToastOptions
+							);
+						}
+					}
+					return prevResults;
 				}
-				if (adKey)
-					instantChecks.push(
-						wrapLoading(
-							'AD',
-							instantCheckInAd(adKey, hashArr, setSearchResults, sortByBiggest)
-						)
-					);
-				const counts = await Promise.all(instantChecks);
-				setSearchState('loaded');
-				const newUncachedCount = hashArr.length - counts.reduce((acc, cur) => acc + cur, 0);
-				setTotalUncachedCount((prev) => prev + newUncachedCount);
-			} else {
-				if (page === 0) {
-					setSearchResults([]);
+
+				// Add to tracking
+				allSourcesResults.push(newUniqueResults);
+
+				// Merge and sort
+				const merged = [...prevResults, ...newUniqueResults];
+				const sorted = merged.sort((a, b) => {
+					const aAvailable = a.rdAvailable || a.adAvailable;
+					const bAvailable = b.rdAvailable || b.adAvailable;
+					if (aAvailable !== bAvailable) {
+						return aAvailable ? -1 : 1;
+					}
+					return b.fileSize - a.fileSize;
+				});
+
+				// Check availability for new non-cached results
+				const nonCachedNew = newUniqueResults.filter(
+					(r) => !r.rdAvailable && !r.adAvailable
+				);
+
+				// Always increment the completed sources counter synchronously
+				completedSources++;
+
+				if (nonCachedNew.length > 0 && rdKey) {
+					const hashArr = nonCachedNew.map((r) => r.hash);
+
+					// Track pending availability check
+					pendingAvailabilityChecks++;
+
+					// Start async availability check but don't wait for it
+					(async () => {
+						const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
+						const count = await instantCheckInRd(
+							tokenWithTimestamp,
+							tokenHash,
+							imdbId,
+							hashArr,
+							setSearchResults,
+							sortByBiggest
+						);
+						// Update the count
+						totalAvailableCount += count;
+
+						// Decrement pending checks
+						pendingAvailabilityChecks--;
+
+						// If all sources completed and this was the last availability check
+						if (
+							allSourcesCompleted &&
+							pendingAvailabilityChecks === 0 &&
+							totalAvailableCount > 0
+						) {
+							toast(
+								`Found ${totalAvailableCount} available torrents in RD`,
+								searchToastOptions
+							);
+						}
+					})();
 				}
-				setHasMoreResults(false);
-				toast(`No${page === 0 ? '' : ' more'} results found`, searchToastOptions);
+
+				// Check if all sources completed
+				if (completedSources === totalSources) {
+					allSourcesCompleted = true;
+					// Show completion toast
+					const finalResults = sorted.length;
+					if (finalResults === 0) {
+						toast('No results found', searchToastOptions);
+					} else {
+						toast(`Found ${finalResults} unique results`, searchToastOptions);
+					}
+					setSearchState('loaded');
+
+					// If no pending availability checks, show the RD count now
+					if (pendingAvailabilityChecks === 0 && rdKey && totalAvailableCount > 0) {
+						toast(
+							`Found ${totalAvailableCount} available torrents in RD`,
+							searchToastOptions
+						);
+					}
+				}
+
+				return sorted;
+			});
+		};
+
+		try {
+			// Start DMM fetch
+			const dmmPromise = (async () => {
+				let path = `api/torrents/movie?imdbId=${imdbId}&dmmProblemKey=${tokenWithTimestamp}&solution=${tokenHash}&onlyTrusted=${onlyTrustedTorrents}&maxSize=${movieMaxSize}&page=${page}`;
+				if (config.externalSearchApiHostname) {
+					path = encodeURIComponent(path);
+				}
+				let endpoint = `${config.externalSearchApiHostname || ''}/${path}`;
+				const response = await axios.get<SearchApiResponse>(endpoint);
+
+				if (response.status !== 200) {
+					setSearchState(response.headers.status ?? 'loaded');
+					return [];
+				}
+
+				return response.data.results || [];
+			})();
+
+			// Check enabled sources and start external fetches
+			if (page === 0) {
+				const enableTorrentio =
+					window.localStorage.getItem('settings:enableTorrentio') !== 'false';
+				const enableComet = window.localStorage.getItem('settings:enableComet') !== 'false';
+				const enableMediaFusion =
+					window.localStorage.getItem('settings:enableMediaFusion') !== 'false';
+				const enablePeerflix =
+					window.localStorage.getItem('settings:enablePeerflix') !== 'false';
+				const enableTorrentsDB =
+					window.localStorage.getItem('settings:enableTorrentsDB') !== 'false';
+
+				// Count total sources
+				if (enableTorrentio) totalSources++;
+				if (enableComet) totalSources++;
+				if (enableMediaFusion) totalSources++;
+				if (enablePeerflix) totalSources++;
+				if (enableTorrentsDB) totalSources++;
+
+				// Start all external fetches simultaneously
+				if (enableTorrentio) {
+					fetchTorrentioData(imdbId)
+						.then((results) => processSourceResults(results, 'Torrentio'))
+						.catch((err) => {
+							console.error('Torrentio error:', err);
+							completedSources++;
+							// Check if all sources completed after error
+							if (completedSources === totalSources) {
+								allSourcesCompleted = true;
+								setSearchResults((prevResults) => {
+									const finalResults = prevResults.length;
+									if (finalResults === 0) {
+										toast('No results found', searchToastOptions);
+									} else {
+										toast(
+											`Found ${finalResults} unique results`,
+											searchToastOptions
+										);
+									}
+									setSearchState('loaded');
+									// If no pending availability checks, show the RD count now
+									if (
+										pendingAvailabilityChecks === 0 &&
+										rdKey &&
+										totalAvailableCount > 0
+									) {
+										toast(
+											`Found ${totalAvailableCount} available torrents in RD`,
+											searchToastOptions
+										);
+									}
+									return prevResults;
+								});
+							}
+						});
+				}
+
+				if (enableComet) {
+					fetchCometData(imdbId)
+						.then((results) => processSourceResults(results, 'Comet'))
+						.catch((err) => {
+							console.error('Comet error:', err);
+							completedSources++;
+							// Check if all sources completed after error
+							if (completedSources === totalSources) {
+								allSourcesCompleted = true;
+								setSearchResults((prevResults) => {
+									const finalResults = prevResults.length;
+									if (finalResults === 0) {
+										toast('No results found', searchToastOptions);
+									} else {
+										toast(
+											`Found ${finalResults} unique results`,
+											searchToastOptions
+										);
+									}
+									setSearchState('loaded');
+									// If no pending availability checks, show the RD count now
+									if (
+										pendingAvailabilityChecks === 0 &&
+										rdKey &&
+										totalAvailableCount > 0
+									) {
+										toast(
+											`Found ${totalAvailableCount} available torrents in RD`,
+											searchToastOptions
+										);
+									}
+									return prevResults;
+								});
+							}
+						});
+				}
+
+				if (enableMediaFusion) {
+					fetchMediaFusionData(imdbId)
+						.then((results) => processSourceResults(results, 'MediaFusion'))
+						.catch((err) => {
+							console.error('MediaFusion error:', err);
+							completedSources++;
+							// Check if all sources completed after error
+							if (completedSources === totalSources) {
+								allSourcesCompleted = true;
+								setSearchResults((prevResults) => {
+									const finalResults = prevResults.length;
+									if (finalResults === 0) {
+										toast('No results found', searchToastOptions);
+									} else {
+										toast(
+											`Found ${finalResults} unique results`,
+											searchToastOptions
+										);
+									}
+									setSearchState('loaded');
+									// If no pending availability checks, show the RD count now
+									if (
+										pendingAvailabilityChecks === 0 &&
+										rdKey &&
+										totalAvailableCount > 0
+									) {
+										toast(
+											`Found ${totalAvailableCount} available torrents in RD`,
+											searchToastOptions
+										);
+									}
+									return prevResults;
+								});
+							}
+						});
+				}
+
+				if (enablePeerflix) {
+					fetchPeerflixData(imdbId)
+						.then((results) => processSourceResults(results, 'Peerflix'))
+						.catch((err) => {
+							console.error('Peerflix error:', err);
+							completedSources++;
+							// Check if all sources completed after error
+							if (completedSources === totalSources) {
+								allSourcesCompleted = true;
+								setSearchResults((prevResults) => {
+									const finalResults = prevResults.length;
+									if (finalResults === 0) {
+										toast('No results found', searchToastOptions);
+									} else {
+										toast(
+											`Found ${finalResults} unique results`,
+											searchToastOptions
+										);
+									}
+									setSearchState('loaded');
+									// If no pending availability checks, show the RD count now
+									if (
+										pendingAvailabilityChecks === 0 &&
+										rdKey &&
+										totalAvailableCount > 0
+									) {
+										toast(
+											`Found ${totalAvailableCount} available torrents in RD`,
+											searchToastOptions
+										);
+									}
+									return prevResults;
+								});
+							}
+						});
+				}
+
+				if (enableTorrentsDB) {
+					fetchTorrentsDBData(imdbId)
+						.then((results) => processSourceResults(results, 'TorrentsDB'))
+						.catch((err) => {
+							console.error('TorrentsDB error:', err);
+							completedSources++;
+							// Check if all sources completed after error
+							if (completedSources === totalSources) {
+								allSourcesCompleted = true;
+								setSearchResults((prevResults) => {
+									const finalResults = prevResults.length;
+									if (finalResults === 0) {
+										toast('No results found', searchToastOptions);
+									} else {
+										toast(
+											`Found ${finalResults} unique results`,
+											searchToastOptions
+										);
+									}
+									setSearchState('loaded');
+									// If no pending availability checks, show the RD count now
+									if (
+										pendingAvailabilityChecks === 0 &&
+										rdKey &&
+										totalAvailableCount > 0
+									) {
+										toast(
+											`Found ${totalAvailableCount} available torrents in RD`,
+											searchToastOptions
+										);
+									}
+									return prevResults;
+								});
+							}
+						});
+				}
 			}
+
+			// Process DMM results
+			const dmmResults = await dmmPromise;
+			setHasMoreResults(dmmResults.length > 0);
+
+			// Always process DMM results through processSourceResults for consistency
+			const formattedDmmResults = dmmResults.map((r) => ({
+				...r,
+				rdAvailable: false,
+				adAvailable: false,
+				noVideos: false,
+				files: r.files || [],
+			}));
+			await processSourceResults(formattedDmmResults, 'DMM');
 		} catch (error) {
 			console.error(
 				'Error fetching torrents:',
@@ -312,7 +600,6 @@ const MovieSearch: FunctionComponent = () => {
 				);
 				setHasMoreResults(false);
 			}
-		} finally {
 			setSearchState('loaded');
 		}
 	}
@@ -322,6 +609,578 @@ const MovieSearch: FunctionComponent = () => {
 		const filteredResults = quickSearch(query, searchResults);
 		setFilteredResults(filteredResults);
 	}, [query, searchResults]);
+
+	async function fetchTorrentioData(imdbId: string): Promise<SearchResult[]> {
+		if (!rdKey) return [];
+
+		try {
+			const torrentioUrl = `https://torrentio.strem.fun/realdebrid=real-debrid-key/stream/movie/${imdbId}.json`;
+			const response = await axios.get(torrentioUrl);
+
+			if (response.data?.streams && response.data.streams.length > 0) {
+				// Transform Torrentio streams to SearchResult format
+				const transformedResults: SearchResult[] = response.data.streams
+					.map((stream: any) => {
+						// Parse clean title - remove the metadata line (👤 💾 ⚙️)
+						let cleanTitle = stream.title || stream.name || '';
+						const titleParts = cleanTitle.split('\n');
+						if (titleParts.length > 1) {
+							// First line is the actual title
+							cleanTitle = titleParts[0].trim();
+						}
+
+						// Extract file info from the metadata
+						const filename = stream.behaviorHints?.filename || cleanTitle;
+						const sizeMatch = stream.title?.match(/💾\s*([\d.]+)\s*(GB|MB|TB)/i);
+						let fileSize = 0;
+						if (sizeMatch) {
+							const size = parseFloat(sizeMatch[1]);
+							if (sizeMatch[2].toUpperCase() === 'TB') {
+								fileSize = size * 1024 * 1024; // TB to MB
+							} else if (sizeMatch[2].toUpperCase() === 'GB') {
+								fileSize = size * 1024; // GB to MB
+							} else {
+								fileSize = size; // Already in MB
+							}
+						}
+
+						// Extract hash from URL if available
+						const hashMatch = stream.url?.match(/\/([a-f0-9]{40})\//);
+						const hash = hashMatch ? hashMatch[1] : '';
+
+						// Create a file entry for the main file
+						const files: FileData[] = [];
+						if (filename) {
+							files.push({
+								fileId: 0,
+								filename: filename,
+								filesize: fileSize * 1024 * 1024, // Convert MB to bytes
+							});
+						}
+
+						return {
+							title: cleanTitle,
+							fileSize: fileSize,
+							hash: hash,
+							rdAvailable: false,
+							adAvailable: false,
+							tbAvailable: false,
+							files: files,
+							noVideos: false,
+							medianFileSize: fileSize,
+							biggestFileSize: fileSize,
+							videoCount: 1,
+							imdbId: imdbId,
+						};
+					})
+					.filter((r: SearchResult) => r.hash); // Only include results with valid hash
+
+				return transformedResults;
+			}
+			return [];
+		} catch (error) {
+			console.error('Error fetching Torrentio data:', error);
+			// Silently fail - Torrentio is supplementary
+			return [];
+		}
+	}
+
+	async function getMediaFusionHash(): Promise<string> {
+		// Check if we have a cached hash in localStorage
+		const cacheKey = 'mediafusion_hash';
+		const cachedData = localStorage.getItem(cacheKey);
+
+		if (cachedData) {
+			// Handle old format (JSON object) and new format (plain string)
+			try {
+				const parsed = JSON.parse(cachedData);
+				if (parsed.hash) {
+					// Old format - extract hash and update storage
+					localStorage.setItem(cacheKey, parsed.hash);
+					return parsed.hash;
+				}
+			} catch (e) {
+				// Not JSON, assume it's already a plain string
+				return cachedData;
+			}
+		}
+
+		// Generate new hash
+		try {
+			const config = {
+				streaming_provider: null,
+				selected_catalogs: [],
+				selected_resolutions: [
+					'4k',
+					'2160p',
+					'1440p',
+					'1080p',
+					'720p',
+					'576p',
+					'480p',
+					'360p',
+					'240p',
+					null,
+				],
+				enable_catalogs: true,
+				enable_imdb_metadata: false,
+				max_size: 'inf',
+				max_streams_per_resolution: '10',
+				torrent_sorting_priority: [
+					{ key: 'language', direction: 'desc' },
+					{ key: 'cached', direction: 'desc' },
+					{ key: 'resolution', direction: 'desc' },
+					{ key: 'quality', direction: 'desc' },
+					{ key: 'size', direction: 'desc' },
+					{ key: 'seeders', direction: 'desc' },
+					{ key: 'created_at', direction: 'desc' },
+				],
+				show_full_torrent_name: true,
+				show_language_country_flag: false,
+				nudity_filter: ['Disable'],
+				certification_filter: ['Disable'],
+				language_sorting: [
+					'English',
+					'Tamil',
+					'Hindi',
+					'Malayalam',
+					'Kannada',
+					'Telugu',
+					'Chinese',
+					'Russian',
+					'Arabic',
+					'Japanese',
+					'Korean',
+					'Taiwanese',
+					'Latino',
+					'French',
+					'Spanish',
+					'Portuguese',
+					'Italian',
+					'German',
+					'Ukrainian',
+					'Polish',
+					'Czech',
+					'Thai',
+					'Indonesian',
+					'Vietnamese',
+					'Dutch',
+					'Bengali',
+					'Turkish',
+					'Greek',
+					'Swedish',
+					'Romanian',
+					'Hungarian',
+					'Finnish',
+					'Norwegian',
+					'Danish',
+					'Hebrew',
+					'Lithuanian',
+					'Punjabi',
+					'Marathi',
+					'Gujarati',
+					'Bhojpuri',
+					'Nepali',
+					'Urdu',
+					'Tagalog',
+					'Filipino',
+					'Malay',
+					'Mongolian',
+					'Armenian',
+					'Georgian',
+					null,
+				],
+				quality_filter: ['BluRay/UHD', 'WEB/HD', 'DVD/TV/SAT', 'CAM/Screener', 'Unknown'],
+				api_password: null,
+				mediaflow_config: null,
+				rpdb_config: null,
+				live_search_streams: false,
+				contribution_streams: false,
+				mdblist_config: null,
+			};
+
+			const response = await axios.post(
+				'https://mediafusion.elfhosted.com/encrypt-user-data',
+				config,
+				{
+					headers: { 'content-type': 'application/json' },
+				}
+			);
+
+			if (response.data?.encrypted_str) {
+				// Cache the hash permanently
+				localStorage.setItem(cacheKey, response.data.encrypted_str);
+				return response.data.encrypted_str;
+			}
+		} catch (error) {
+			console.error('Error generating MediaFusion hash:', error);
+		}
+
+		return ''; // Return empty string if generation fails
+	}
+
+	async function fetchMediaFusionData(imdbId: string): Promise<SearchResult[]> {
+		if (!rdKey) return [];
+
+		try {
+			const specialHash = await getMediaFusionHash();
+			if (!specialHash) return [];
+
+			const mediaFusionUrl = `https://mediafusion.elfhosted.com/${specialHash}/stream/movie/${imdbId}.json`;
+			const response = await axios.get(mediaFusionUrl);
+
+			if (response.data?.streams && response.data.streams.length > 0) {
+				// Transform MediaFusion streams to SearchResult format
+				const transformedResults: SearchResult[] = response.data.streams
+					.map((stream: any) => {
+						// Extract title from description (first line after 📂)
+						let cleanTitle = '';
+						if (stream.description) {
+							const lines = stream.description.split('\n');
+							if (lines.length > 0) {
+								// First line typically has the title after 📂
+								cleanTitle = lines[0].replace(/^📂\s*/, '').trim();
+							}
+						}
+						// Fallback to filename or name
+						if (!cleanTitle) {
+							cleanTitle = stream.behaviorHints?.filename || stream.name || '';
+						}
+
+						// Extract file size from description or behaviorHints
+						let fileSize = 0;
+						if (stream.behaviorHints?.videoSize) {
+							// Convert bytes to MB
+							fileSize = stream.behaviorHints.videoSize / (1024 * 1024);
+						} else if (stream.description) {
+							// Try to extract from description (💾 25.35 GB format)
+							const sizeMatch = stream.description.match(
+								/💾\s*([\d.]+)\s*(GB|MB|TB)/i
+							);
+							if (sizeMatch) {
+								const size = parseFloat(sizeMatch[1]);
+								if (sizeMatch[2].toUpperCase() === 'TB') {
+									fileSize = size * 1024 * 1024; // TB to MB
+								} else if (sizeMatch[2].toUpperCase() === 'GB') {
+									fileSize = size * 1024; // GB to MB
+								} else {
+									fileSize = size; // Already in MB
+								}
+							}
+						}
+
+						// Use infoHash directly from the stream
+						const hash = stream.infoHash || '';
+
+						// Create a file entry for the main file
+						const files: FileData[] = [];
+						const filename = stream.behaviorHints?.filename || cleanTitle;
+						if (filename) {
+							files.push({
+								fileId: stream.fileIdx || 0,
+								filename: filename,
+								filesize: stream.behaviorHints?.videoSize || fileSize * 1024 * 1024,
+							});
+						}
+
+						return {
+							title: cleanTitle,
+							fileSize: fileSize,
+							hash: hash,
+							rdAvailable: false,
+							adAvailable: false,
+							tbAvailable: false,
+							files: files,
+							noVideos: false,
+							medianFileSize: fileSize,
+							biggestFileSize: fileSize,
+							videoCount: 1,
+							imdbId: imdbId,
+						};
+					})
+					.filter((r: SearchResult) => r.hash); // Only include results with valid hash
+
+				return transformedResults;
+			}
+			return [];
+		} catch (error) {
+			console.error('Error fetching MediaFusion data:', error);
+			// Silently fail - MediaFusion is supplementary
+			return [];
+		}
+	}
+
+	async function fetchTorrentsDBData(imdbId: string): Promise<SearchResult[]> {
+		if (!rdKey) return [];
+
+		try {
+			const torrentsDBUrl = `https://torrentsdb.com/${rdKey}/stream/movie/${imdbId}.json`;
+			const response = await axios.get(torrentsDBUrl);
+
+			if (response.data?.streams && response.data.streams.length > 0) {
+				// Transform TorrentsDB streams to SearchResult format
+				const transformedResults: SearchResult[] = response.data.streams
+					.map((stream: any) => {
+						// Parse title - TorrentsDB has title in multiline format
+						let cleanTitle = '';
+						if (stream.title) {
+							const lines = stream.title.split('\n');
+							if (lines.length > 0) {
+								// First line is the actual title
+								cleanTitle = lines[0].trim();
+							}
+						}
+						// Fallback to name
+						if (!cleanTitle && stream.name) {
+							const nameParts = stream.name.split('\n');
+							cleanTitle = nameParts[nameParts.length - 1].trim(); // Last part of name
+						}
+
+						// Extract file size from title
+						let fileSize = 0;
+						const sizeMatch = stream.title?.match(/💾\s*([\d.]+)\s*(GB|MB|TB)/i);
+						if (sizeMatch) {
+							const size = parseFloat(sizeMatch[1]);
+							if (sizeMatch[2].toUpperCase() === 'TB') {
+								fileSize = size * 1024 * 1024; // TB to MB
+							} else if (sizeMatch[2].toUpperCase() === 'GB') {
+								fileSize = size * 1024; // GB to MB
+							} else {
+								fileSize = size; // Already in MB
+							}
+						}
+
+						// Use infoHash directly from the stream
+						const hash = stream.infoHash || '';
+
+						// Extract filename from behaviorHints or use title
+						const filename = stream.behaviorHints?.filename || cleanTitle;
+
+						// Create a file entry for the main file
+						const files: FileData[] = [];
+						if (filename) {
+							files.push({
+								fileId: stream.fileIdx || 0,
+								filename: filename,
+								filesize: fileSize * 1024 * 1024, // Convert MB to bytes
+							});
+						}
+
+						return {
+							title: cleanTitle,
+							fileSize: fileSize,
+							hash: hash,
+							rdAvailable: false,
+							adAvailable: false,
+							tbAvailable: false,
+							files: files,
+							noVideos: false,
+							medianFileSize: fileSize,
+							biggestFileSize: fileSize,
+							videoCount: 1,
+							imdbId: imdbId,
+						};
+					})
+					.filter((r: SearchResult) => r.hash); // Only include results with valid hash
+
+				return transformedResults;
+			}
+			return [];
+		} catch (error) {
+			console.error('Error fetching TorrentsDB data:', error);
+			// Silently fail - TorrentsDB is supplementary
+			return [];
+		}
+	}
+
+	async function fetchPeerflixData(imdbId: string): Promise<SearchResult[]> {
+		if (!rdKey) return [];
+
+		try {
+			const peerflixUrl = `https://addon.peerflix.mov/realdebrid=real-debrid-key/stream/movie/${imdbId}.json`;
+			const response = await axios.get(peerflixUrl);
+
+			if (response.data?.streams && response.data.streams.length > 0) {
+				// Transform Peerflix streams to SearchResult format
+				const transformedResults: SearchResult[] = response.data.streams
+					.map((stream: any) => {
+						// Parse title from the multiline format
+						let cleanTitle = '';
+						if (stream.title) {
+							const lines = stream.title.split('\n');
+							if (lines.length > 0) {
+								// First line is the actual title
+								cleanTitle = lines[0].trim();
+							}
+						}
+						// Fallback to name
+						if (!cleanTitle) {
+							cleanTitle = stream.name || '';
+						}
+
+						// Extract file size from title
+						let fileSize = 0;
+						const sizeMatch = stream.title?.match(/💾\s*([\d.]+)\s*(GB|MB|TB)/i);
+						if (sizeMatch) {
+							const size = parseFloat(sizeMatch[1]);
+							if (sizeMatch[2].toUpperCase() === 'TB') {
+								fileSize = size * 1024 * 1024; // TB to MB
+							} else if (sizeMatch[2].toUpperCase() === 'GB') {
+								fileSize = size * 1024; // GB to MB
+							} else {
+								fileSize = size; // Already in MB
+							}
+						}
+
+						// Extract hash from URL
+						const hashMatch = stream.url?.match(/\/([a-f0-9]{40})\//);
+						const hash = hashMatch ? hashMatch[1] : '';
+
+						// Extract filename from URL or title
+						let filename = '';
+						if (stream.url) {
+							const filenameMatch = stream.url.match(/\/([^\/]+)$/);
+							if (filenameMatch) {
+								filename = decodeURIComponent(filenameMatch[1]);
+							}
+						}
+						if (!filename && stream.title) {
+							const lines = stream.title.split('\n');
+							if (lines.length > 1) {
+								filename = lines[1].trim();
+							}
+						}
+						if (!filename) {
+							filename = cleanTitle;
+						}
+
+						// Create a file entry for the main file
+						const files: FileData[] = [];
+						if (filename) {
+							files.push({
+								fileId: 0,
+								filename: filename,
+								filesize: fileSize * 1024 * 1024, // Convert MB to bytes
+							});
+						}
+
+						return {
+							title: cleanTitle,
+							fileSize: fileSize,
+							hash: hash,
+							rdAvailable: false,
+							adAvailable: false,
+							tbAvailable: false,
+							files: files,
+							noVideos: false,
+							medianFileSize: fileSize,
+							biggestFileSize: fileSize,
+							videoCount: 1,
+							imdbId: imdbId,
+						};
+					})
+					.filter((r: SearchResult) => r.hash); // Only include results with valid hash
+
+				return transformedResults;
+			}
+			return [];
+		} catch (error) {
+			console.error('Error fetching Peerflix data:', error);
+			// Silently fail - Peerflix is supplementary
+			return [];
+		}
+	}
+
+	async function fetchCometData(imdbId: string): Promise<SearchResult[]> {
+		if (!rdKey) return [];
+
+		try {
+			const cometUrl = `https://comet.elfhosted.com/realdebrid=real-debrid-key/stream/movie/${imdbId}.json`;
+			const response = await axios.get(cometUrl);
+
+			if (response.data?.streams && response.data.streams.length > 0) {
+				// Transform Comet streams to SearchResult format
+				const transformedResults: SearchResult[] = response.data.streams
+					.map((stream: any) => {
+						// Extract title from description (first line after removing [TORRENT🧲] prefix)
+						let cleanTitle = '';
+						if (stream.description) {
+							const lines = stream.description.split('\n');
+							if (lines.length > 0) {
+								// First line typically has the title after 📄
+								cleanTitle = lines[0]
+									.replace(/^\[TORRENT🧲\]\s*/, '')
+									.replace(/^📄\s*/, '')
+									.trim();
+							}
+						}
+						// Fallback to filename or name
+						if (!cleanTitle) {
+							cleanTitle = stream.behaviorHints?.filename || stream.name || '';
+						}
+
+						// Extract file size from description or behaviorHints
+						let fileSize = 0;
+						if (stream.behaviorHints?.videoSize) {
+							// Convert bytes to MB
+							fileSize = stream.behaviorHints.videoSize / (1024 * 1024);
+						} else if (stream.description) {
+							// Try to extract from description (💾 24.91 GB format)
+							const sizeMatch = stream.description.match(
+								/💾\s*([\d.]+)\s*(GB|MB|TB)/i
+							);
+							if (sizeMatch) {
+								const size = parseFloat(sizeMatch[1]);
+								if (sizeMatch[2].toUpperCase() === 'TB') {
+									fileSize = size * 1024 * 1024; // TB to MB
+								} else if (sizeMatch[2].toUpperCase() === 'GB') {
+									fileSize = size * 1024; // GB to MB
+								} else {
+									fileSize = size; // Already in MB
+								}
+							}
+						}
+
+						// Use infoHash directly from the stream
+						const hash = stream.infoHash || '';
+
+						// Create a file entry for the main file
+						const files: FileData[] = [];
+						const filename = stream.behaviorHints?.filename || cleanTitle;
+						if (filename) {
+							files.push({
+								fileId: stream.fileIdx || 0,
+								filename: filename,
+								filesize: stream.behaviorHints?.videoSize || fileSize * 1024 * 1024,
+							});
+						}
+
+						return {
+							title: cleanTitle,
+							fileSize: fileSize,
+							hash: hash,
+							rdAvailable: false,
+							adAvailable: false,
+							tbAvailable: false,
+							files: files,
+							noVideos: false,
+							medianFileSize: fileSize,
+							biggestFileSize: fileSize,
+							videoCount: 1,
+							imdbId: imdbId,
+						};
+					})
+					.filter((r: SearchResult) => r.hash); // Only include results with valid hash
+
+				return transformedResults;
+			}
+			return [];
+		} catch (error) {
+			console.error('Error fetching Comet data:', error);
+			// Silently fail - Comet is supplementary
+			return [];
+		}
+	}
 
 	async function fetchHashAndProgress(hash?: string) {
 		const torrents = await torrentDB.all();
@@ -1127,6 +1986,14 @@ const MovieSearch: FunctionComponent = () => {
 					onClick={() => setQuery('')}
 				>
 					Reset
+				</span>
+				<span className="text-xs text-gray-400">
+					{
+						filteredResults.filter(
+							(r) => r.rdAvailable || r.adAvailable || r.tbAvailable
+						).length
+					}
+					/{filteredResults.length}
 				</span>
 				{query && filteredResults.length > 0 && rdKey && showMassReportButtons && (
 					<div className="ml-2 flex gap-2">

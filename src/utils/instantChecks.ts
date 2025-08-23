@@ -285,7 +285,7 @@ export const instantCheckInRd = (
 	hashes: string[],
 	setTorrentList: Dispatch<SetStateAction<SearchResult[]>>,
 	sortFn: (searchResults: SearchResult[]) => SearchResult[]
-) => processRdInstantCheck(dmmProblemKey, solution, imdbId, hashes, 20, setTorrentList, sortFn);
+) => processRdInstantCheck(dmmProblemKey, solution, imdbId, hashes, 100, setTorrentList, sortFn);
 
 export const instantCheckAnimeInRd = (
 	dmmProblemKey: string,
@@ -294,7 +294,7 @@ export const instantCheckAnimeInRd = (
 	hashes: string[],
 	setTorrentList: Dispatch<SetStateAction<SearchResult[]>>,
 	sortFn: (searchResults: SearchResult[]) => SearchResult[]
-) => processRdInstantCheck(dmmProblemKey, solution, '', hashes, 20, setTorrentList, sortFn, true);
+) => processRdInstantCheck(dmmProblemKey, solution, '', hashes, 100, setTorrentList, sortFn, true);
 
 export const instantCheckInRd2 = (
 	dmmProblemKey: string,
@@ -302,7 +302,7 @@ export const instantCheckInRd2 = (
 	rdKey: string,
 	hashes: string[],
 	setTorrentList: Dispatch<SetStateAction<EnrichedHashlistTorrent[]>>
-) => processRdInstantCheckByHashes(dmmProblemKey, solution, hashes, 20, setTorrentList);
+) => processRdInstantCheckByHashes(dmmProblemKey, solution, hashes, 100, setTorrentList);
 
 export const instantCheckInAd = (
 	adKey: string,

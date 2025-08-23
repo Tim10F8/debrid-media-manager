@@ -37,6 +37,11 @@ export const SettingsSection = () => {
 		defaultAvailabilityCheckLimit;
 	const includeTrackerStats =
 		window.localStorage.getItem('settings:includeTrackerStats') === 'true';
+	const enableTorrentio = window.localStorage.getItem('settings:enableTorrentio') !== 'false'; // Default to true
+	const enableComet = window.localStorage.getItem('settings:enableComet') !== 'false'; // Default to true
+	const enableMediaFusion = window.localStorage.getItem('settings:enableMediaFusion') !== 'false'; // Default to true
+	const enablePeerflix = window.localStorage.getItem('settings:enablePeerflix') !== 'false'; // Default to true
+	const enableTorrentsDB = window.localStorage.getItem('settings:enableTorrentsDB') !== 'false'; // Default to true
 
 	useEffect(() => {
 		// Check if protocol handler is registered
@@ -94,6 +99,26 @@ export const SettingsSection = () => {
 
 	const handleIncludeTrackerStatsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		window.localStorage.setItem('settings:includeTrackerStats', String(e.target.checked));
+	};
+
+	const handleEnableTorrentioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		window.localStorage.setItem('settings:enableTorrentio', String(e.target.checked));
+	};
+
+	const handleEnableCometChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		window.localStorage.setItem('settings:enableComet', String(e.target.checked));
+	};
+
+	const handleEnableMediaFusionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		window.localStorage.setItem('settings:enableMediaFusion', String(e.target.checked));
+	};
+
+	const handleEnablePeerflixChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		window.localStorage.setItem('settings:enablePeerflix', String(e.target.checked));
+	};
+
+	const handleEnableTorrentsDBChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		window.localStorage.setItem('settings:enableTorrentsDB', String(e.target.checked));
 	};
 
 	const handleHideInstructions = () => {
@@ -337,6 +362,73 @@ export const SettingsSection = () => {
 								When enabled, also fetches seeders, leechers, and download counts
 								from trackers during availability checks. This provides more
 								detailed information but may slow down the check process.
+							</span>
+						</div>
+
+						<div className="flex flex-col gap-2 rounded border-2 border-blue-500/30 p-3">
+							<div className="text-sm font-semibold text-blue-200">
+								External Sources
+							</div>
+
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-enable-torrentio"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									defaultChecked={enableTorrentio}
+									onChange={handleEnableTorrentioChange}
+								/>
+								<label className="font-semibold">Enable Torrentio</label>
+							</div>
+
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-enable-comet"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									defaultChecked={enableComet}
+									onChange={handleEnableCometChange}
+								/>
+								<label className="font-semibold">Enable Comet</label>
+							</div>
+
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-enable-mediafusion"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									defaultChecked={enableMediaFusion}
+									onChange={handleEnableMediaFusionChange}
+								/>
+								<label className="font-semibold">Enable MediaFusion</label>
+							</div>
+
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-enable-peerflix"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									defaultChecked={enablePeerflix}
+									onChange={handleEnablePeerflixChange}
+								/>
+								<label className="font-semibold">Enable Peerflix</label>
+							</div>
+
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-enable-torrentsdb"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									defaultChecked={enableTorrentsDB}
+									onChange={handleEnableTorrentsDBChange}
+								/>
+								<label className="font-semibold">Enable TorrentsDB</label>
+							</div>
+
+							<span className="text-xs text-gray-400">
+								External sources provide additional cached torrents from
+								Real-Debrid. Disable if you want to use only DMM&apos;s own search
+								results.
 							</span>
 						</div>
 					</div>
