@@ -1,3 +1,4 @@
+import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { SearchResult } from '@/services/mediasearch';
 import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
@@ -29,6 +30,7 @@ export function useTorrentManagement(
 	setSearchResults: React.Dispatch<React.SetStateAction<SearchResult[]>>
 ) {
 	const [hashAndProgress, setHashAndProgress] = useState<Record<string, number>>({});
+	const { addTorrent: addToCache, removeTorrent: removeFromCache } = useLibraryCache();
 
 	const fetchHashAndProgress = useCallback(async (hash?: string) => {
 		const torrents = await torrentDB.all();
@@ -86,14 +88,15 @@ export function useTorrentManagement(
 					await submitAvailability(tokenWithTimestamp, tokenHash, info, imdbId);
 				}
 
-				await torrentDB
-					.add(convertToUserTorrent(info))
-					.then(() => fetchHashAndProgress(hash));
+				const userTorrent = convertToUserTorrent(info);
+				await torrentDB.add(userTorrent);
+				addToCache(userTorrent); // Update global cache
+				await fetchHashAndProgress(hash);
 			});
 
 			return isCheckingAvailability ? torrentInfo : undefined;
 		},
-		[rdKey, setSearchResults, imdbId, fetchHashAndProgress]
+		[rdKey, setSearchResults, imdbId, fetchHashAndProgress, addToCache, searchResults]
 	);
 
 	const addAd = useCallback(
@@ -101,13 +104,14 @@ export function useTorrentManagement(
 			if (!adKey) return;
 
 			await handleAddAsMagnetInAd(adKey, hash);
-			await fetchAllDebrid(
-				adKey,
-				async (torrents: UserTorrent[]) => await torrentDB.addAll(torrents)
-			);
+			await fetchAllDebrid(adKey, async (torrents: UserTorrent[]) => {
+				await torrentDB.addAll(torrents);
+				// Update global cache with new torrents
+				torrents.forEach((torrent) => addToCache(torrent));
+			});
 			await fetchHashAndProgress();
 		},
-		[adKey, fetchHashAndProgress]
+		[adKey, fetchHashAndProgress, addToCache]
 	);
 
 	const addTb = useCallback(
@@ -116,10 +120,11 @@ export function useTorrentManagement(
 
 			await handleAddAsMagnetInTb(torboxKey, hash, async (userTorrent: UserTorrent) => {
 				await torrentDB.add(userTorrent);
+				addToCache(userTorrent); // Update global cache
 				await fetchHashAndProgress();
 			});
 		},
-		[torboxKey, fetchHashAndProgress]
+		[torboxKey, fetchHashAndProgress, addToCache]
 	);
 
 	const deleteRd = useCallback(
@@ -131,6 +136,7 @@ export function useTorrentManagement(
 				if (!t.id.startsWith('rd:')) continue;
 				await handleDeleteRdTorrent(rdKey, t.id);
 				await torrentDB.deleteByHash('rd', hash);
+				removeFromCache(t.id); // Update global cache
 				setHashAndProgress((prev) => {
 					const newHashAndProgress = { ...prev };
 					delete newHashAndProgress[`rd:${hash}`];
@@ -138,7 +144,7 @@ export function useTorrentManagement(
 				});
 			}
 		},
-		[rdKey]
+		[rdKey, removeFromCache]
 	);
 
 	const deleteAd = useCallback(
@@ -150,6 +156,7 @@ export function useTorrentManagement(
 				if (!t.id.startsWith('ad:')) continue;
 				await handleDeleteAdTorrent(adKey, t.id);
 				await torrentDB.deleteByHash('ad', hash);
+				removeFromCache(t.id); // Update global cache
 				setHashAndProgress((prev) => {
 					const newHashAndProgress = { ...prev };
 					delete newHashAndProgress[`ad:${hash}`];
@@ -157,7 +164,7 @@ export function useTorrentManagement(
 				});
 			}
 		},
-		[adKey]
+		[adKey, removeFromCache]
 	);
 
 	const deleteTb = useCallback(
@@ -169,6 +176,7 @@ export function useTorrentManagement(
 				if (!t.id.startsWith('tb:')) continue;
 				await handleDeleteTbTorrent(torboxKey, t.id);
 				await torrentDB.deleteByHash('tb', hash);
+				removeFromCache(t.id); // Update global cache
 				setHashAndProgress((prev) => {
 					const newHashAndProgress = { ...prev };
 					delete newHashAndProgress[`tb:${hash}`];
@@ -176,7 +184,7 @@ export function useTorrentManagement(
 				});
 			}
 		},
-		[torboxKey]
+		[torboxKey, removeFromCache]
 	);
 
 	return {

@@ -190,7 +190,7 @@ function countTestTermsInTarget(test: string, target: string, shouldBeInSequence
 	return actual.length;
 }
 
-function flexEq(test: string, target: string, targetYears: string[]) {
+export function flexEq(test: string, target: string, targetYears: string[]) {
 	const targetNoSpc = target.replace(/\s+/gi, '');
 	const testNoSpc = test.replace(/\s+/gi, '');
 

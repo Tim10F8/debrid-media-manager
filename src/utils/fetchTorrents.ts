@@ -87,7 +87,7 @@ export const fetchRealDebrid = async (
 		}
 
 		// Step 3: Send requests in parallel with exactly 3 concurrent requests
-		const limit = 1000;
+		const limit = 5000; // Increased from 1000 to 5000 for better performance
 		const maxPages = Math.ceil((totalCount ?? 1) / limit);
 
 		// Use the custom RequestQueue to maintain exactly 3 requests at all times

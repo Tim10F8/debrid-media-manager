@@ -535,7 +535,8 @@ const TvSearch: FunctionComponent = () => {
 		) {
 			loadCachedTrackerStats();
 		}
-	}, [searchState, searchResults.length]); // Depend on searchState and length only
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchState]); // Depend on searchState only
 
 	// Reset the tracker stats flag when season changes
 	useEffect(() => {

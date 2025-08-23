@@ -1,3 +1,5 @@
+import FloatingLibraryIndicator from '@/components/FloatingLibraryIndicator';
+import { LibraryCacheProvider } from '@/contexts/LibraryCacheContext';
 import '@/styles/globals.css';
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
@@ -58,7 +60,7 @@ export default function App({ Component, pageProps }: AppProps) {
 		};
 	}, [router]);
 	return (
-		<>
+		<LibraryCacheProvider>
 			<Head>
 				<meta
 					name="viewport"
@@ -69,6 +71,7 @@ export default function App({ Component, pageProps }: AppProps) {
 				<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 			</Head>
 			<Component {...pageProps} />
-		</>
+			<FloatingLibraryIndicator />
+		</LibraryCacheProvider>
 	);
 }

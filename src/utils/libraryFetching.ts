@@ -1,9 +1,8 @@
 import UserTorrentDB from '@/torrent/db';
 import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
-import { fetchAllDebrid, fetchRealDebrid } from '@/utils/fetchTorrents';
-import { libraryToastOptions } from '@/utils/toastOptions';
+import { fetchAllDebrid } from '@/utils/fetchTorrents';
+import { clearTorrentCache, fetchRealDebridWithCache } from '@/utils/fetchTorrentsWithCache';
 import { Dispatch, SetStateAction } from 'react';
-import { toast } from 'react-hot-toast';
 
 export async function fetchLatestRDTorrents(
 	rdKey: string | null,
@@ -12,7 +11,8 @@ export async function fetchLatestRDTorrents(
 	setLoading: (loading: boolean) => void,
 	setRdSyncing: (syncing: boolean) => void,
 	setSelectedTorrents: Dispatch<SetStateAction<Set<string>>>,
-	customLimit?: number
+	customLimit?: number,
+	forceRefresh?: boolean
 ) {
 	const oldTorrents = await torrentDB.all();
 	const oldIds = new Set(
@@ -34,51 +34,65 @@ export async function fetchLatestRDTorrents(
 		setLoading(false);
 		setRdSyncing(false);
 	} else {
-		await fetchRealDebrid(
-			rdKey,
-			async (torrents: UserTorrent[]) => {
-				// add all new torrents to the database
-				torrents.forEach((torrent) => newIds.add(torrent.id));
-				const newTorrents = torrents.filter((torrent) => !oldIds.has(torrent.id));
-				setUserTorrentsList((prev) => {
-					const newTorrentIds = new Set(newTorrents.map((t) => t.id));
-					const filteredPrev = prev.filter((t) => !newTorrentIds.has(t.id));
-					return [...newTorrents, ...filteredPrev];
-				});
-				await torrentDB.addAll(newTorrents);
+		try {
+			// Clear cache if force refresh requested
+			if (forceRefresh) {
+				clearTorrentCache();
+				console.log('RealDebrid: Cleared cache for force refresh');
+			}
 
-				// refresh the torrents that are in progress
-				const inProgressTorrents = torrents.filter(
-					(torrent) =>
-						torrent.status === UserTorrentStatus.waiting ||
-						torrent.status === UserTorrentStatus.downloading ||
-						inProgressIds.has(torrent.id)
-				);
-				setUserTorrentsList((prev) => {
-					const newList = [...prev];
-					for (const t of inProgressTorrents) {
-						const idx = prev.findIndex((i) => i.id === t.id);
-						if (idx >= 0) {
-							newList[idx] = t;
-						}
+			// Use caching strategy for fetching
+			const useCache = !customLimit && !forceRefresh; // Don't use cache for small syncs or force refresh
+			const { torrents, cacheHit } = await fetchRealDebridWithCache(
+				rdKey,
+				useCache,
+				customLimit
+			);
+
+			if (cacheHit) {
+				console.log('RealDebrid: Used cached data for faster loading');
+			}
+
+			// add all new torrents to the database
+			torrents.forEach((torrent) => newIds.add(torrent.id));
+			const newTorrents = torrents.filter((torrent) => !oldIds.has(torrent.id));
+			setUserTorrentsList((prev) => {
+				const newTorrentIds = new Set(newTorrents.map((t) => t.id));
+				const filteredPrev = prev.filter((t) => !newTorrentIds.has(t.id));
+				return [...newTorrents, ...filteredPrev];
+			});
+			await torrentDB.addAll(newTorrents);
+
+			// refresh the torrents that are in progress
+			const inProgressTorrents = torrents.filter(
+				(torrent) =>
+					torrent.status === UserTorrentStatus.waiting ||
+					torrent.status === UserTorrentStatus.downloading ||
+					inProgressIds.has(torrent.id)
+			);
+			setUserTorrentsList((prev) => {
+				const newList = [...prev];
+				for (const t of inProgressTorrents) {
+					const idx = prev.findIndex((i) => i.id === t.id);
+					if (idx >= 0) {
+						newList[idx] = t;
 					}
-					return newList;
-				});
-				await torrentDB.addAll(inProgressTorrents);
+				}
+				return newList;
+			});
+			await torrentDB.addAll(inProgressTorrents);
 
-				setLoading(false);
-			},
-			customLimit
-		);
+			setLoading(false);
+		} catch (error) {
+			console.error('Error fetching RD torrents:', error);
+			setLoading(false);
+		}
 		setRdSyncing(false);
 
 		// this is just a small sync
 		if (customLimit) return;
 
-		toast.success(
-			`Updated ${newIds.size} torrents in your Real-Debrid library`,
-			libraryToastOptions
-		);
+		// Toast notification removed for better UX
 	}
 
 	const toDelete = Array.from(oldIds).filter((id) => !newIds.has(id));
@@ -154,10 +168,7 @@ export async function fetchLatestADTorrents(
 			setLoading(false);
 		});
 		setAdSyncing(false);
-		toast.success(
-			`Updated ${newIds.size} torrents in your AllDebrid library`,
-			libraryToastOptions
-		);
+		// Toast notification removed for better UX
 	}
 
 	const toDelete = Array.from(oldIds).filter((id) => !newIds.has(id));

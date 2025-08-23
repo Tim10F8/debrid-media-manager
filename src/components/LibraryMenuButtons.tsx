@@ -1,5 +1,6 @@
-import Link from 'next/link';
 import { FaArrowLeft, FaArrowRight } from 'react-icons/fa';
+import LibraryButton from './LibraryButton';
+import LibraryLinkButton from './LibraryLinkButton';
 
 interface LibraryMenuButtonsProps {
 	currentPage: number;
@@ -32,109 +33,83 @@ export default function LibraryMenuButtons({
 }: LibraryMenuButtonsProps) {
 	return (
 		<div className="mb-0 flex overflow-x-auto">
-			<button
-				className={`mb-1 mr-1 rounded border-2 border-indigo-500 bg-indigo-900/30 px-1 py-0.5 text-indigo-100 transition-colors hover:bg-indigo-800/50 ${
-					currentPage <= 1 ? 'cursor-not-allowed opacity-60' : ''
-				}`}
+			<LibraryButton
+				variant="indigo"
 				onClick={onPrevPage}
 				disabled={currentPage <= 1}
+				className="mr-1"
 			>
 				<FaArrowLeft />
-			</button>
+			</LibraryButton>
 			<span className="w-16 text-center">
 				{currentPage}/{maxPages}
 			</span>
-			<button
-				className={`mb-1 ml-1 mr-2 rounded border-2 border-indigo-500 bg-indigo-900/30 px-1 py-0.5 text-xs text-indigo-100 transition-colors hover:bg-indigo-800/50 ${
-					currentPage >= maxPages ? 'cursor-not-allowed opacity-60' : ''
-				}`}
+			<LibraryButton
+				variant="indigo"
+				size="xs"
 				onClick={onNextPage}
 				disabled={currentPage >= maxPages}
+				className="ml-1"
 			>
 				<FaArrowRight />
-			</button>
-			<Link
-				href="/library?mediaType=movie&page=1"
-				className="mb-1 mr-2 rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 py-0.5 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50"
-			>
+			</LibraryButton>
+			<LibraryLinkButton href="/library?mediaType=movie&page=1" variant="yellow">
 				🎥 Movies
-			</Link>
-			<Link
-				href="/library?mediaType=tv&page=1"
-				className="mb-1 mr-2 rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 py-0.5 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50"
-			>
+			</LibraryLinkButton>
+			<LibraryLinkButton href="/library?mediaType=tv&page=1" variant="yellow">
 				📺 TV&nbsp;shows
-			</Link>
-			<Link
-				href="/library?mediaType=other&page=1"
-				className="mb-1 mr-2 rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 py-0.5 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50"
-			>
+			</LibraryLinkButton>
+			<LibraryLinkButton href="/library?mediaType=other&page=1" variant="yellow">
 				🗂️ Others
-			</Link>
-			<button
-				className="mb-1 mr-2 rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 py-0.5 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50"
-				onClick={onResetFilters}
-			>
+			</LibraryLinkButton>
+			<LibraryButton variant="yellow" size="xs" onClick={onResetFilters}>
 				Reset
-			</button>
+			</LibraryButton>
 
 			{sameHashSize > 0 && (
-				<Link
+				<LibraryLinkButton
 					href="/library?status=samehash&page=1"
-					className="mb-1 mr-2 rounded border-2 border-orange-500 bg-orange-900/30 px-1 py-0 text-xs text-orange-100 transition-colors hover:bg-orange-800/50"
+					variant="orange"
+					size="sm"
 				>
 					👀 Same&nbsp;hash
-				</Link>
+				</LibraryLinkButton>
 			)}
 			{sameTitleSize > 0 && sameHashSize < sameTitleSize && (
-				<Link
+				<LibraryLinkButton
 					href="/library?status=sametitle&page=1"
-					className="mb-1 mr-2 rounded border-2 border-amber-500 bg-amber-900/30 px-1 py-0 text-xs text-amber-100 transition-colors hover:bg-amber-800/50"
+					variant="amber"
+					size="sm"
 				>
 					👀 Same&nbsp;title
-				</Link>
+				</LibraryLinkButton>
 			)}
 
 			{selectedTorrentsSize > 0 && (
-				<Link
-					href="/library?status=selected&page=1"
-					className="mb-1 mr-2 rounded border-2 border-slate-500 bg-slate-900/30 px-1 py-0.5 text-xs text-slate-100 transition-colors hover:bg-slate-800/50"
-				>
+				<LibraryLinkButton href="/library?status=selected&page=1" variant="slate">
 					👀 Selected ({selectedTorrentsSize})
-				</Link>
+				</LibraryLinkButton>
 			)}
 			{uncachedCount > 0 && (
-				<Link
-					href="/library?status=uncached&page=1"
-					className="mb-1 mr-2 rounded border-2 border-slate-500 bg-slate-900/30 px-1 py-0.5 text-xs text-slate-100 transition-colors hover:bg-slate-800/50"
-				>
+				<LibraryLinkButton href="/library?status=uncached&page=1" variant="slate">
 					👀 Uncached
-				</Link>
+				</LibraryLinkButton>
 			)}
 
 			{inProgressCount > 0 && (
-				<Link
-					href="/library?status=inprogress&page=1"
-					className="mb-1 mr-2 rounded border-2 border-slate-500 bg-slate-900/30 px-1 py-0.5 text-xs text-slate-100 transition-colors hover:bg-slate-800/50"
-				>
+				<LibraryLinkButton href="/library?status=inprogress&page=1" variant="slate">
 					👀 In&nbsp;progress
-				</Link>
+				</LibraryLinkButton>
 			)}
 			{slowCount > 0 && (
-				<Link
-					href="/library?status=slow&page=1"
-					className="mb-1 mr-2 rounded border-2 border-slate-500 bg-slate-900/30 px-1 py-0.5 text-xs text-slate-100 transition-colors hover:bg-slate-800/50"
-				>
+				<LibraryLinkButton href="/library?status=slow&page=1" variant="slate">
 					👀 No&nbsp;seeds
-				</Link>
+				</LibraryLinkButton>
 			)}
 			{failedCount > 0 && (
-				<Link
-					href="/library?status=failed&page=1"
-					className="mb-1 mr-2 rounded border-2 border-slate-500 bg-slate-900/30 px-1 py-0.5 text-xs text-slate-100 transition-colors hover:bg-slate-800/50"
-				>
+				<LibraryLinkButton href="/library?status=failed&page=1" variant="slate">
 					👀 Failed
-				</Link>
+				</LibraryLinkButton>
 			)}
 		</div>
 	);

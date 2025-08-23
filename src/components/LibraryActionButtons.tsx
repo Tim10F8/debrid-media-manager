@@ -1,3 +1,5 @@
+import LibraryButton from './LibraryButton';
+
 interface LibraryActionButtonsProps {
 	onSelectShown: () => void;
 	onResetSelection: () => void;
@@ -37,103 +39,67 @@ export default function LibraryActionButtons({
 }: LibraryActionButtonsProps) {
 	return (
 		<div className="mb-0 flex overflow-x-auto">
-			<button
-				className="mb-1 mr-2 rounded border-2 border-orange-500 bg-orange-900/30 px-1 py-0.5 text-[0.6rem] text-orange-100 transition-colors hover:bg-orange-800/50"
-				onClick={onSelectShown}
-			>
+			<LibraryButton variant="orange" onClick={onSelectShown}>
 				✅ Select Shown
-			</button>
+			</LibraryButton>
 
-			<button
-				className="mb-1 mr-2 rounded border-2 border-orange-500 bg-orange-900/30 px-1 py-0.5 text-[0.6rem] text-orange-100 transition-colors hover:bg-orange-800/50"
-				onClick={onResetSelection}
-			>
+			<LibraryButton variant="orange" onClick={onResetSelection}>
 				❌ Unselect All
-			</button>
-			<button
-				className={`mb-1 mr-2 rounded border-2 border-green-500 bg-green-900/30 px-1 py-0.5 text-[0.6rem] text-green-100 transition-colors hover:bg-green-800/50`}
-				onClick={onReinsertTorrents}
-			>
+			</LibraryButton>
+
+			<LibraryButton variant="green" onClick={onReinsertTorrents}>
 				🔄 Reinsert{selectedTorrentsSize ? ` (${selectedTorrentsSize})` : ' List'}
-			</button>
-			<button
-				className={`mb-1 mr-2 rounded border-2 border-indigo-500 bg-indigo-900/30 px-1 py-0.5 text-[0.6rem] text-indigo-100 transition-colors hover:bg-indigo-800/50`}
-				onClick={onGenerateHashlist}
-			>
+			</LibraryButton>
+
+			<LibraryButton variant="indigo" onClick={onGenerateHashlist}>
 				🚀 Share{selectedTorrentsSize ? ` (${selectedTorrentsSize})` : ' List'}
-			</button>
-			<button
-				className={`mb-1 mr-2 rounded border-2 border-red-500 bg-red-900/30 px-1 py-0.5 text-[0.6rem] text-red-100 transition-colors hover:bg-red-800/50`}
-				onClick={onDeleteShownTorrents}
-			>
+			</LibraryButton>
+
+			<LibraryButton variant="red" onClick={onDeleteShownTorrents}>
 				🗑️ Delete{selectedTorrentsSize ? ` (${selectedTorrentsSize})` : ' List'}
-			</button>
+			</LibraryButton>
 
 			{rdKey && (
 				<>
-					<button
-						className={`mb-1 mr-2 rounded border-2 border-teal-500 bg-teal-900/30 px-1 py-0.5 text-[0.6rem] text-teal-100 transition-colors hover:bg-teal-800/50`}
-						onClick={() => onAddMagnet('rd')}
-					>
+					<LibraryButton variant="teal" onClick={() => onAddMagnet('rd')}>
 						🧲 RD&nbsp;Add
-					</button>
-					<button
-						className={`mb-1 mr-2 rounded border-2 border-indigo-500 bg-indigo-900/30 px-1 py-0.5 text-[0.6rem] text-indigo-100 transition-colors hover:bg-indigo-800/50`}
-						onClick={() => onLocalRestore('rd')}
-					>
+					</LibraryButton>
+					<LibraryButton variant="indigo" onClick={() => onLocalRestore('rd')}>
 						🪛 RD Restore
-					</button>
-				</>
-			)}
-			{adKey && (
-				<>
-					<button
-						className={`mb-1 mr-2 rounded border-2 border-teal-500 bg-teal-900/30 px-1 py-0.5 text-[0.6rem] text-teal-100 transition-colors hover:bg-teal-800/50`}
-						onClick={() => onAddMagnet('ad')}
-					>
-						🧲 AD&nbsp;Add
-					</button>
-					<button
-						className={`mb-1 mr-2 rounded border-2 border-indigo-500 bg-indigo-900/30 px-1 py-0.5 text-[0.6rem] text-indigo-100 transition-colors hover:bg-indigo-800/50`}
-						onClick={() => onLocalRestore('ad')}
-					>
-						🪛 AD Restore
-					</button>
+					</LibraryButton>
 				</>
 			)}
 
-			<button
-				className={`mb-1 mr-2 rounded border-2 border-indigo-500 bg-indigo-900/30 px-1 py-0.5 text-[0.6rem] text-indigo-100 transition-colors hover:bg-indigo-800/50`}
-				onClick={onLocalBackup}
-			>
+			{adKey && (
+				<>
+					<LibraryButton variant="teal" onClick={() => onAddMagnet('ad')}>
+						🧲 AD&nbsp;Add
+					</LibraryButton>
+					<LibraryButton variant="indigo" onClick={() => onLocalRestore('ad')}>
+						🪛 AD Restore
+					</LibraryButton>
+				</>
+			)}
+
+			<LibraryButton variant="indigo" onClick={onLocalBackup}>
 				💾 Backup
-			</button>
+			</LibraryButton>
 
 			{showDedupe && (
 				<>
-					<button
-						className="mb-1 mr-2 rounded border-2 border-green-500 bg-green-900/30 px-1 py-0.5 text-[0.6rem] text-green-100 transition-colors hover:bg-green-800/50"
-						onClick={onDedupeBySize}
-					>
+					<LibraryButton variant="green" onClick={onDedupeBySize}>
 						Size 🧹
-					</button>
-
-					<button
-						className="mb-1 mr-2 rounded border-2 border-green-500 bg-green-900/30 px-1 py-0.5 text-[0.6rem] text-green-100 transition-colors hover:bg-green-800/50"
-						onClick={onDedupeByRecency}
-					>
+					</LibraryButton>
+					<LibraryButton variant="green" onClick={onDedupeByRecency}>
 						Date 🧹
-					</button>
+					</LibraryButton>
 				</>
 			)}
 
 			{showHashCombine && (
-				<button
-					className={`mb-1 mr-2 rounded border-2 border-green-500 bg-green-900/30 px-1 py-0.5 text-[0.6rem] text-green-100 transition-colors hover:bg-green-800/50`}
-					onClick={onCombineSameHash}
-				>
+				<LibraryButton variant="green" onClick={onCombineSameHash}>
 					Hash 🧹
-				</button>
+				</LibraryButton>
 			)}
 		</div>
 	);

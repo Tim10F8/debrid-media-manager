@@ -4,8 +4,9 @@ import LibraryMenuButtons from '@/components/LibraryMenuButtons';
 import LibrarySize from '@/components/LibrarySize';
 import LibraryTableHeader from '@/components/LibraryTableHeader';
 import LibraryTorrentRow from '@/components/LibraryTorrentRow';
+import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { useAllDebridApiKey, useRealDebridAccessToken } from '@/hooks/auth';
-import { proxyUnrestrictLink } from '@/services/realDebrid';
+import { getTorrentInfo, proxyUnrestrictLink } from '@/services/realDebrid';
 import UserTorrentDB from '@/torrent/db';
 import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
 import {
@@ -20,9 +21,8 @@ import { AsyncFunction, runConcurrentFunctions } from '@/utils/batch';
 import { deleteFilteredTorrents } from '@/utils/deleteList';
 import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorrent';
 import { extractHashes } from '@/utils/extractHashes';
+import { getRdStatus } from '@/utils/fetchTorrents';
 import { generateHashList } from '@/utils/hashList';
-import { fetchLatestADTorrents, fetchLatestRDTorrents } from '@/utils/libraryFetching';
-import { initializeLibrary } from '@/utils/libraryInitialization';
 import { handleSelectTorrent, resetSelection, selectShown } from '@/utils/librarySelection';
 import { handleChangeType } from '@/utils/libraryTypeManagement';
 import { localRestore } from '@/utils/localRestore';
@@ -62,13 +62,27 @@ function TorrentsPage() {
 	const [query, setQuery] = useState('');
 	const [currentPage, setCurrentPage] = useState(1);
 
+	// Use cached library data
+	const {
+		libraryItems: cachedLibraryItems,
+		isLoading: cacheLoading,
+		isFetching,
+		refreshLibrary,
+		setLibraryItems: setCachedLibraryItems,
+		removeTorrent: removeFromCache,
+		updateTorrent: updateInCache,
+		error: cacheError,
+		lastFetchTime,
+	} = useLibraryCache();
+
 	// loading states
-	const [loading, setLoading] = useState(true);
-	const [rdSyncing, setRdSyncing] = useState(true);
-	const [adSyncing, setAdSyncing] = useState(true);
+	const [loading, setLoading] = useState(false);
+	const [rdSyncing, setRdSyncing] = useState(false);
+	const [adSyncing, setAdSyncing] = useState(false);
 	const [filtering, setFiltering] = useState(false);
 	const [grouping, setGrouping] = useState(false);
 
+	// Use cached items as the source
 	const [userTorrentsList, setUserTorrentsList] = useState<UserTorrent[]>([]);
 	const [filteredList, setFilteredList] = useState<UserTorrent[]>([]);
 	const [sortBy, setSortBy] = useState<SortBy>({ column: 'added', direction: 'desc' });
@@ -229,32 +243,20 @@ function TorrentsPage() {
 	}, [handlePrevPage, handleNextPage]);
 
 	const triggerFetchLatestRDTorrents = async (customLimit?: number) => {
-		await fetchLatestRDTorrents(
-			rdKey,
-			torrentDB,
-			setUserTorrentsList,
-			setLoading,
-			setRdSyncing,
-			setSelectedTorrents,
-			customLimit
-		);
+		// Use refreshLibrary from cache context instead
+		await refreshLibrary();
 	};
 
 	const triggerFetchLatestADTorrents = async () => {
-		await fetchLatestADTorrents(
-			adKey,
-			torrentDB,
-			setUserTorrentsList,
-			setLoading,
-			setAdSyncing,
-			setSelectedTorrents
-		);
+		// Use refreshLibrary from cache context instead
+		await refreshLibrary();
 	};
 
+	// Sync with cached library - one-way sync only
 	useEffect(() => {
-		initialize();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [rdKey, adKey]);
+		setUserTorrentsList(cachedLibraryItems);
+		setLoading(cacheLoading);
+	}, [cachedLibraryItems, cacheLoading]);
 
 	// aggregate metadata
 	useEffect(() => {
@@ -619,18 +621,26 @@ function TorrentsPage() {
 	function wrapDeleteFn(t: UserTorrent) {
 		return async () => {
 			const oldId = t.id;
-			if (rdKey && t.id.startsWith('rd:')) {
-				await handleDeleteRdTorrent(rdKey, t.id);
-			}
-			if (adKey && t.id.startsWith('ad:')) {
-				await handleDeleteAdTorrent(adKey, t.id);
-			}
-			setUserTorrentsList((prev) => prev.filter((torrent) => torrent.id !== oldId));
-			await torrentDB.deleteById(oldId);
+			// Optimistic update - remove from cache immediately
+			removeFromCache(oldId);
 			setSelectedTorrents((prev) => {
 				prev.delete(oldId);
 				return new Set(prev);
 			});
+
+			try {
+				if (rdKey && t.id.startsWith('rd:')) {
+					await handleDeleteRdTorrent(rdKey, t.id);
+				}
+				if (adKey && t.id.startsWith('ad:')) {
+					await handleDeleteAdTorrent(adKey, t.id);
+				}
+			} catch (error) {
+				// If delete fails, we should re-add to cache
+				// For now, just refresh to get the correct state
+				console.error('Failed to delete torrent:', error);
+				await refreshLibrary();
+			}
 		};
 	}
 
@@ -640,8 +650,8 @@ function TorrentsPage() {
 				const oldId = t.id;
 				if (rdKey && t.id.startsWith('rd:')) {
 					await handleReinsertTorrentinRd(rdKey, t, true);
-					setUserTorrentsList((prev) => prev.filter((torrent) => torrent.id !== oldId));
 					await torrentDB.deleteById(oldId);
+					removeFromCache(oldId); // Update global cache - this will trigger re-render
 					setSelectedTorrents((prev) => {
 						prev.delete(oldId);
 						return new Set(prev);
@@ -1161,23 +1171,7 @@ function TorrentsPage() {
 		router.push(`/library?page=1`);
 	};
 
-	// Modify initialize function to work offline
-	async function initialize() {
-		// Skip full library reload if we're just adding a magnet
-		const { addMagnet } = router.query;
-
-		await initializeLibrary(
-			torrentDB,
-			setUserTorrentsList,
-			setLoading,
-			rdKey,
-			adKey,
-			triggerFetchLatestRDTorrents,
-			triggerFetchLatestADTorrents,
-			userTorrentsList,
-			!!addMagnet // Pass flag to indicate we're adding a magnet
-		);
-	}
+	// Remove the initialize function as we're using cached data now
 
 	return (
 		<div className="mx-1 my-0 min-h-screen bg-gray-900 text-gray-100">
@@ -1186,19 +1180,61 @@ function TorrentsPage() {
 			</Head>
 			<Toaster position="bottom-right" />
 			<div className="mb-1 flex items-center justify-between">
-				<h1 className="text-xl font-bold text-white">
-					Library 📚{' '}
-					<LibrarySize
-						torrentCount={userTorrentsList.length}
-						totalBytes={totalBytes}
-						isLoading={rdSyncing || adSyncing}
-					/>
-					{selectedTorrents.size > 0 && (
-						<span className="ml-2 text-sm font-normal text-cyan-400">
-							({selectedTorrents.size}/{filteredList.length} selected)
-						</span>
-					)}
-				</h1>
+				<div className="flex items-center gap-2">
+					<h1 className="text-xl font-bold text-white">
+						Library 📚{' '}
+						<LibrarySize
+							torrentCount={userTorrentsList.length}
+							totalBytes={totalBytes}
+							isLoading={isFetching}
+						/>
+						{selectedTorrents.size > 0 && (
+							<span className="ml-2 text-sm font-normal text-cyan-400">
+								({selectedTorrents.size}/{filteredList.length} selected)
+							</span>
+						)}
+					</h1>
+					<div className="flex items-center gap-2">
+						{lastFetchTime && (
+							<span className="text-xs text-gray-500">
+								{(() => {
+									const diff = Date.now() - lastFetchTime.getTime();
+									const minutes = Math.floor(diff / 60000);
+									const hours = Math.floor(minutes / 60);
+									if (hours > 0) return `${hours}h ago`;
+									if (minutes > 0) return `${minutes}m ago`;
+									return 'Just now';
+								})()}
+							</span>
+						)}
+						<button
+							onClick={refreshLibrary}
+							disabled={isFetching}
+							className={`rounded-full p-1.5 transition-all ${
+								isFetching
+									? 'cursor-not-allowed bg-gray-700 text-gray-500'
+									: cacheError
+										? 'bg-red-900/50 text-red-400 hover:bg-red-800/50'
+										: 'bg-cyan-900/50 text-cyan-400 hover:bg-cyan-800/50 hover:text-cyan-300'
+							}`}
+							title={cacheError ? `Retry (${cacheError})` : 'Refresh library'}
+						>
+							<svg
+								className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2}
+									d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+								/>
+							</svg>
+						</button>
+					</div>
+				</div>
 
 				<Link
 					href="/"
@@ -1296,29 +1332,66 @@ function TorrentsPage() {
 										)
 									}
 									onDelete={async (id) => {
-										setUserTorrentsList((prevList) =>
-											prevList.filter((prevTor) => prevTor.id !== id)
-										);
-										await torrentDB.deleteById(id);
+										// Use optimistic update from cache
+										removeFromCache(id);
 										setSelectedTorrents((prev) => {
 											prev.delete(id);
 											return new Set(prev);
 										});
 									}}
-									onShowInfo={(t) =>
-										t.id.startsWith('rd:')
-											? handleShowInfoForRD(
-													t,
-													rdKey!,
-													setUserTorrentsList,
-													torrentDB,
-													setSelectedTorrents
-												)
-											: handleShowInfoForAD(t, adKey!)
-									}
-									onTypeChange={(t) =>
-										handleChangeType(t, setUserTorrentsList, torrentDB)
-									}
+									onShowInfo={async (t) => {
+										if (t.id.startsWith('rd:')) {
+											const info = await getTorrentInfo(
+												rdKey!,
+												t.id.substring(3)
+											);
+											if (
+												t.status === UserTorrentStatus.waiting ||
+												t.status === UserTorrentStatus.downloading
+											) {
+												const selectedFiles = info.files.filter(
+													(f: any) => f.selected
+												);
+												updateInCache(t.id, {
+													progress: info.progress,
+													seeders: info.seeders,
+													speed: info.speed,
+													status: getRdStatus(info),
+													serviceStatus: info.status,
+													links: info.links,
+													selectedFiles: selectedFiles.map(
+														(f: any, idx: number) => ({
+															fileId: f.id,
+															filename: f.path,
+															filesize: f.bytes,
+															link:
+																selectedFiles.length ===
+																info.links.length
+																	? info.links[idx]
+																	: '',
+														})
+													),
+												});
+												await torrentDB.add(t);
+											}
+											// Show the info dialog
+											await handleShowInfoForRD(
+												t,
+												rdKey!,
+												setUserTorrentsList,
+												torrentDB,
+												setSelectedTorrents
+											);
+										} else {
+											await handleShowInfoForAD(t, adKey!);
+										}
+									}}
+									onTypeChange={(t) => {
+										// Update in cache optimistically
+										updateInCache(t.id, { mediaType: t.mediaType });
+										// Also update in database
+										handleChangeType(t, setUserTorrentsList, torrentDB);
+									}}
 								/>
 							))}
 						</tbody>

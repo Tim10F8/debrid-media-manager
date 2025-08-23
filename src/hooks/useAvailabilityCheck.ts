@@ -140,16 +140,7 @@ export function useAvailabilityCheck(
 				}, 1500);
 			}
 		},
-		[
-			rdKey,
-			imdbId,
-			searchResults,
-			setSearchResults,
-			hashAndProgress,
-			addRd,
-			deleteRd,
-			sortFunction,
-		]
+		[imdbId, searchResults, setSearchResults, hashAndProgress, addRd, deleteRd, sortFunction]
 	);
 
 	const handleAvailabilityTest = useCallback(
@@ -416,15 +407,13 @@ export function useAvailabilityCheck(
 			}
 		},
 		[
-			rdKey,
 			imdbId,
-			searchResults,
 			setSearchResults,
 			hashAndProgress,
 			addRd,
 			deleteRd,
 			sortFunction,
-			// Note: isCheckingAvailability removed - only used as runtime guard, not a dependency
+			isCheckingAvailability,
 		]
 	);
 

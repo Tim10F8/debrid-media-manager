@@ -1,3 +1,4 @@
+import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { useAllDebridApiKey, useRealDebridAccessToken } from '@/hooks/auth';
 import { EnrichedHashlistTorrent, Hashlist, HashlistTorrent } from '@/services/mediasearch';
 import UserTorrentDB from '@/torrent/db';
@@ -42,6 +43,7 @@ function HashlistPage() {
 
 	const [rdKey] = useRealDebridAccessToken();
 	const adKey = useAllDebridApiKey();
+	const { addTorrent: addToCache, removeTorrent: removeFromCache } = useLibraryCache();
 
 	const [currentPage, setCurrentPage] = useState(1);
 	const [movieCount, setMovieCount] = useState<number>(0);
@@ -374,6 +376,8 @@ function HashlistPage() {
 			rdKey!,
 			async (torrents) => {
 				await torrentDB.addAll(torrents);
+				// Update global cache with new torrents
+				torrents.forEach((torrent) => addToCache(torrent));
 				await fetchHashAndProgress(hash);
 			},
 			2
@@ -384,6 +388,8 @@ function HashlistPage() {
 		await handleAddAsMagnetInAd(adKey!, hash);
 		await fetchAllDebrid(adKey!, async (torrents) => {
 			await torrentDB.addAll(torrents);
+			// Update global cache with new torrents
+			torrents.forEach((torrent) => addToCache(torrent));
 			await fetchHashAndProgress(hash);
 		});
 	}
@@ -394,6 +400,7 @@ function HashlistPage() {
 			if (!t.id.startsWith('rd:')) continue;
 			await handleDeleteRdTorrent(rdKey!, t.id);
 			await torrentDB.deleteByHash('rd', hash);
+			removeFromCache(t.id); // Update global cache
 			setHashAndProgress((prev) => {
 				const newHashAndProgress = { ...prev };
 				delete newHashAndProgress[`rd:${hash}`];
@@ -406,8 +413,9 @@ function HashlistPage() {
 		const torrents = await torrentDB.getAllByHash(hash);
 		for (const t of torrents) {
 			if (!t.id.startsWith('ad:')) continue;
-			await handleDeleteAdTorrent(rdKey!, t.id);
+			await handleDeleteAdTorrent(adKey!, t.id);
 			await torrentDB.deleteByHash('ad', hash);
+			removeFromCache(t.id); // Update global cache
 			setHashAndProgress((prev) => {
 				const newHashAndProgress = { ...prev };
 				delete newHashAndProgress[`ad:${hash}`];

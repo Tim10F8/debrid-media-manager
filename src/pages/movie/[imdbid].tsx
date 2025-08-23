@@ -172,6 +172,7 @@ const MovieSearch: FunctionComponent = () => {
 		};
 
 		initializeData();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [imdbid, fetchHashAndProgress]);
 
 	useEffect(() => {
@@ -227,7 +228,8 @@ const MovieSearch: FunctionComponent = () => {
 		) {
 			loadCachedTrackerStats();
 		}
-	}, [searchState, searchResults.length]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchState]);
 
 	// Reset tracker stats flag when search changes
 	useEffect(() => {
