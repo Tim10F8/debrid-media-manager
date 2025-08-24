@@ -8,52 +8,6 @@ export interface TrackerStatsResponse {
 	lastChecked: string;
 }
 
-export async function submitTrackerStats(hash: string) {
-	try {
-		const response = await fetch(`/api/torrents/stats?hash=${hash}`, {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-
-		if (!response.ok) {
-			const error = await response.json();
-			throw new Error(error.error || 'Failed to fetch tracker stats');
-		}
-
-		return await response.json();
-	} catch (error) {
-		console.error('Error fetching tracker stats:', error);
-		throw error;
-	}
-}
-
-export async function getTrackerStats(hash: string): Promise<TrackerStatsResponse | null> {
-	try {
-		const response = await fetch(`/api/torrents/stats/stored?hash=${hash}`, {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-
-		if (response.status === 404) {
-			return null; // No stored stats found
-		}
-
-		if (!response.ok) {
-			const error = await response.json();
-			throw new Error(error.error || 'Failed to get stored tracker stats');
-		}
-
-		return await response.json();
-	} catch (error) {
-		console.error('Error getting stored tracker stats:', error);
-		throw error;
-	}
-}
-
 // Helper function to batch arrays into chunks
 function batchArray<T>(array: T[], batchSize: number): T[][] {
 	const batches: T[][] = [];
@@ -95,95 +49,10 @@ export async function getMultipleTrackerStats(hashes: string[]): Promise<Tracker
 	}
 }
 
-export async function refreshTrackerStats(hashes: string[]): Promise<TrackerStatsResponse[]> {
-	try {
-		// Batch hashes into groups of 100
-		const batches = batchArray(hashes, 100);
-		const allResults: TrackerStatsResponse[] = [];
-
-		// Process each batch
-		for (const batch of batches) {
-			const response = await fetch('/api/torrents/stats/refresh', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ hashes: batch }),
-			});
-
-			if (!response.ok) {
-				const error = await response.json();
-				throw new Error(error.error || 'Failed to refresh tracker stats');
-			}
-
-			const batchResults = await response.json();
-			allResults.push(...batchResults);
-		}
-
-		return allResults;
-	} catch (error) {
-		console.error('Error refreshing tracker stats:', error);
-		throw error;
-	}
-}
-
-export async function checkTrackerStatsAvailability(hashes: string[]): Promise<{
-	available: TrackerStatsResponse[];
-	missing: string[];
-	stale: string[];
-}> {
-	try {
-		// Batch hashes into groups of 100
-		const batches = batchArray(hashes, 100);
-		const allAvailable: TrackerStatsResponse[] = [];
-		const allMissing: string[] = [];
-		const allStale: string[] = [];
-
-		// Process each batch
-		for (const batch of batches) {
-			const response = await fetch('/api/torrents/stats/availability', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ hashes: batch }),
-			});
-
-			if (!response.ok) {
-				const error = await response.json();
-				throw new Error(error.error || 'Failed to check tracker stats availability');
-			}
-
-			const batchResult = await response.json();
-			allAvailable.push(...batchResult.available);
-			allMissing.push(...batchResult.missing);
-			allStale.push(...batchResult.stale);
-		}
-
-		return {
-			available: allAvailable,
-			missing: allMissing,
-			stale: allStale,
-		};
-	} catch (error) {
-		console.error('Error checking tracker stats availability:', error);
-		throw error;
-	}
-}
-
 // Helper function to determine if tracker stats should be included based on user settings
 export function shouldIncludeTrackerStats(): boolean {
 	if (typeof window === 'undefined') return false;
 	return window.localStorage.getItem('settings:includeTrackerStats') === 'true';
-}
-
-// Helper function to format tracker stats for display
-export function formatTrackerStats(stats: TrackerStatsResponse): string {
-	const { seeders, leechers, downloads, successfulTrackers, totalTrackers } = stats;
-	const successRate =
-		totalTrackers > 0 ? Math.round((successfulTrackers / totalTrackers) * 100) : 0;
-
-	return `🌱 ${seeders} seeders • 📥 ${leechers} leechers • 📊 ${downloads} downloads • ✅ ${successRate}% trackers`;
 }
 
 // Helper function to get tracker stats with caching (used only during availability checks)
@@ -194,7 +63,17 @@ export async function getCachedTrackerStats(
 ): Promise<TrackerStatsResponse | null> {
 	try {
 		// First, try to get stored stats
-		const stored = await getTrackerStats(hash);
+		const storedResponse = await fetch(`/api/torrents/stats/stored?hash=${hash}`, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+		});
+
+		let stored: TrackerStatsResponse | null = null;
+		if (storedResponse.ok) {
+			stored = await storedResponse.json();
+		}
 
 		if (stored && !forceRefresh) {
 			const lastChecked = new Date(stored.lastChecked);
@@ -213,7 +92,19 @@ export async function getCachedTrackerStats(
 
 		// If no stored stats, they're stale, or force refresh is requested, fetch fresh ones
 		// This should only be called during availability checks when the setting is enabled
-		const fresh = await submitTrackerStats(hash);
+		const freshResponse = await fetch(`/api/torrents/stats?hash=${hash}`, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+		});
+
+		if (!freshResponse.ok) {
+			const error = await freshResponse.json();
+			throw new Error(error.error || 'Failed to fetch tracker stats');
+		}
+
+		const fresh = await freshResponse.json();
 		return {
 			hash: fresh.hash,
 			seeders: fresh.seeders,

@@ -1,8 +1,9 @@
 import { AllDebridUser, RealDebridUser } from '@/hooks/auth';
 import { TraktUser } from '@/services/trakt';
 import { TorBoxUser } from '@/services/types';
+import { Check, X } from 'lucide-react';
 import Link from 'next/link';
-import Swal from 'sweetalert2';
+import Swal from '../components/modals/modal';
 
 interface ServiceCardProps {
 	service: 'rd' | 'ad' | 'tb' | 'trakt';
@@ -139,7 +140,11 @@ export function ServiceCard({ service, user, onTraktLogin, onLogout }: ServiceCa
 			>
 				<span className="font-medium">Real-Debrid</span>
 				<span>{rdUser.username}</span>
-				<span>{rdUser.premium ? '✅' : '❌'}</span>
+				{rdUser.premium ? (
+					<Check className="h-4 w-4 text-green-500" />
+				) : (
+					<X className="h-4 w-4 text-red-500" />
+				)}
 			</button>
 		) : (
 			<Link
@@ -160,7 +165,11 @@ export function ServiceCard({ service, user, onTraktLogin, onLogout }: ServiceCa
 			>
 				<span className="font-medium">AllDebrid</span>
 				<span>{adUser.username}</span>
-				<span>{adUser.isPremium ? '✅' : '❌'}</span>
+				{adUser.isPremium ? (
+					<Check className="h-4 w-4 text-green-500" />
+				) : (
+					<X className="h-4 w-4 text-red-500" />
+				)}
 			</button>
 		) : (
 			<Link
@@ -184,7 +193,11 @@ export function ServiceCard({ service, user, onTraktLogin, onLogout }: ServiceCa
 			>
 				<span className="font-medium">Torbox</span>
 				<span>{tbUser.email.split('@')[0]}</span>
-				<span>{isPremiumActive ? '✅' : '❌'}</span>
+				{isPremiumActive ? (
+					<Check className="h-4 w-4 text-green-500" />
+				) : (
+					<X className="h-4 w-4 text-red-500" />
+				)}
 			</button>
 		) : (
 			<Link
@@ -205,7 +218,7 @@ export function ServiceCard({ service, user, onTraktLogin, onLogout }: ServiceCa
 			>
 				<span className="font-medium">Trakt</span>
 				<span>{traktUser.user.username}</span>
-				<span className="text-green-500">✅</span>
+				<Check className="h-4 w-4 text-green-400" />
 			</button>
 		) : (
 			<button

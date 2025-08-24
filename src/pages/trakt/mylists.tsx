@@ -7,6 +7,7 @@ import {
 	getUsersPersonalLists,
 } from '@/services/trakt';
 import { withAuth } from '@/utils/withAuth';
+import { List } from 'lucide-react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -60,7 +61,8 @@ function TraktMyLists() {
 
 			<div className="mb-4 flex items-center justify-between">
 				<h1 className="text-xl font-bold text-white">
-					Trakt - 🧏🏻‍♀️ {traktUserSlug}&apos;s lists
+					Trakt - <List className="mr-1 inline-block h-5 w-5 text-green-400" />{' '}
+					{traktUserSlug}&apos;s lists
 				</h1>
 				<Link
 					href="/"

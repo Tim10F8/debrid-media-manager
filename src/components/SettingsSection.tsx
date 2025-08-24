@@ -1,3 +1,4 @@
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Link2, Settings, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
 	defaultAvailabilityCheckLimit,
@@ -161,16 +162,26 @@ export const SettingsSection = () => {
 				onClick={() => setIsExpanded(!isExpanded)}
 				className="haptic-sm flex w-full items-center justify-between rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-2 text-sm font-medium text-gray-100 transition-colors hover:bg-gray-700/50"
 			>
-				<span>⚙️ Settings</span>
-				<span>{isExpanded ? '▼' : '▶'}</span>
+				<span className="flex items-center">
+					<Settings className="mr-2 inline-block h-4 w-4 text-gray-400" />
+					Settings
+				</span>
+				<span>
+					{isExpanded ? (
+						<ChevronDown className="h-4 w-4 text-gray-400" />
+					) : (
+						<ChevronRight className="h-4 w-4 text-gray-400" />
+					)}
+				</span>
 			</button>
 
 			{isExpanded && (
 				<div className="mt-4 text-sm text-gray-200">
 					<div className="flex flex-col gap-4">
 						<div className="rounded border-2 border-yellow-500/30 p-4">
-							<div className="mb-4 text-center text-sm font-medium text-yellow-200">
-								⚠️ Experiencing lag or buffering? Try smaller files
+							<div className="mb-4 flex items-center justify-center text-center text-sm font-medium text-yellow-200">
+								<AlertTriangle className="mr-2 inline-block h-4 w-4 text-yellow-400" />
+								Experiencing lag or buffering? Try smaller files
 							</div>
 
 							<div className="flex flex-col gap-4">
@@ -461,9 +472,17 @@ export const SettingsSection = () => {
 						}
 					}}
 				>
-					{isMagnetHandlerEnabled
-						? '✅ DMM is your default magnet handler'
-						: '🧲 Make DMM your default magnet handler'}
+					{isMagnetHandlerEnabled ? (
+						<>
+							<Check className="mr-1 inline-block h-4 w-4 text-green-400" />
+							DMM is your default magnet handler
+						</>
+					) : (
+						<>
+							<Link2 className="mr-1 inline-block h-4 w-4 text-blue-400" />
+							Make DMM your default magnet handler
+						</>
+					)}
 				</button>
 
 				{!isInstructionsHidden ? (
@@ -474,7 +493,7 @@ export const SettingsSection = () => {
 								onClick={handleHideInstructions}
 								className="ml-2 text-gray-500 hover:text-gray-300"
 							>
-								✕
+								<X className="h-3 w-3" />
 							</button>
 						</div>
 						<input

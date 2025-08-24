@@ -1,4 +1,4 @@
-import { FaArrowLeft, FaArrowRight } from 'react-icons/fa';
+import { ChevronLeft, ChevronRight, Eye, Film, FolderOpen, RotateCcw, Tv } from 'lucide-react';
 import LibraryButton from './LibraryButton';
 import LibraryLinkButton from './LibraryLinkButton';
 
@@ -39,7 +39,7 @@ export default function LibraryMenuButtons({
 				disabled={currentPage <= 1}
 				className="mr-1"
 			>
-				<FaArrowLeft />
+				<ChevronLeft className="h-4 w-4 text-indigo-400" />
 			</LibraryButton>
 			<span className="w-16 text-center">
 				{currentPage}/{maxPages}
@@ -51,18 +51,22 @@ export default function LibraryMenuButtons({
 				disabled={currentPage >= maxPages}
 				className="ml-1"
 			>
-				<FaArrowRight />
+				<ChevronRight className="h-4 w-4 text-indigo-400" />
 			</LibraryButton>
 			<LibraryLinkButton href="/library?mediaType=movie&page=1" variant="yellow">
-				🎥 Movies
+				<Film className="mr-1 inline-block h-4 w-4 text-yellow-400" />
+				Movies
 			</LibraryLinkButton>
 			<LibraryLinkButton href="/library?mediaType=tv&page=1" variant="yellow">
-				📺 TV&nbsp;shows
+				<Tv className="mr-1 inline-block h-4 w-4 text-cyan-400" />
+				TV&nbsp;shows
 			</LibraryLinkButton>
 			<LibraryLinkButton href="/library?mediaType=other&page=1" variant="yellow">
-				🗂️ Others
+				<FolderOpen className="mr-1 inline-block h-4 w-4 text-orange-400" />
+				Others
 			</LibraryLinkButton>
 			<LibraryButton variant="yellow" size="xs" onClick={onResetFilters}>
+				<RotateCcw className="mr-1 inline-block h-3 w-3 text-yellow-400" />
 				Reset
 			</LibraryButton>
 
@@ -72,7 +76,8 @@ export default function LibraryMenuButtons({
 					variant="orange"
 					size="sm"
 				>
-					👀 Same&nbsp;hash
+					<Eye className="mr-1 inline-block h-4 w-4 text-orange-400" />
+					Same&nbsp;hash
 				</LibraryLinkButton>
 			)}
 			{sameTitleSize > 0 && sameHashSize < sameTitleSize && (
@@ -81,34 +86,40 @@ export default function LibraryMenuButtons({
 					variant="amber"
 					size="sm"
 				>
-					👀 Same&nbsp;title
+					<Eye className="mr-1 inline-block h-4 w-4 text-amber-400" />
+					Same&nbsp;title
 				</LibraryLinkButton>
 			)}
 
 			{selectedTorrentsSize > 0 && (
 				<LibraryLinkButton href="/library?status=selected&page=1" variant="slate">
-					👀 Selected ({selectedTorrentsSize})
+					<Eye className="mr-1 inline-block h-4 w-4 text-slate-400" />
+					Selected ({selectedTorrentsSize})
 				</LibraryLinkButton>
 			)}
 			{uncachedCount > 0 && (
 				<LibraryLinkButton href="/library?status=uncached&page=1" variant="slate">
-					👀 Uncached
+					<Eye className="mr-1 inline-block h-4 w-4 text-slate-400" />
+					Uncached
 				</LibraryLinkButton>
 			)}
 
 			{inProgressCount > 0 && (
 				<LibraryLinkButton href="/library?status=inprogress&page=1" variant="slate">
-					👀 In&nbsp;progress
+					<Eye className="mr-1 inline-block h-4 w-4 text-slate-400" />
+					In&nbsp;progress
 				</LibraryLinkButton>
 			)}
 			{slowCount > 0 && (
 				<LibraryLinkButton href="/library?status=slow&page=1" variant="slate">
-					👀 No&nbsp;seeds
+					<Eye className="mr-1 inline-block h-4 w-4 text-slate-400" />
+					No&nbsp;seeds
 				</LibraryLinkButton>
 			)}
 			{failedCount > 0 && (
 				<LibraryLinkButton href="/library?status=failed&page=1" variant="slate">
-					👀 Failed
+					<Eye className="mr-1 inline-block h-4 w-4 text-slate-400" />
+					Failed
 				</LibraryLinkButton>
 			)}
 		</div>

@@ -1,3 +1,4 @@
+import { Clock3, Drama, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useMemo } from 'react';
@@ -26,13 +27,15 @@ export function BrowseSection({ terms }: BrowseSectionProps) {
 				href="/browse"
 				className="haptic-sm flex flex-1 items-center justify-center rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-100 transition-colors hover:bg-blue-800/50"
 			>
-				🎭&nbsp;genres
+				<Drama className="mr-1 inline-block h-3 w-3 text-blue-500" />
+				genres
 			</Link>
 			<Link
 				href="/browse/recent"
 				className="haptic-sm flex flex-1 items-center justify-center rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-100 transition-colors hover:bg-blue-800/50"
 			>
-				⏰&nbsp;recent
+				<Clock3 className="mr-1 inline-block h-3 w-3 text-blue-500" />
+				recent
 			</Link>
 			<Link
 				href={`/browse/${randomTerm.replace(/\W/gi, '')}`}
@@ -44,7 +47,8 @@ export function BrowseSection({ terms }: BrowseSectionProps) {
 				onClick={handleCustomSearch}
 				className="haptic-sm flex flex-1 items-center justify-center rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-100 transition-colors hover:bg-blue-800/50"
 			>
-				🔍&nbsp;browse
+				<Search className="mr-1 inline-block h-3 w-3 text-blue-500" />
+				browse
 			</button>
 		</div>
 	);

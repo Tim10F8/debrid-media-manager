@@ -13,13 +13,13 @@ import getReleaseTags from '@/utils/score';
 import { genericToastOptions } from '@/utils/toastOptions';
 import { generateTokenAndHash } from '@/utils/token';
 import { filenameParse } from '@ctrl/video-filename-parser';
+import { CheckCircle, ChevronLeft, ChevronRight, Download, Film, Tv, X } from 'lucide-react';
 import lzString from 'lz-string';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import { FaArrowLeft, FaArrowRight, FaDownload, FaTimes } from 'react-icons/fa';
 
 const ONE_GIGABYTE = 1024 * 1024 * 1024;
 const ITEMS_PER_PAGE = 100;
@@ -285,7 +285,15 @@ function HashlistPage() {
 			.filter((t) => !libraryHashes.has(t.hash))
 			.map(wrapDownloadFilesInRdFn);
 		if (yetToDownload.length === 0) {
-			toast('Everything has been downloaded', { icon: '👏' });
+			toast.custom(
+				(t) => (
+					<div className="flex items-center rounded-lg bg-gray-800 px-4 py-3 text-white shadow-lg">
+						<CheckCircle className="mr-2 h-5 w-5 text-green-500" />
+						<span>Everything has been downloaded</span>
+					</div>
+				),
+				genericToastOptions
+			);
 			return;
 		}
 
@@ -337,7 +345,15 @@ function HashlistPage() {
 			.filter((t) => !libraryHashes.has(t.hash))
 			.map(wrapDownloadFilesInAdFn);
 		if (yetToDownload.length === 0) {
-			toast('Everything has been downloaded', { icon: '👏' });
+			toast.custom(
+				(t) => (
+					<div className="flex items-center rounded-lg bg-gray-800 px-4 py-3 text-white shadow-lg">
+						<CheckCircle className="mr-2 h-5 w-5 text-green-500" />
+						<span>Everything has been downloaded</span>
+					</div>
+				),
+				genericToastOptions
+			);
 			return;
 		}
 
@@ -470,7 +486,7 @@ function HashlistPage() {
 					onClick={handlePrevPage}
 					disabled={currentPage <= 1}
 				>
-					<FaArrowLeft />
+					<ChevronLeft className="h-4 w-4" />
 				</button>
 				<span className="w-16 text-center">
 					{currentPage}/{Math.max(1, Math.ceil(sortedData().length / ITEMS_PER_PAGE))}
@@ -484,7 +500,7 @@ function HashlistPage() {
 					onClick={handleNextPage}
 					disabled={currentPage >= Math.ceil(sortedData().length / ITEMS_PER_PAGE)}
 				>
-					<FaArrowRight />
+					<ChevronRight className="h-4 w-4" />
 				</button>
 				<Link
 					href="/hashlist?mediaType=movie"
@@ -613,7 +629,11 @@ function HashlistPage() {
 										{!['Invalid Magnet', 'Magnet'].includes(t.filename) && (
 											<>
 												<span className="cursor-pointer">
-													{t.mediaType === 'tv' ? '📺' : '🎥'}
+													{t.mediaType === 'tv' ? (
+														<Tv className="inline-block h-4 w-4 text-cyan-400" />
+													) : (
+														<Film className="inline-block h-4 w-4 text-yellow-400" />
+													)}
 												</span>
 												&nbsp;<strong>{t.title}</strong>{' '}
 												{filterText && (
@@ -656,7 +676,7 @@ function HashlistPage() {
 												className="rounded border-2 border-red-500 bg-red-900/30 px-2 py-1 text-red-100 transition-colors hover:bg-red-800/50"
 												onClick={() => deleteRd(t.hash)}
 											>
-												<FaTimes className="mr-1 inline" />
+												<X className="mr-1 inline h-3 w-3" />
 												RD ({hashAndProgress[`rd:${t.hash}`] || 0}%)
 											</button>
 										)}
@@ -665,7 +685,7 @@ function HashlistPage() {
 												className="rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-blue-100 transition-colors hover:bg-blue-800/50"
 												onClick={() => addRd(t.hash)}
 											>
-												<FaDownload className="mr-1 inline" />
+												<Download className="mr-1 inline h-3 w-3" />
 												RD
 											</button>
 										)}
@@ -674,7 +694,7 @@ function HashlistPage() {
 												className="rounded border-2 border-green-500 bg-green-900/30 px-2 py-1 text-green-100 transition-colors hover:bg-green-800/50"
 												onClick={() => addRd(t.hash)}
 											>
-												<FaDownload className="mr-1 inline" />
+												<Download className="mr-1 inline h-3 w-3" />
 												RD
 											</button>
 										)}
@@ -684,7 +704,7 @@ function HashlistPage() {
 												className="ml-2 rounded border-2 border-red-500 bg-red-900/30 px-2 py-1 text-red-100 transition-colors hover:bg-red-800/50"
 												onClick={() => deleteAd(t.hash)}
 											>
-												<FaTimes className="mr-1 inline" />
+												<X className="mr-1 inline h-3 w-3" />
 												AD ({hashAndProgress[`ad:${t.hash}`] + '%'})
 											</button>
 										)}
@@ -693,7 +713,7 @@ function HashlistPage() {
 												className="ml-2 rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-blue-100 transition-colors hover:bg-blue-800/50"
 												onClick={() => addAd(t.hash)}
 											>
-												<FaDownload className="mr-1 inline" />
+												<Download className="mr-1 inline h-3 w-3" />
 												AD
 											</button>
 										)}
@@ -702,7 +722,7 @@ function HashlistPage() {
 												className="ml-2 rounded border-2 border-green-500 bg-green-900/30 px-2 py-1 text-green-100 transition-colors hover:bg-green-800/50"
 												onClick={() => addAd(t.hash)}
 											>
-												<FaDownload className="mr-1 inline" />
+												<Download className="mr-1 inline h-3 w-3" />
 												AD
 											</button>
 										)}

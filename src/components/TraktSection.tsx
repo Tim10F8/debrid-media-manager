@@ -1,4 +1,5 @@
 import { TraktUser } from '@/services/trakt';
+import { Archive, Eye, Film, List, Tv } from 'lucide-react';
 import Link from 'next/link';
 
 interface TraktSectionProps {
@@ -12,13 +13,15 @@ export function TraktSection({ traktUser }: TraktSectionProps) {
 				href="/trakt/movies"
 				className="haptic flex items-center justify-center gap-2 rounded border-2 border-red-500 bg-red-900/30 p-3 text-sm font-medium text-red-100 transition-colors hover:bg-red-800/50"
 			>
-				🎥&nbsp;Movies
+				<Film className="mr-1 inline-block h-4 w-4 text-yellow-400" />
+				Movies
 			</Link>
 			<Link
 				href="/trakt/shows"
 				className="haptic flex items-center justify-center gap-2 rounded border-2 border-red-500 bg-red-900/30 p-3 text-sm font-medium text-red-100 transition-colors hover:bg-red-800/50"
 			>
-				📺&nbsp;Shows
+				<Tv className="mr-1 inline-block h-4 w-4 text-cyan-400" />
+				Shows
 			</Link>
 			{traktUser && (
 				<div className="col-span-2 grid grid-cols-3 gap-3">
@@ -26,19 +29,22 @@ export function TraktSection({ traktUser }: TraktSectionProps) {
 						href="/trakt/watchlist"
 						className="haptic flex items-center justify-center gap-2 rounded border-2 border-red-500 bg-red-900/30 p-3 text-sm font-medium text-red-100 transition-colors hover:bg-red-800/50"
 					>
-						👀&nbsp;Watchlist
+						<Eye className="mr-1 inline-block h-4 w-4 text-purple-400" />
+						Watchlist
 					</Link>
 					<Link
 						href="/trakt/collection"
 						className="haptic flex items-center justify-center gap-2 rounded border-2 border-red-500 bg-red-900/30 p-3 text-sm font-medium text-red-100 transition-colors hover:bg-red-800/50"
 					>
-						🗃️&nbsp;Collections
+						<Archive className="mr-1 inline-block h-4 w-4 text-blue-400" />
+						Collections
 					</Link>
 					<Link
 						href="/trakt/mylists"
 						className="haptic flex items-center justify-center gap-2 rounded border-2 border-red-500 bg-red-900/30 p-3 text-sm font-medium text-red-100 transition-colors hover:bg-red-800/50"
 					>
-						🧏🏻‍♀️&nbsp;My lists
+						<List className="mr-1 inline-block h-4 w-4 text-green-400" />
+						My lists
 					</Link>
 				</div>
 			)}

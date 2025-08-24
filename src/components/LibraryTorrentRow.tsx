@@ -6,9 +6,20 @@ import { handleShare } from '@/utils/hashList';
 import { normalize } from '@/utils/mediaId';
 import { torrentPrefix } from '@/utils/results';
 import { shortenNumber } from '@/utils/speed';
+import {
+	Check,
+	Film,
+	FolderOpen,
+	Leaf,
+	Link2,
+	Plus,
+	RefreshCw,
+	Share2,
+	Trash2,
+	Tv,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FaMagnet, FaRecycle, FaSeedling, FaShare, FaTrash } from 'react-icons/fa';
 
 const ONE_GIGABYTE = 1024 * 1024 * 1024;
 
@@ -73,7 +84,11 @@ export default function TorrentRow({
 				onClick={() => onSelect(torrent.id)}
 				className="truncate px-0.5 py-1 text-center text-sm"
 			>
-				{isSelected ? '✅' : '➕'}
+				{isSelected ? (
+					<Check className="inline-block h-4 w-4 text-green-500" />
+				) : (
+					<Plus className="inline-block h-4 w-4 text-gray-500" />
+				)}
 			</td>
 			<td onClick={() => onShowInfo(torrent)} className="truncate px-0.5 py-1 text-sm">
 				{!['Invalid Magnet', 'Magnet', 'noname'].includes(torrent.filename) && (
@@ -86,9 +101,15 @@ export default function TorrentRow({
 							}}
 						>
 							{
-								['🎥', '📺', '🗂️'][
-									['movie', 'tv', 'other'].indexOf(torrent.mediaType)
-								]
+								{
+									movie: (
+										<Film className="inline-block h-4 w-4 text-yellow-500" />
+									),
+									tv: <Tv className="inline-block h-4 w-4 text-cyan-500" />,
+									other: (
+										<FolderOpen className="inline-block h-4 w-4 text-orange-500" />
+									),
+								}[torrent.mediaType]
 							}
 						</div>
 						&nbsp;<strong>{torrent.title}</strong>{' '}
@@ -152,7 +173,7 @@ export default function TorrentRow({
 							{torrent.progress.toFixed(2)}%&nbsp;
 						</span>
 						<span className="inline-block align-middle">
-							<FaSeedling />
+							<Leaf className="inline-block h-4 w-4 text-green-500" />
 						</span>
 						<span className="inline-block align-middle">{torrent.seeders}</span>
 						<br />
@@ -179,7 +200,7 @@ export default function TorrentRow({
 						router.push(await handleShare(torrent));
 					}}
 				>
-					<FaShare />
+					<Share2 className="h-4 w-4 text-indigo-500" />
 				</button>
 				<button
 					title="Delete"
@@ -195,7 +216,7 @@ export default function TorrentRow({
 						onDelete(torrent.id);
 					}}
 				>
-					<FaTrash />
+					<Trash2 className="h-4 w-4 text-red-500" />
 				</button>
 				<button
 					title="Copy magnet url"
@@ -205,7 +226,7 @@ export default function TorrentRow({
 						handleCopyOrDownloadMagnet(torrent.hash, shouldDownloadMagnets);
 					}}
 				>
-					<FaMagnet />
+					<Link2 className="h-4 w-4 text-teal-500" />
 				</button>
 				<button
 					title="Reinsert"
@@ -225,7 +246,7 @@ export default function TorrentRow({
 						}
 					}}
 				>
-					<FaRecycle />
+					<RefreshCw className="h-4 w-4 text-green-500" />
 				</button>
 			</td>
 		</tr>

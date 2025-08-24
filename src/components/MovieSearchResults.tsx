@@ -2,8 +2,16 @@ import { SearchResult } from '@/services/mediasearch';
 import { downloadMagnetFile } from '@/utils/downloadMagnet';
 import { borderColor, btnColor, btnIcon, btnLabel, fileSize } from '@/utils/results';
 import { isVideo } from '@/utils/selectable';
+import {
+	Cast,
+	Eye as EyeIcon,
+	Folder,
+	Link2,
+	Loader2,
+	Search as SearchIcon,
+	X,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { FaMagnet, FaTimes } from 'react-icons/fa';
 import ReportButton from './ReportButton';
 
 type MovieSearchResultsProps = {
@@ -243,10 +251,11 @@ const MovieSearchResults = ({
 							{r.videoCount > 0 ? (
 								<div className="text-xs text-gray-300">
 									<span
-										className="haptic-sm inline-block cursor-pointer rounded bg-black bg-opacity-50 px-2 py-1 hover:bg-opacity-75"
+										className="haptic-sm inline-flex cursor-pointer items-center rounded bg-black bg-opacity-50 px-2 py-1 hover:bg-opacity-75"
 										onClick={() => handleShowInfo(r)}
 									>
-										📂&nbsp;{getMovieCountLabel(r.videoCount)}
+										<Folder className="mr-1 h-4 w-4" />
+										{getMovieCountLabel(r.videoCount)}
 									</span>
 									{r.videoCount > 1 ? (
 										<span className="ml-2">
@@ -307,9 +316,9 @@ const MovieSearchResults = ({
 										disabled={isLoading}
 									>
 										{isLoading ? (
-											<span className="inline-block animate-spin">⌛</span>
+											<Loader2 className="inline-block h-3 w-3 animate-spin" />
 										) : (
-											<FaTimes className="mr-2 inline" />
+											<X className="mr-2 inline h-3 w-3" />
 										)}
 										{isLoading
 											? 'Removing...'
@@ -323,7 +332,7 @@ const MovieSearchResults = ({
 										disabled={isLoading}
 									>
 										{isLoading ? (
-											<span className="inline-block animate-spin">⌛</span>
+											<Loader2 className="inline-block h-3 w-3 animate-spin" />
 										) : (
 											btnIcon(r.rdAvailable)
 										)}
@@ -339,9 +348,9 @@ const MovieSearchResults = ({
 										disabled={isLoading}
 									>
 										{isLoading ? (
-											<span className="inline-block animate-spin">⌛</span>
+											<Loader2 className="inline-block h-3 w-3 animate-spin" />
 										) : (
-											<FaTimes className="mr-2 inline" />
+											<X className="mr-2 inline h-3 w-3" />
 										)}
 										{isLoading
 											? 'Removing...'
@@ -355,7 +364,7 @@ const MovieSearchResults = ({
 										disabled={isLoading}
 									>
 										{isLoading ? (
-											<span className="inline-block animate-spin">⌛</span>
+											<Loader2 className="inline-block h-3 w-3 animate-spin" />
 										) : (
 											btnIcon(r.adAvailable)
 										)}
@@ -371,9 +380,9 @@ const MovieSearchResults = ({
 										disabled={isLoading}
 									>
 										{isLoading ? (
-											<span className="inline-block animate-spin">⌛</span>
+											<Loader2 className="inline-block h-3 w-3 animate-spin" />
 										) : (
-											<FaTimes className="mr-2 inline" />
+											<X className="mr-2 inline h-3 w-3" />
 										)}
 										{isLoading
 											? 'Removing...'
@@ -387,7 +396,7 @@ const MovieSearchResults = ({
 										disabled={isLoading}
 									>
 										{isLoading ? (
-											<span className="inline-block animate-spin">⌛</span>
+											<Loader2 className="inline-block h-3 w-3 animate-spin" />
 										) : (
 											btnIcon(r.tbAvailable)
 										)}
@@ -404,13 +413,14 @@ const MovieSearchResults = ({
 									>
 										{isCasting ? (
 											<>
-												<span className="inline-block animate-spin">
-													⌛
-												</span>{' '}
+												<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
 												Casting...
 											</>
 										) : (
-											'Cast✨'
+											<span className="inline-flex items-center">
+												<Cast className="mr-1 h-3 w-3 text-gray-500" />
+												Cast
+											</span>
 										)}
 									</button>
 								)}
@@ -424,13 +434,14 @@ const MovieSearchResults = ({
 									>
 										{checkingHashes.has(r.hash) ? (
 											<>
-												<span className="inline-block animate-spin">
-													⌛
-												</span>{' '}
+												<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
 												Checking...
 											</>
 										) : (
-											'🕵🏻Check'
+											<span className="inline-flex items-center">
+												<SearchIcon className="mr-1 h-3 w-3 text-yellow-500" />
+												Check
+											</span>
 										)}
 									</button>
 								)}
@@ -447,7 +458,10 @@ const MovieSearchResults = ({
 													)
 												}
 											>
-												🧐Watch
+												<span className="inline-flex items-center">
+													<EyeIcon className="mr-1 h-3 w-3 text-teal-500" />
+													Watch
+												</span>
 											</button>
 										)}
 									</>
@@ -458,8 +472,10 @@ const MovieSearchResults = ({
 									className="haptic-sm inline rounded border-2 border-pink-500 bg-pink-900/30 px-1 text-xs text-pink-100 transition-colors hover:bg-pink-800/50"
 									onClick={() => handleMagnetAction(r.hash)}
 								>
-									<FaMagnet className="inline" />{' '}
-									{downloadMagnets ? 'Download' : 'Copy'}
+									<span className="inline-flex items-center">
+										<Link2 className="mr-1 h-3 w-3 text-teal-500" />
+										{downloadMagnets ? 'Download' : 'Copy'}
+									</span>
 								</button>
 
 								{/* Report btn */}

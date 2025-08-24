@@ -1,4 +1,4 @@
-import Swal from 'sweetalert2';
+import Swal from './modals/modal';
 
 export const showSubscribeModal = async () => {
 	Swal.fire({

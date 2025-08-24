@@ -28,6 +28,7 @@ import { generateTokenAndHash } from '@/utils/token';
 import { getMultipleTrackerStats } from '@/utils/trackerStats';
 import { withAuth } from '@/utils/withAuth';
 import axios, { AxiosError } from 'axios';
+import { CloudOff, Loader2, RotateCcw, Search, Sparkles, Tv, Zap } from 'lucide-react';
 import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -847,9 +848,7 @@ const TvSearch: FunctionComponent = () => {
 								href={`/show/${imdbid}/${season}`}
 								className={`inline-flex items-center border-2 p-1 text-xs border-${color}-500 bg-${color}-900/30 text-${color}-100 hover:bg-${color}-800/50 mb-1 mr-2 rounded transition-colors`}
 							>
-								<span role="img" aria-label="tv show" className="mr-2">
-									📺
-								</span>{' '}
+								<Tv className="mr-2 h-3 w-3 text-cyan-500" />
 								<span className="whitespace-nowrap">
 									{showInfo.season_names && showInfo.season_names[season - 1]
 										? showInfo.season_names[season - 1]
@@ -868,10 +867,18 @@ const TvSearch: FunctionComponent = () => {
 								onClick={() => handleAvailabilityTest(filteredResults)}
 								disabled={isCheckingAvailability}
 							>
-								<b>
-									{isCheckingAvailability
-										? '🔄 Checking...'
-										: '🕵🏻Check Available'}
+								<b className="flex items-center justify-center">
+									{isCheckingAvailability ? (
+										<>
+											<Loader2 className="mr-1 h-3 w-3 animate-spin text-yellow-500" />
+											Checking...
+										</>
+									) : (
+										<>
+											<Search className="mr-1 h-3 w-3 text-yellow-500" />
+											Check Available
+										</>
+									)}
 								</b>
 							</button>
 							{getFirstCompleteSeasonTorrent() && (
@@ -879,7 +886,10 @@ const TvSearch: FunctionComponent = () => {
 									className="haptic-sm mb-1 mr-2 mt-0 rounded border-2 border-green-500 bg-green-900/30 p-1 text-xs text-green-100 transition-colors hover:bg-green-800/50"
 									onClick={handleInstantRdWholeSeason}
 								>
-									<b>⚡Instant RD (Whole Season)</b>
+									<b className="flex items-center justify-center">
+										<Zap className="mr-1 h-3 w-3 text-yellow-500" />
+										Instant RD (Whole Season)
+									</b>
 								</button>
 							)}
 							{getIndividualEpisodeTorrents().length > 0 && (
@@ -887,7 +897,10 @@ const TvSearch: FunctionComponent = () => {
 									className="haptic-sm mb-1 mr-2 mt-0 rounded border-2 border-green-500 bg-green-900/30 p-1 text-xs text-green-100 transition-colors hover:bg-green-800/50"
 									onClick={handleInstantRdEveryEpisode}
 								>
-									<b>⚡Instant RD (Every Episode)</b>
+									<b className="flex items-center justify-center">
+										<Zap className="mr-1 h-3 w-3 text-yellow-500" />
+										Instant RD (Every Episode)
+									</b>
 								</button>
 							)}
 							<button
@@ -898,7 +911,10 @@ const TvSearch: FunctionComponent = () => {
 									)
 								}
 							>
-								<b>🔮Stremio</b>
+								<b className="flex items-center justify-center">
+									<Sparkles className="mr-1 h-3 w-3 text-purple-500" />
+									Stremio
+								</b>
 							</button>
 						</>
 					)}
@@ -909,6 +925,7 @@ const TvSearch: FunctionComponent = () => {
 								setOnlyShowCached(false);
 							}}
 						>
+							<CloudOff className="mr-1 h-3 w-3 text-blue-500" />
 							Show {totalUncachedCount} uncached
 						</button>
 					)}
@@ -956,10 +973,12 @@ const TvSearch: FunctionComponent = () => {
 					}}
 				/>
 				<span
-					className="me-2 cursor-pointer rounded bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+					className="me-2 inline-flex cursor-pointer items-center rounded bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
 					onClick={() => setQuery('')}
+					title="Reset search"
 				>
-					Reset
+					<RotateCcw className="h-3 w-3" />
+					<span className="ml-1 hidden sm:inline">Reset</span>
 				</span>
 				<span className="text-xs text-gray-400">
 					{

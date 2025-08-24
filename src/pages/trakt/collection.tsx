@@ -2,6 +2,7 @@ import Poster from '@/components/poster';
 import useLocalStorage from '@/hooks/localStorage';
 import { TraktCollectionItem, getCollectionMovies, getCollectionShows } from '@/services/trakt';
 import { withAuth } from '@/utils/withAuth';
+import { Archive } from 'lucide-react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -44,7 +45,8 @@ function TraktCollection() {
 
 			<div className="mb-2 flex items-center justify-between">
 				<h1 className="text-xl font-bold text-white">
-					Trakt - 📚 {traktUserSlug}&apos;s Collection
+					Trakt - <Archive className="mr-1 inline-block h-5 w-5 text-blue-400" />{' '}
+					{traktUserSlug}&apos;s Collection
 				</h1>
 				<Link
 					href="/"

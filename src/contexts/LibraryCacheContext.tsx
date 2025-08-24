@@ -53,6 +53,7 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 	const [adSyncing, setAdSyncing] = useState(false);
 	const [selectedTorrents, setSelectedTorrents] = useState<Set<string>>(new Set());
 	const retryCountRef = useRef(0);
+	const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const lastLibraryState = useRef<LibraryState | null>(null);
 
 	const [rdKey] = useRealDebridAccessToken();
@@ -162,13 +163,20 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 			// Prevent multiple simultaneous fetches
 			if (isFetching) return;
 
+			// Clear any pending retry
+			if (retryTimeoutRef.current) {
+				clearTimeout(retryTimeoutRef.current);
+				retryTimeoutRef.current = null;
+			}
+
+			// Set fetching flag immediately
 			setIsFetching(true);
 			setError(null);
 
 			try {
 				// Load from local DB first for immediate display
 				const localLibrary = await torrentDB.all();
-				if (localLibrary.length > 0 && libraryItems.length === 0) {
+				if (localLibrary.length > 0) {
 					setLibraryItems(localLibrary);
 					setIsLoading(false);
 				}
@@ -219,10 +227,21 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 				setError(errorMessage);
 
 				// Retry logic with exponential backoff
-				if (retryCountRef.current < 3) {
+				// Only retry for network errors, not for service configuration issues
+				const isNetworkError =
+					error instanceof Error &&
+					(error.message.includes('fetch') ||
+						error.message.includes('network') ||
+						error.message.includes('timeout'));
+
+				if (isNetworkError && retryCountRef.current < 3) {
 					retryCountRef.current++;
 					const retryDelay = Math.pow(2, retryCountRef.current) * 1000; // 2s, 4s, 8s
-					setTimeout(() => {
+					console.log(
+						`Retrying fetch (attempt ${retryCountRef.current}/3) in ${retryDelay}ms`
+					);
+					retryTimeoutRef.current = setTimeout(() => {
+						retryTimeoutRef.current = null;
 						fetchFromServices(forceRefresh);
 					}, retryDelay);
 				}
@@ -231,7 +250,7 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 				setIsLoading(false);
 			}
 		},
-		[rdKey, adKey, isFetching, libraryItems.length, getCurrentLibraryState]
+		[rdKey, adKey, isFetching, getCurrentLibraryState]
 	);
 
 	// Smart refresh with change detection (for auto-refresh)
@@ -321,7 +340,14 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 		};
 
 		window.addEventListener('online', handleOnline);
-		return () => window.removeEventListener('online', handleOnline);
+		return () => {
+			window.removeEventListener('online', handleOnline);
+			// Clear any pending retry on unmount
+			if (retryTimeoutRef.current) {
+				clearTimeout(retryTimeoutRef.current);
+				retryTimeoutRef.current = null;
+			}
+		};
 	}, [error, isFetching, fetchFromServices]);
 
 	return (

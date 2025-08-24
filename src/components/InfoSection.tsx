@@ -1,9 +1,12 @@
+import { Handshake, Sparkles } from 'lucide-react';
+
 export function InfoSection() {
 	return (
 		<div className="space-y-3 text-center text-sm">
 			<div className="rounded border-2 border-gray-600 bg-gray-800/50 p-4 text-gray-100">
 				<div className="mb-1 text-center text-sm">
-					✨ Get DMM browser extensions for{' '}
+					<Sparkles className="mr-1 inline-block h-3 w-3 text-yellow-400" />
+					Get DMM browser extensions for{' '}
 					<b>
 						<a
 							className="text-blue-300 underline hover:text-blue-200"
@@ -44,7 +47,7 @@ export function InfoSection() {
 				</div>
 
 				<div className="mb-1 text-center text-sm">
-					✨
+					<Sparkles className="mr-1 inline-block h-3 w-3 text-yellow-400" />
 					<a
 						className="text-blue-300 underline hover:text-blue-200"
 						href="https://github.com/debridmediamanager/zurg-testing"
@@ -56,7 +59,7 @@ export function InfoSection() {
 					or with Plex
 				</div>
 				<div className="mb-1 text-center text-sm">
-					✨
+					<Sparkles className="mr-1 inline-block h-3 w-3 text-yellow-400" />
 					<a
 						className="text-azure bg-red-500 px-1 text-red-100"
 						href="https://www.reddit.com/r/debridmediamanager/"
@@ -64,7 +67,8 @@ export function InfoSection() {
 					>
 						r/debridmediamanager
 					</a>{' '}
-					🤝 Sponsor this project&apos;s development on{' '}
+					<Handshake className="mr-1 inline-block h-3 w-3 text-blue-400" />
+					Sponsor this project&apos;s development on{' '}
 					<a
 						className="text-blue-300 underline hover:text-blue-200"
 						href="https://github.com/sponsors/debridmediamanager"
@@ -90,7 +94,8 @@ export function InfoSection() {
 					</a>
 				</div>
 				<div className="mb-1 text-center text-sm">
-					✨ Lastly... we now have a{' '}
+					<Sparkles className="mr-1 inline-block h-3 w-3 text-yellow-400" /> Lastly... we
+					now have a{' '}
 					<a
 						className="text-blue-300 underline hover:text-blue-200"
 						href="https://discord.gg/7u4YjMThXP"

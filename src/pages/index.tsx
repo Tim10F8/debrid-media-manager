@@ -13,6 +13,7 @@ import { handleLogout } from '@/utils/logout';
 import { checkPremiumStatus } from '@/utils/premiumCheck';
 import { genericToastOptions } from '@/utils/toastOptions';
 import { withAuth } from '@/utils/withAuth';
+import { Megaphone, Star, X } from 'lucide-react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
@@ -145,13 +146,13 @@ function IndexPage() {
 			(tbUser || !hasTBAuth) &&
 			(traktUser || !hasTraktAuth) ? (
 				<>
-					<h1 className="mb-2 text-xl font-bold text-white">
+					<h1 className="mb-2 flex items-center justify-center text-xl font-bold text-white">
 						Debrid Media Manager{' '}
 						<a
 							href="https://www.patreon.com/debridmediamanager"
-							className="text-2xl hover:opacity-75"
+							className="ml-2 inline-flex hover:opacity-75"
 						>
-							📣
+							<Megaphone className="h-6 w-6 text-yellow-400" />
 						</a>
 					</h1>
 
@@ -165,7 +166,10 @@ function IndexPage() {
 						<div className="mb-2 w-full max-w-md rounded-md border border-blue-500 bg-blue-900/30 p-1.5 text-xs shadow-sm">
 							<div className="flex justify-between">
 								<div className="flex-1">
-									<span className="text-yellow-300">✨ Sponsor:</span>{' '}
+									<span className="inline-flex items-center text-yellow-300">
+										<Star className="mr-1 inline-block h-3 w-3 text-yellow-400" />
+										Sponsor:
+									</span>{' '}
 									<a
 										className="font-medium text-blue-300 underline hover:text-blue-200"
 										href="https://store.elfhosted.com/product-category/streaming-bundles/"
@@ -185,7 +189,7 @@ function IndexPage() {
 									className="ml-1 text-gray-400 hover:text-gray-200"
 									title="Hide banner"
 								>
-									✕
+									<X className="h-4 w-4" />
 								</button>
 							</div>
 						</div>

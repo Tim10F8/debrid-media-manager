@@ -10,25 +10,20 @@ export const globalToastOptions = {
 
 export const searchToastOptions = {
 	...globalToastOptions,
-	icon: '🔍',
 };
 
 export const libraryToastOptions = {
 	...globalToastOptions,
-	icon: '📚',
 };
 
 export const genericToastOptions = {
 	...globalToastOptions,
-	icon: '📢',
 };
 
 export const magnetToastOptions = {
 	...globalToastOptions,
-	icon: '🧲',
 };
 
 export const castToastOptions = {
 	...globalToastOptions,
-	icon: '🪄',
 };

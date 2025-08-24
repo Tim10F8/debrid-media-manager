@@ -1,5 +1,5 @@
 import { RealDebridUser } from '@/hooks/auth';
-import Swal from 'sweetalert2';
+import Swal from '../components/modals/modal';
 
 export async function checkPremiumStatus(rdUser: RealDebridUser) {
 	// Calculate days remaining either from premium seconds or expiration date

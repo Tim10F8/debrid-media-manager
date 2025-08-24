@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Popcorn } from 'lucide-react';
 import getConfig from 'next/config';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
@@ -67,7 +68,10 @@ export default function RelatedMedia({ imdbId, mediaType }: RelatedMediaProps) {
 					setShowRelated(!showRelated);
 				}}
 			>
-				<b>{showRelated ? '🍿Hide Related' : '🍿Show Related'}</b>
+				<b className="inline-flex items-center">
+					<Popcorn className="mr-1 h-4 w-4" />
+					{showRelated ? 'Hide Related' : 'Show Related'}
+				</b>
 			</button>
 
 			{showRelated && (

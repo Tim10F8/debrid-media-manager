@@ -15,7 +15,7 @@ import { libraryToastOptions, magnetToastOptions } from '@/utils/toastOptions';
 import { saveAs } from 'file-saver';
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
-import Swal from 'sweetalert2';
+import Swal from '../../../components/modals/modal';
 
 export function useLibraryBatchActions(
 	rdKey: string | null,

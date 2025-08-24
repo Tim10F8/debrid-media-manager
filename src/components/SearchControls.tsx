@@ -1,4 +1,5 @@
 import SearchTokens from '@/components/SearchTokens';
+import { RotateCcw, Search } from 'lucide-react';
 import React from 'react';
 
 interface SearchControlsProps {
@@ -35,6 +36,7 @@ const SearchControls: React.FC<SearchControlsProps> = ({
 	return (
 		<>
 			<div className="mb-1 flex items-center border-b-2 border-gray-600 py-2">
+				<Search className="mr-2 h-4 w-4 text-gray-400" />
 				<input
 					className="mr-3 w-full appearance-none border-none bg-transparent px-2 py-1 text-sm leading-tight text-gray-100 focus:outline-none"
 					type="text"
@@ -44,10 +46,12 @@ const SearchControls: React.FC<SearchControlsProps> = ({
 					onChange={(e) => onQueryChange(e.target.value.toLocaleLowerCase())}
 				/>
 				<span
-					className="me-2 cursor-pointer rounded bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+					className="me-2 inline-flex cursor-pointer items-center rounded bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
 					onClick={() => onQueryChange('')}
+					title="Reset search"
 				>
-					Reset
+					<RotateCcw className="h-3 w-3" />
+					<span className="ml-1 hidden sm:inline">Reset</span>
 				</span>
 				<span className="mr-2 text-xs text-gray-400">
 					{filteredCount}/{totalCount}

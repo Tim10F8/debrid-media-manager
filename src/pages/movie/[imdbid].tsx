@@ -22,6 +22,7 @@ import { generateTokenAndHash } from '@/utils/token';
 import { getMultipleTrackerStats } from '@/utils/trackerStats';
 import { withAuth } from '@/utils/withAuth';
 import axios from 'axios';
+import { Cast, CloudOff, Eye as EyeIcon, Loader2, Search, Sparkles, Zap } from 'lucide-react';
 import getConfig from 'next/config';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
@@ -547,7 +548,19 @@ const MovieSearch: FunctionComponent = () => {
 						onClick={() => handleAvailabilityTest(filteredResults)}
 						disabled={isCheckingAvailability}
 					>
-						<b>{isCheckingAvailability ? '🔄 Checking...' : '🕵🏻Check Available'}</b>
+						<b className="flex items-center justify-center">
+							{isCheckingAvailability ? (
+								<>
+									<Loader2 className="mr-1 h-3 w-3 animate-spin text-yellow-500" />
+									Checking...
+								</>
+							) : (
+								<>
+									<Search className="mr-1 h-3 w-3 text-yellow-500" />
+									Check Available
+								</>
+							)}
+						</b>
 					</button>
 					{getFirstAvailableRdTorrent() && (
 						<>
@@ -564,7 +577,10 @@ const MovieSearch: FunctionComponent = () => {
 									addRd(firstAvailable.hash);
 								}}
 							>
-								<b>⚡Instant RD</b>
+								<b className="flex items-center justify-center">
+									<Zap className="mr-1 h-3 w-3 text-yellow-500" />
+									Instant RD
+								</b>
 							</button>
 							<button
 								className="mb-1 mr-2 mt-0 rounded border-2 border-teal-500 bg-teal-900/30 p-1 text-xs text-teal-100 transition-colors hover:bg-teal-800/50"
@@ -574,13 +590,19 @@ const MovieSearch: FunctionComponent = () => {
 									)
 								}
 							>
-								<b>🧐Watch</b>
+								<b className="flex items-center justify-center">
+									<EyeIcon className="mr-1 h-3 w-3 text-teal-500" />
+									Watch
+								</b>
 							</button>
 							<button
 								className="mb-1 mr-2 mt-0 rounded border-2 border-gray-500 bg-gray-900/30 p-1 text-xs text-gray-100 transition-colors hover:bg-gray-800/50"
 								onClick={() => handleCast(getFirstAvailableRdTorrent()!.hash)}
 							>
-								<b>Cast✨</b>
+								<b className="flex items-center justify-center">
+									Cast
+									<Cast className="ml-1 h-3 w-3 text-gray-500" />
+								</b>
 							</button>
 						</>
 					)}
@@ -590,13 +612,17 @@ const MovieSearch: FunctionComponent = () => {
 				className="mb-1 mr-2 mt-0 rounded border-2 border-purple-500 bg-purple-900/30 p-1 text-xs text-purple-100 transition-colors hover:bg-purple-800/50"
 				onClick={() => window.open(`stremio://detail/movie/${imdbid}/${imdbid}`)}
 			>
-				<b>🔮Stremio</b>
+				<b className="flex items-center justify-center">
+					<Sparkles className="mr-1 h-3 w-3 text-purple-500" />
+					Stremio
+				</b>
 			</button>
 			{onlyShowCached && totalUncachedCount > 0 && (
 				<button
 					className="mb-1 mr-2 mt-0 rounded border-2 border-blue-500 bg-blue-900/30 p-1 text-xs text-blue-100 transition-colors hover:bg-blue-800/50"
 					onClick={() => setOnlyShowCached(false)}
 				>
+					<CloudOff className="mr-1 h-3 w-3 text-blue-500" />
 					Show {totalUncachedCount} uncached
 				</button>
 			)}

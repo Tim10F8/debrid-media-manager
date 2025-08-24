@@ -6,7 +6,7 @@ import { defaultPlayer } from '@/utils/settings';
 import { filenameParse } from '@ctrl/video-filename-parser';
 import { every, some } from 'lodash';
 import { Dispatch, SetStateAction } from 'react';
-import Swal from 'sweetalert2';
+import Swal from '../components/modals/modal';
 import { handleReinsertTorrentinRd } from './addMagnet';
 import { handleCopyOrDownloadMagnet } from './copyMagnet';
 import { handleDeleteRdTorrent } from './deleteTorrent';
@@ -145,18 +145,8 @@ export async function handleShowInfoForRD(
 		});
 		Swal.close();
 	};
-	// Add a method to trigger the fetch for latest RD torrents
-	(window as any).triggerFetchLatestRDTorrents = async (limit: number = 2) => {
-		await fetchLatestRDTorrents(
-			rdKey,
-			torrentDB,
-			setUserTorrentsList,
-			(loading) => console.log('Loading:', loading),
-			(syncing) => console.log('Syncing:', syncing),
-			setSelectedTorrents,
-			limit
-		);
-	};
+	// Note: triggerFetchLatestRDTorrents is now set in the library page component
+	// where it has access to the refreshLibrary function from cache context
 	(window as any).closePopup = Swal.close;
 	(window as any).saveSelection = async (key: string, hash: string, fileIDs: string[]) => {
 		console.log('Saving selection', key, hash, fileIDs);

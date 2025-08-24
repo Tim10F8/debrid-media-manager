@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Clock, Film, Globe, Info, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -124,7 +125,10 @@ export default function MediaInfoButton({ hash }: MediaInfoButtonProps) {
 				{/* Video Info */}
 				{videoStream && (
 					<div>
-						<h4 className="font-bold">🎥 Video</h4>
+						<h4 className="flex items-center font-bold">
+							<Film className="mr-2 inline-block h-4 w-4 text-yellow-400" />
+							Video
+						</h4>
 						<p>
 							{videoStream.codec_name.toUpperCase()} • {videoStream.width}x
 							{videoStream.height}
@@ -138,9 +142,11 @@ export default function MediaInfoButton({ hash }: MediaInfoButtonProps) {
 						<h4 className="font-bold">🔊 Audio Tracks</h4>
 						{audioStreams.map((stream, index) => (
 							<p key={index}>
-								{stream.tags?.language
-									? languageEmojis[stream.tags.language] || stream.tags.language
-									: '🌐'}{' '}
+								{stream.tags?.language ? (
+									languageEmojis[stream.tags.language] || stream.tags.language
+								) : (
+									<Globe className="inline-block h-3 w-3 text-gray-400" />
+								)}{' '}
 								{stream.codec_name.toUpperCase()} • {stream.channel_layout}
 								{stream.tags?.title && ` • ${stream.tags.title}`}
 							</p>
@@ -151,12 +157,17 @@ export default function MediaInfoButton({ hash }: MediaInfoButtonProps) {
 				{/* Subtitles */}
 				{subtitleStreams.length > 0 && (
 					<div>
-						<h4 className="font-bold">💬 Subtitles</h4>
+						<h4 className="flex items-center font-bold">
+							<MessageSquare className="mr-2 inline-block h-4 w-4 text-green-400" />
+							Subtitles
+						</h4>
 						{subtitleStreams.map((stream, index) => (
 							<p key={index}>
-								{stream.tags?.language
-									? languageEmojis[stream.tags.language] || stream.tags.language
-									: '🌐'}{' '}
+								{stream.tags?.language ? (
+									languageEmojis[stream.tags.language] || stream.tags.language
+								) : (
+									<Globe className="inline-block h-3 w-3 text-gray-400" />
+								)}{' '}
 								{stream.tags?.title && ` • ${stream.tags.title}`}
 							</p>
 						))}
@@ -166,7 +177,10 @@ export default function MediaInfoButton({ hash }: MediaInfoButtonProps) {
 				{/* Duration */}
 				{format.duration && (
 					<div>
-						<h4 className="font-bold">⏱️ Duration</h4>
+						<h4 className="flex items-center font-bold">
+							<Clock className="mr-2 inline-block h-4 w-4 text-blue-400" />
+							Duration
+						</h4>
 						<p>{formatDuration(format.duration)}</p>
 					</div>
 				)}
@@ -188,7 +202,8 @@ export default function MediaInfoButton({ hash }: MediaInfoButtonProps) {
 				onClick={handleShowDialog}
 				className="haptic-sm inline rounded border-2 border-blue-500 bg-blue-900/30 px-1 text-xs text-blue-100 transition-colors hover:bg-blue-800/50"
 			>
-				ℹ️ Info
+				<Info className="mr-1 inline-block h-3 w-3 text-blue-400" />
+				Info
 			</button>
 
 			{showDialog && (

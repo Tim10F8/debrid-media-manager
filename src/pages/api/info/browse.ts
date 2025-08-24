@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				.slice(0, 24)
 				.map(
 					(item: MListItem) =>
-						`${list.mediatype || defaultMediaType}:${item.imdb_id}:${item.title}`
+						`${item.mediatype || list.mediatype || defaultMediaType}:${item.imdb_id}:${item.title}`
 				);
 			response[list.name] = shuffle(response[list.name], rng);
 		}

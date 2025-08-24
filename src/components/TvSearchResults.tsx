@@ -3,9 +3,17 @@ import { createTorrent } from '@/services/torbox';
 import { downloadMagnetFile } from '@/utils/downloadMagnet';
 import { getEpisodeCountClass, getEpisodeCountLabel } from '@/utils/episodeUtils';
 import { borderColor, btnColor, btnIcon, btnLabel, fileSize } from '@/utils/results';
+import {
+	Cast,
+	Eye as EyeIcon,
+	Folder,
+	Link2,
+	Loader2,
+	Search as SearchIcon,
+	X,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { FaMagnet, FaTimes } from 'react-icons/fa';
 import ReportButton from './ReportButton';
 
 type TvSearchResultsProps = {
@@ -168,10 +176,11 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 		videoCount: number;
 	}) => (
 		<span
-			className="haptic-sm inline-block cursor-pointer rounded bg-black bg-opacity-50 px-2 py-1 hover:bg-opacity-75"
+			className="haptic-sm inline-flex cursor-pointer items-center rounded bg-black bg-opacity-50 px-2 py-1 hover:bg-opacity-75"
 			onClick={() => handleShowInfo(result)}
 		>
-			📂&nbsp;{getEpisodeCountLabel(videoCount, expectedEpisodeCount)}
+			<Folder className="mr-1 h-4 w-4" />
+			{getEpisodeCountLabel(videoCount, expectedEpisodeCount)}
 		</span>
 	);
 
@@ -279,7 +288,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 														⌛
 													</span>
 												) : (
-													<FaTimes className="mr-2 inline" />
+													<X className="mr-2 inline h-3 w-3" />
 												)}
 												{isLoading
 													? 'Removing...'
@@ -317,7 +326,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 														⌛
 													</span>
 												) : (
-													<FaTimes className="mr-2 inline" />
+													<X className="mr-2 inline h-3 w-3" />
 												)}
 												{isLoading
 													? 'Removing...'
@@ -355,7 +364,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 														⌛
 													</span>
 												) : (
-													<FaTimes className="mr-2 inline" />
+													<X className="mr-2 inline h-3 w-3" />
 												)}
 												{isLoading
 													? 'Removing...'
@@ -427,13 +436,14 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 											>
 												{isCasting ? (
 													<>
-														<span className="inline-block animate-spin">
-															⌛
-														</span>{' '}
+														<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
 														Casting...
 													</>
 												) : (
-													'Cast✨'
+													<>
+														<Cast className="mr-1 inline-block h-3 w-3 text-gray-400" />
+														Cast
+													</>
 												)}
 											</button>
 										)}
@@ -447,13 +457,14 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 											>
 												{checkingHashes.has(r.hash) ? (
 													<>
-														<span className="inline-block animate-spin">
-															⌛
-														</span>{' '}
+														<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
 														Checking...
 													</>
 												) : (
-													'🕵🏻Check'
+													<>
+														<SearchIcon className="mr-1 inline-block h-3 w-3 text-yellow-400" />
+														Check
+													</>
 												)}
 											</button>
 										)}
@@ -468,7 +479,10 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 													)
 												}
 											>
-												🧐Watch
+												<>
+													<EyeIcon className="mr-1 inline-block h-3 w-3 text-teal-400" />
+													Watch
+												</>
 											</button>
 										)}
 
@@ -477,7 +491,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 											className="haptic-sm inline rounded border-2 border-pink-500 bg-pink-900/30 px-1 text-xs text-pink-100 transition-colors hover:bg-pink-800/50"
 											onClick={() => handleMagnetAction(r.hash)}
 										>
-											<FaMagnet className="inline" />{' '}
+											<Link2 className="inline h-3 w-3 text-teal-400" />{' '}
 											{downloadMagnets ? 'Download' : 'Copy'}
 										</button>
 

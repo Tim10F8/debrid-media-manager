@@ -60,7 +60,7 @@ export const TraktBrowse: FunctionComponent = () => {
 		);
 	}
 
-	const title = data.mediaType === 'movie' ? 'Movies 🎥' : 'Shows 📺';
+	const title = data.mediaType === 'movie' ? 'Movies' : 'Shows';
 
 	return (
 		<div className="mx-2 my-1 min-h-screen bg-gray-900">

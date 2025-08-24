@@ -1,3 +1,5 @@
+import { Lightbulb } from 'lucide-react';
+
 interface LibraryHelpTextProps {
 	helpText: string;
 	onHide: () => void;
@@ -8,7 +10,8 @@ export default function LibraryHelpText({ helpText, onHide }: LibraryHelpTextPro
 
 	return (
 		<div className="bg-blue-900 py-0.5 text-xs" onClick={onHide}>
-			💡 {helpText}
+			<Lightbulb className="mr-1 inline-block h-3 w-3 text-yellow-400" />
+			{helpText}
 		</div>
 	);
 }

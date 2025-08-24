@@ -34,18 +34,31 @@ import { getHashOfTorrent } from '@/utils/torrentFile';
 import { handleShowInfoForAD, handleShowInfoForRD } from '@/utils/torrentInfo';
 import { withAuth } from '@/utils/withAuth';
 import { saveAs } from 'file-saver';
+import { BookOpen } from 'lucide-react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import Swal from 'sweetalert2';
+import Swal from '../components/modals/modal';
 
 const ITEMS_PER_PAGE = 100;
 
 interface SortBy {
 	column: 'id' | 'filename' | 'title' | 'bytes' | 'progress' | 'status' | 'added';
 	direction: 'asc' | 'desc';
+}
+
+interface RestoredFile {
+	filename: string;
+	hash: string;
+}
+
+interface RDFileInfo {
+	id: number;
+	path: string;
+	bytes: number;
+	selected: boolean;
 }
 
 const torrentDB = new UserTorrentDB();
@@ -69,6 +82,7 @@ function TorrentsPage() {
 		isFetching,
 		refreshLibrary,
 		setLibraryItems: setCachedLibraryItems,
+		addTorrent,
 		removeTorrent: removeFromCache,
 		updateTorrent: updateInCache,
 		error: cacheError,
@@ -76,33 +90,34 @@ function TorrentsPage() {
 	} = useLibraryCache();
 
 	// loading states
-	const [loading, setLoading] = useState(false);
 	const [rdSyncing, setRdSyncing] = useState(false);
 	const [adSyncing, setAdSyncing] = useState(false);
 	const [filtering, setFiltering] = useState(false);
 	const [grouping, setGrouping] = useState(false);
 
-	// Use cached items as the source
-	const [userTorrentsList, setUserTorrentsList] = useState<UserTorrent[]>([]);
+	// Use cached items directly instead of duplicating state
+	const userTorrentsList = cachedLibraryItems;
+	const loading = cacheLoading;
+	const setUserTorrentsList = setCachedLibraryItems;
 	const [filteredList, setFilteredList] = useState<UserTorrent[]>([]);
 	const [sortBy, setSortBy] = useState<SortBy>({ column: 'added', direction: 'desc' });
 	const [helpText, setHelpText] = useState('');
-	const [selectedTorrents, setSelectedTorrents] = useState<Set<string>>(new Set());
+	const [selectedTorrents, setSelectedTorrents] = useState<Set<string>>(() => new Set());
 
 	// keys
 	const [rdKey] = useRealDebridAccessToken();
 	const adKey = useAllDebridApiKey();
 
-	const [defaultTitleGrouping] = useState<Record<string, number>>({});
-	const [movieTitleGrouping] = useState<Record<string, number>>({});
-	const [tvGroupingByEpisode] = useState<Record<string, number>>({});
-	const [tvGroupingByTitle] = useState<Record<string, number>>({});
-	const [hashGrouping] = useState<Record<string, number>>({});
-	const [sameTitle] = useState<Set<string>>(new Set());
-	const [sameHash] = useState<Set<string>>(new Set());
+	const [defaultTitleGrouping] = useState<Record<string, number>>(() => ({}));
+	const [movieTitleGrouping] = useState<Record<string, number>>(() => ({}));
+	const [tvGroupingByEpisode] = useState<Record<string, number>>(() => ({}));
+	const [tvGroupingByTitle] = useState<Record<string, number>>(() => ({}));
+	const [hashGrouping] = useState<Record<string, number>>(() => ({}));
+	const [sameTitle] = useState<Set<string>>(() => new Set());
+	const [sameHash] = useState<Set<string>>(() => new Set());
 
-	const [uncachedRdHashes, setUncachedRdHashes] = useState<Set<string>>(new Set());
-	const [uncachedAdIDs, setUncachedAdIDs] = useState<string[]>([]);
+	const [uncachedRdHashes, setUncachedRdHashes] = useState<Set<string>>(() => new Set());
+	const [uncachedAdIDs, setUncachedAdIDs] = useState<string[]>(() => []);
 	const [shouldDownloadMagnets] = useState(
 		() =>
 			typeof window !== 'undefined' &&
@@ -154,6 +169,11 @@ function TorrentsPage() {
 					}
 				}
 			};
+
+			// Cleanup function to remove global window function
+			return () => {
+				delete (window as any).generateStrmFiles;
+			};
 		}
 	}, [rdKey]);
 
@@ -177,8 +197,27 @@ function TorrentsPage() {
 				link.click();
 				URL.revokeObjectURL(link.href);
 			};
+
+			// Cleanup function to remove global window function
+			return () => {
+				delete (window as any).exportLinks;
+			};
 		}
 	}, [rdKey]);
+
+	// Set up global refresh function for dialogs
+	useEffect(() => {
+		if (typeof window !== 'undefined') {
+			(window as any).triggerFetchLatestRDTorrents = async () => {
+				await refreshLibrary();
+			};
+
+			// Cleanup function to remove global window function
+			return () => {
+				delete (window as any).triggerFetchLatestRDTorrents;
+			};
+		}
+	}, [refreshLibrary]);
 
 	// add hash to library
 	useEffect(() => {
@@ -188,18 +227,37 @@ function TorrentsPage() {
 		const hashes = extractHashes(addMagnet as string);
 		if (hashes.length !== 1) return;
 
-		if (rdKey)
-			handleAddMultipleHashesInRd(
-				rdKey,
-				hashes,
-				async () => await triggerFetchLatestRDTorrents(2)
+		let isCancelled = false;
+
+		// Handle both services but only refresh once at the end
+		const promises: Promise<void>[] = [];
+
+		if (rdKey) {
+			promises.push(
+				new Promise<void>((resolve) => {
+					handleAddMultipleHashesInRd(rdKey, hashes, async () => resolve());
+				})
 			);
-		if (adKey)
-			handleAddMultipleHashesInAd(
-				adKey,
-				hashes,
-				async () => await triggerFetchLatestADTorrents()
+		}
+		if (adKey) {
+			promises.push(
+				new Promise<void>((resolve) => {
+					handleAddMultipleHashesInAd(adKey, hashes, async () => resolve());
+				})
 			);
+		}
+
+		// Wait for all operations to complete, then refresh once
+		Promise.all(promises).then(() => {
+			if (!isCancelled && promises.length > 0) {
+				refreshLibrary();
+			}
+		});
+
+		// Cleanup function to prevent refresh if component unmounts
+		return () => {
+			isCancelled = true;
+		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [router]);
 
@@ -252,11 +310,7 @@ function TorrentsPage() {
 		await refreshLibrary();
 	};
 
-	// Sync with cached library - one-way sync only
-	useEffect(() => {
-		setUserTorrentsList(cachedLibraryItems);
-		setLoading(cacheLoading);
-	}, [cachedLibraryItems, cacheLoading]);
+	// No longer needed since we're using cached items directly
 
 	// aggregate metadata
 	useEffect(() => {
@@ -442,8 +496,8 @@ function TorrentsPage() {
 		});
 	}
 
-	function sortedData() {
-		return filteredList.sort((a, b) => {
+	const sortedData = useMemo(() => {
+		return [...filteredList].sort((a, b) => {
 			const isAsc = sortBy.direction === 'asc';
 			let comparison = 0;
 
@@ -468,14 +522,14 @@ function TorrentsPage() {
 
 			return isAsc ? comparison : comparison * -1;
 		});
-	}
+	}, [filteredList, sortBy]);
 
-	function currentPageData() {
-		return sortedData().slice(
+	const currentPageData = useMemo(() => {
+		return sortedData.slice(
 			(currentPage - 1) * ITEMS_PER_PAGE,
 			(currentPage - 1) * ITEMS_PER_PAGE + ITEMS_PER_PAGE
 		);
-	}
+	}, [sortedData, currentPage]);
 
 	const getTitleGroupings = (mediaType: UserTorrent['mediaType']) => {
 		switch (mediaType) {
@@ -548,8 +602,7 @@ function TorrentsPage() {
 				...magnetToastOptions,
 			});
 			resetSelection(setSelectedTorrents);
-			await triggerFetchLatestRDTorrents(Math.ceil(relevantList.length * 1.1));
-			await triggerFetchLatestADTorrents();
+			await refreshLibrary();
 		} else if (errors.length) {
 			toast.error(`Failed to reinsert ${errors.length} torrents`, {
 				id: progressToast,
@@ -561,8 +614,7 @@ function TorrentsPage() {
 				...magnetToastOptions,
 			});
 			resetSelection(setSelectedTorrents);
-			await triggerFetchLatestRDTorrents(Math.ceil(relevantList.length * 1.1));
-			await triggerFetchLatestADTorrents();
+			await refreshLibrary();
 		} else {
 			toast.dismiss(progressToast);
 		}
@@ -621,11 +673,14 @@ function TorrentsPage() {
 	function wrapDeleteFn(t: UserTorrent) {
 		return async () => {
 			const oldId = t.id;
+			const torrentBackup = t; // Store the torrent for rollback
+
 			// Optimistic update - remove from cache immediately
 			removeFromCache(oldId);
 			setSelectedTorrents((prev) => {
-				prev.delete(oldId);
-				return new Set(prev);
+				const newSet = new Set(prev);
+				newSet.delete(oldId);
+				return newSet;
 			});
 
 			try {
@@ -636,10 +691,27 @@ function TorrentsPage() {
 					await handleDeleteAdTorrent(adKey, t.id);
 				}
 			} catch (error) {
-				// If delete fails, we should re-add to cache
-				// For now, just refresh to get the correct state
+				// Rollback optimistic update on failure
 				console.error('Failed to delete torrent:', error);
-				await refreshLibrary();
+
+				// Re-add the torrent to cache
+				addTorrent(torrentBackup);
+
+				// Re-add to selection if it was selected
+				setSelectedTorrents((prev) => {
+					const newSet = new Set(prev);
+					newSet.add(oldId);
+					return newSet;
+				});
+
+				// Show error message to user
+				toast.error(
+					`Failed to delete torrent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+					libraryToastOptions
+				);
+
+				// Throw error so caller knows it failed
+				throw error;
 			}
 		};
 	}
@@ -938,8 +1010,7 @@ function TorrentsPage() {
 				id: progressToast,
 				...libraryToastOptions,
 			});
-			await triggerFetchLatestRDTorrents(Math.ceil(results.length * 1.1));
-			await triggerFetchLatestADTorrents();
+			await refreshLibrary();
 		} else if (errors.length) {
 			toast.error(`Failed to merge ${errors.length} torrents`, {
 				id: progressToast,
@@ -950,8 +1021,7 @@ function TorrentsPage() {
 				id: progressToast,
 				...libraryToastOptions,
 			});
-			await triggerFetchLatestRDTorrents(Math.ceil(results.length * 1.1));
-			await triggerFetchLatestADTorrents();
+			await refreshLibrary();
 		} else {
 			toast.dismiss(progressToast);
 		}
@@ -1000,7 +1070,7 @@ function TorrentsPage() {
 	}
 
 	async function wrapLocalRestoreFn(debridService: string) {
-		return await localRestore((files: any[]) => {
+		return await localRestore((files: RestoredFile[]) => {
 			const allHashes = new Set(userTorrentsList.map((t) => t.hash));
 			const addMagnet = (hash: string) => {
 				if (rdKey && debridService === 'rd') return handleAddAsMagnetInRd(rdKey, hash);
@@ -1039,8 +1109,7 @@ function TorrentsPage() {
 					);
 					toast.dismiss('restore-progress');
 					if (results.length) {
-						await triggerFetchLatestRDTorrents(Math.ceil(results.length * 1.1));
-						await triggerFetchLatestADTorrents();
+						await refreshLibrary();
 					}
 					resolve({ success: results.length, error: errors.length });
 				}
@@ -1147,18 +1216,10 @@ function TorrentsPage() {
 		const hashes = input as string[];
 
 		if (rdKey && hashes && debridService === 'rd') {
-			handleAddMultipleHashesInRd(
-				rdKey,
-				hashes,
-				async () => await triggerFetchLatestRDTorrents(Math.ceil(hashes.length * 1.1))
-			);
+			handleAddMultipleHashesInRd(rdKey, hashes, async () => await refreshLibrary());
 		}
 		if (adKey && hashes && debridService === 'ad') {
-			handleAddMultipleHashesInAd(
-				adKey,
-				hashes,
-				async () => await triggerFetchLatestADTorrents()
-			);
+			handleAddMultipleHashesInAd(adKey, hashes, async () => await refreshLibrary());
 		}
 	}
 
@@ -1182,7 +1243,8 @@ function TorrentsPage() {
 			<div className="mb-1 flex items-center justify-between">
 				<div className="flex items-center gap-2">
 					<h1 className="text-xl font-bold text-white">
-						Library 📚{' '}
+						<BookOpen className="mr-1 inline-block h-5 w-5 text-cyan-400" />
+						Library{' '}
 						<LibrarySize
 							torrentCount={userTorrentsList.length}
 							totalBytes={totalBytes}
@@ -1258,7 +1320,7 @@ function TorrentsPage() {
 			</div>
 			<LibraryMenuButtons
 				currentPage={currentPage}
-				maxPages={Math.ceil(sortedData().length / ITEMS_PER_PAGE)}
+				maxPages={Math.ceil(sortedData.length / ITEMS_PER_PAGE)}
 				onPrevPage={handlePrevPage}
 				onNextPage={handleNextPage}
 				onResetFilters={resetFilters}
@@ -1271,7 +1333,7 @@ function TorrentsPage() {
 				failedCount={failedCount}
 			/>
 			<LibraryActionButtons
-				onSelectShown={() => selectShown(currentPageData(), setSelectedTorrents)}
+				onSelectShown={() => selectShown(currentPageData, setSelectedTorrents)}
 				onResetSelection={() => resetSelection(setSelectedTorrents)}
 				onReinsertTorrents={handleReinsertTorrents}
 				onGenerateHashlist={handleGenerateHashlist}
@@ -1310,7 +1372,7 @@ function TorrentsPage() {
 							/>
 						</thead>
 						<tbody>
-							{currentPageData().map((torrent) => (
+							{currentPageData.map((torrent) => (
 								<LibraryTorrentRow
 									key={torrent.id}
 									torrent={torrent}
@@ -1335,14 +1397,15 @@ function TorrentsPage() {
 										// Use optimistic update from cache
 										removeFromCache(id);
 										setSelectedTorrents((prev) => {
-											prev.delete(id);
-											return new Set(prev);
+											const newSet = new Set(prev);
+											newSet.delete(id);
+											return newSet;
 										});
 									}}
 									onShowInfo={async (t) => {
-										if (t.id.startsWith('rd:')) {
+										if (t.id.startsWith('rd:') && rdKey) {
 											const info = await getTorrentInfo(
-												rdKey!,
+												rdKey,
 												t.id.substring(3)
 											);
 											if (
@@ -1350,7 +1413,7 @@ function TorrentsPage() {
 												t.status === UserTorrentStatus.downloading
 											) {
 												const selectedFiles = info.files.filter(
-													(f: any) => f.selected
+													(f: RDFileInfo) => f.selected
 												);
 												updateInCache(t.id, {
 													progress: info.progress,
@@ -1360,7 +1423,7 @@ function TorrentsPage() {
 													serviceStatus: info.status,
 													links: info.links,
 													selectedFiles: selectedFiles.map(
-														(f: any, idx: number) => ({
+														(f: RDFileInfo, idx: number) => ({
 															fileId: f.id,
 															filename: f.path,
 															filesize: f.bytes,
@@ -1377,13 +1440,17 @@ function TorrentsPage() {
 											// Show the info dialog
 											await handleShowInfoForRD(
 												t,
-												rdKey!,
+												rdKey,
 												setUserTorrentsList,
 												torrentDB,
 												setSelectedTorrents
 											);
+										} else if (t.id.startsWith('ad:') && adKey) {
+											await handleShowInfoForAD(t, adKey);
 										} else {
-											await handleShowInfoForAD(t, adKey!);
+											console.error(
+												'Cannot show info: missing debrid service key'
+											);
 										}
 									}}
 									onTypeChange={(t) => {

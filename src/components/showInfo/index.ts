@@ -3,11 +3,12 @@ import { handleDeleteRdTorrent } from '@/utils/deleteTorrent';
 import { magnetToastOptions } from '@/utils/toastOptions';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import Swal from 'sweetalert2';
 import { handleShare } from '../../utils/hashList';
 import { isVideo } from '../../utils/selectable';
+import Swal from '../modals/modal';
 import { renderButton, renderInfoTable } from './components';
 import { renderTorrentInfo } from './render';
+import { icons } from './styles';
 import { ApiTorrentFile, MagnetLink, MediaInfoResponse } from './types';
 import { generatePasswordHash, getStreamInfo } from './utils';
 
@@ -200,27 +201,31 @@ export const showInfoForRD = async (
 				return `
 				<div class="m-2 text-center">
 					<div id="selection-count" class="text-sm text-cyan-400 mb-2">${info.files.filter((f: ApiTorrentFile) => f.selected === 1).length}/${info.files.length} files selected</div>
-					<div class="flex gap-2 justify-center">
+					<div class="flex gap-1 sm:gap-2 justify-center flex-wrap">
 						<button
-							class="px-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
+							class="px-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
 							onclick="window.selectAllVideos(); window.updateSelectionCount();"
+							title="Select All Videos"
 						>
-							🎥 Select All Videos
+							<span class="inline-flex items-center">${icons.selectVideos}<span class="hidden sm:inline ml-1">Select All Videos</span></span>
 						</button>
 						<button
-							class="px-2 bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
+							class="px-2 bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
 							onclick="window.unselectAll(); window.updateSelectionCount();"
+							title="Unselect All"
 						>
-							❌ Unselect All
+							<span class="inline-flex items-center">${icons.unselectAll}<span class="hidden sm:inline ml-1">Unselect All</span></span>
 						</button>
 						<button
 							class="px-2 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
 							onclick="window.resetSelection()"
+							title="Reset Selection"
 						>
-							↩️ Reset Selection
+							${icons.reset}
 						</button>
 					<button
-						class="px-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
+						class="px-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+						title="Save File Selection"
 						onclick="(async () => {
 							const oldId = 'rd:${info.id}';
 							try {
@@ -238,7 +243,7 @@ export const showInfoForRD = async (
 							}
 						})()"
 					>
-						💾 Save File Selection
+						<span class="inline-flex items-center">${icons.saveSelection}<span class="hidden sm:inline ml-1">Save Selection</span></span>
 					</button>
 					</div>
 				</div>

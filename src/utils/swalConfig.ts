@@ -1,4 +1,12 @@
-import Swal, { SweetAlertIcon, SweetAlertResult } from 'sweetalert2';
+import Swal from '../components/modals/modal';
+
+export type SweetAlertIcon = 'warning' | 'error' | 'success' | 'info' | 'question';
+export type SweetAlertResult = {
+	isConfirmed?: boolean;
+	isDenied?: boolean;
+	isDismissed?: boolean;
+	value?: any;
+};
 
 const baseConfig = {
 	background: '#111827',

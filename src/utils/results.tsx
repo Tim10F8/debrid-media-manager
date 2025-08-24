@@ -1,5 +1,5 @@
 import { SearchResult } from '@/services/mediasearch';
-import { FaDownload } from 'react-icons/fa';
+import { Download, Zap } from 'lucide-react';
 
 export const borderColor = (downloaded: boolean, downloading: boolean) =>
 	downloaded
@@ -28,7 +28,12 @@ export const torrentPrefix = (id: string) =>
 		<span className="bg-[#fbc730] text-[8px] text-black">AD</span>
 	);
 
-export const btnIcon = (avail: boolean) => (avail ? `⚡` : <FaDownload className="mr-2 inline" />);
+export const btnIcon = (avail: boolean) =>
+	avail ? (
+		<Zap className="mr-2 inline h-3 w-3 text-yellow-400" />
+	) : (
+		<Download className="mr-2 inline h-3 w-3" />
+	);
 
 export const btnLabel = (avail: boolean, debridService: string) =>
 	avail ? <b>Instant {debridService}</b> : `DL with ${debridService}`;

@@ -1,6 +1,7 @@
 import Poster from '@/components/poster';
 import { useRealDebridAccessToken } from '@/hooks/auth';
 import { withAuth } from '@/utils/withAuth';
+import { Eye, Trash2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -362,13 +363,13 @@ function ManagePage() {
 														href={getStremioUrl(link)}
 														className="haptic-sm rounded bg-cyan-600 px-3 py-1 text-sm text-white hover:bg-cyan-700"
 													>
-														👀
+														<Eye className="h-4 w-4" />
 													</a>
 													<button
 														onClick={() => handleDelete(link)}
 														className="haptic-sm rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700"
 													>
-														🗑️
+														<Trash2 className="h-4 w-4" />
 													</button>
 												</div>
 											</div>
