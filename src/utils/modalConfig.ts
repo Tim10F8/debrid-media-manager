@@ -1,34 +1,21 @@
-interface ConfirmDialogOptions {
-	title: string;
-	text: string;
-	icon?: 'warning' | 'error' | 'success' | 'info' | 'question';
-	confirmButtonText?: string;
-}
+// Re-export types from the unified types file
+export type {
+	ChoiceDialogOptions,
+	ConfirmDialogOptions,
+	CustomHtmlDialogOptions,
+	FireOptions,
+	InputDialogOptions,
+	SwalResult,
+} from '@/components/modals/types';
 
-interface ChoiceDialogOptions {
-	title: string;
-	text: string;
-	confirmButtonText: string;
-	denyButtonText: string;
-	cancelButtonText?: string;
-}
-
-interface InputDialogOptions {
-	title: string;
-	inputPlaceholder?: string;
-}
-
-interface CustomHtmlDialogOptions {
-	title: string;
-	html: string;
-	preConfirm?: () => Promise<any> | any;
-}
-
-let modalContext: any = null;
-
-export const setModalContext = (context: any) => {
-	modalContext = context;
-};
+// Helper functions that use the unified modal system
+import Swal from '@/components/modals/modal';
+import type {
+	ChoiceDialogOptions,
+	ConfirmDialogOptions,
+	CustomHtmlDialogOptions,
+	InputDialogOptions,
+} from '@/components/modals/types';
 
 export const showConfirmDialog = async ({
 	title,
@@ -36,11 +23,14 @@ export const showConfirmDialog = async ({
 	icon = 'warning',
 	confirmButtonText = 'Yes, proceed!',
 }: ConfirmDialogOptions): Promise<boolean> => {
-	if (!modalContext) {
-		console.error('Modal context not initialized');
-		return false;
-	}
-	return modalContext.showConfirmDialog({ title, text, icon, confirmButtonText });
+	const result = await Swal.fire({
+		title,
+		text,
+		icon,
+		confirmButtonText,
+		showCancelButton: true,
+	});
+	return result.isConfirmed;
 };
 
 export const showChoiceDialog = async ({
@@ -50,28 +40,31 @@ export const showChoiceDialog = async ({
 	denyButtonText,
 	cancelButtonText = 'Cancel',
 }: ChoiceDialogOptions): Promise<'confirm' | 'deny' | 'cancel'> => {
-	if (!modalContext) {
-		console.error('Modal context not initialized');
-		return 'cancel';
-	}
-	return modalContext.showChoiceDialog({
+	const result = await Swal.fire({
 		title,
 		text,
 		confirmButtonText,
 		denyButtonText,
 		cancelButtonText,
+		showDenyButton: true,
+		showCancelButton: true,
 	});
+	if (result.isConfirmed) return 'confirm';
+	if (result.isDenied) return 'deny';
+	return 'cancel';
 };
 
 export const showInputDialog = async ({
 	title,
 	inputPlaceholder = 'Enter a value',
 }: InputDialogOptions): Promise<string | null> => {
-	if (!modalContext) {
-		console.error('Modal context not initialized');
-		return null;
-	}
-	return modalContext.showInputDialog({ title, inputPlaceholder });
+	const result = await Swal.fire({
+		title,
+		input: 'text',
+		inputPlaceholder,
+		showCancelButton: true,
+	});
+	return result.isConfirmed ? result.value : null;
 };
 
 export const showCustomHtmlDialog = async ({
@@ -79,9 +72,10 @@ export const showCustomHtmlDialog = async ({
 	html,
 	preConfirm,
 }: CustomHtmlDialogOptions): Promise<any> => {
-	if (!modalContext) {
-		console.error('Modal context not initialized');
-		return { isConfirmed: false };
-	}
-	return modalContext.showCustomHtmlDialog({ title, html, preConfirm });
+	return Swal.fire({
+		title,
+		html,
+		preConfirm,
+		showCancelButton: true,
+	});
 };

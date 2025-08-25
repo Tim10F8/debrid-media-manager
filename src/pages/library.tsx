@@ -58,7 +58,7 @@ interface RDFileInfo {
 	id: number;
 	path: string;
 	bytes: number;
-	selected: boolean;
+	selected: number;
 }
 
 const torrentDB = new UserTorrentDB();
@@ -1413,7 +1413,7 @@ function TorrentsPage() {
 												t.status === UserTorrentStatus.downloading
 											) {
 												const selectedFiles = info.files.filter(
-													(f: RDFileInfo) => f.selected
+													(f: RDFileInfo) => f.selected === 1
 												);
 												updateInCache(t.id, {
 													progress: info.progress,

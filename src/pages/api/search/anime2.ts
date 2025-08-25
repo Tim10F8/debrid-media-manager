@@ -1,3 +1,4 @@
+import { AnimeSearchResult } from '@/services/database/anime';
 import { repository as db } from '@/services/repository';
 import { NextApiHandler } from 'next';
 

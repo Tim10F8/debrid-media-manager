@@ -1,37 +1,19 @@
-import { AlertTriangle, CheckCircle, HelpCircle, Info, XCircle } from 'lucide-react';
-import React, { createContext, ReactNode, useContext, useState } from 'react';
+import { AlertTriangle, CheckCircle, HelpCircle, Info, Loader2, XCircle } from 'lucide-react';
+import React, {
+	createContext,
+	ReactNode,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useState,
+} from 'react';
+import type { FireOptions, SwalResult } from './types';
 
 interface ModalContextType {
-	showConfirmDialog: (options: ConfirmDialogOptions) => Promise<boolean>;
-	showChoiceDialog: (options: ChoiceDialogOptions) => Promise<'confirm' | 'deny' | 'cancel'>;
-	showInputDialog: (options: InputDialogOptions) => Promise<string | null>;
-	showCustomHtmlDialog: (options: CustomHtmlDialogOptions) => Promise<any>;
-}
-
-interface ConfirmDialogOptions {
-	title: string;
-	text: string;
-	icon?: 'warning' | 'error' | 'success' | 'info' | 'question';
-	confirmButtonText?: string;
-}
-
-interface ChoiceDialogOptions {
-	title: string;
-	text: string;
-	confirmButtonText: string;
-	denyButtonText: string;
-	cancelButtonText?: string;
-}
-
-interface InputDialogOptions {
-	title: string;
-	inputPlaceholder?: string;
-}
-
-interface CustomHtmlDialogOptions {
-	title: string;
-	html: string;
-	preConfirm?: () => Promise<any> | any;
+	fire: (options: FireOptions) => Promise<SwalResult>;
+	close: () => void;
+	showLoading: () => void;
 }
 
 const ModalContext = createContext<ModalContextType | undefined>(undefined);
@@ -44,8 +26,21 @@ export const useModal = () => {
 	return context;
 };
 
+let globalModalInstance: ModalContextType | null = null;
+
+export const setGlobalModalInstance = (instance: ModalContextType) => {
+	globalModalInstance = instance;
+};
+
+export const getGlobalModalInstance = () => {
+	if (!globalModalInstance) {
+		console.warn('Modal instance not initialized. Make sure ModalProvider is mounted.');
+	}
+	return globalModalInstance;
+};
+
 interface ModalState {
-	type: 'confirm' | 'choice' | 'input' | 'custom' | null;
+	type: 'confirm' | 'choice' | 'input' | 'custom' | 'loading' | null;
 	options: any;
 	resolve: (value: any) => void;
 }
@@ -57,49 +52,56 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 		resolve: () => {},
 	});
 
-	const showConfirmDialog = (options: ConfirmDialogOptions): Promise<boolean> => {
+	const fire = useCallback((options: FireOptions): Promise<SwalResult> => {
 		return new Promise((resolve) => {
+			if (options.willOpen) {
+				options.willOpen();
+			}
+
+			let type: ModalState['type'] = 'confirm';
+			if (options.input === 'text') {
+				type = 'input';
+			} else if (options.showDenyButton) {
+				type = 'choice';
+			} else if (options.html && !options.text) {
+				type = 'custom';
+			}
+
 			setModalState({
-				type: 'confirm',
+				type,
 				options,
-				resolve,
+				resolve: (result) => {
+					if (options.didOpen) {
+						setTimeout(options.didOpen, 0);
+					}
+					resolve(result);
+				},
 			});
 		});
-	};
+	}, []);
 
-	const showChoiceDialog = (
-		options: ChoiceDialogOptions
-	): Promise<'confirm' | 'deny' | 'cancel'> => {
-		return new Promise((resolve) => {
-			setModalState({
-				type: 'choice',
-				options,
-				resolve,
-			});
+	const close = useCallback(() => {
+		setModalState((prevState) => {
+			if (prevState.resolve) {
+				prevState.resolve({ isConfirmed: false, isDismissed: true });
+			}
+			return {
+				type: null,
+				options: {},
+				resolve: () => {},
+			};
 		});
-	};
+	}, []);
 
-	const showInputDialog = (options: InputDialogOptions): Promise<string | null> => {
-		return new Promise((resolve) => {
-			setModalState({
-				type: 'input',
-				options,
-				resolve,
-			});
+	const showLoading = useCallback(() => {
+		setModalState({
+			type: 'loading',
+			options: {},
+			resolve: () => {},
 		});
-	};
+	}, []);
 
-	const showCustomHtmlDialog = (options: CustomHtmlDialogOptions): Promise<any> => {
-		return new Promise((resolve) => {
-			setModalState({
-				type: 'custom',
-				options,
-				resolve,
-			});
-		});
-	};
-
-	const closeModal = (result?: any) => {
+	const closeModal = (result: any) => {
 		modalState.resolve(result);
 		setModalState({
 			type: null,
@@ -108,134 +110,275 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 		});
 	};
 
+	const contextValue = useMemo(
+		() => ({
+			fire,
+			close,
+			showLoading,
+		}),
+		[fire, close, showLoading]
+	);
+
+	useEffect(() => {
+		setGlobalModalInstance(contextValue);
+		return () => {
+			globalModalInstance = null;
+		};
+	}, [contextValue]);
+
+	// Set up global close function when modal is opened
+	useEffect(() => {
+		if (modalState.type && typeof window !== 'undefined') {
+			(window as any).closePopup = close;
+			return () => {
+				if ((window as any).closePopup) {
+					delete (window as any).closePopup;
+				}
+			};
+		}
+	}, [modalState.type, close]);
+
 	return (
-		<ModalContext.Provider
-			value={{
-				showConfirmDialog,
-				showChoiceDialog,
-				showInputDialog,
-				showCustomHtmlDialog,
-			}}
-		>
+		<ModalContext.Provider value={contextValue}>
 			{children}
+			{modalState.type === 'loading' && <LoadingModal />}
 			{modalState.type === 'confirm' && (
-				<ConfirmDialog {...modalState.options} onClose={(result) => closeModal(result)} />
+				<ConfirmDialog {...modalState.options} onClose={closeModal} />
 			)}
 			{modalState.type === 'choice' && (
-				<ChoiceDialog {...modalState.options} onClose={(result) => closeModal(result)} />
+				<ChoiceDialog {...modalState.options} onClose={closeModal} />
 			)}
 			{modalState.type === 'input' && (
-				<InputDialog {...modalState.options} onClose={(result) => closeModal(result)} />
+				<InputDialog {...modalState.options} onClose={closeModal} />
 			)}
 			{modalState.type === 'custom' && (
-				<CustomHtmlDialog
-					{...modalState.options}
-					onClose={(result) => closeModal(result)}
-				/>
+				<CustomHtmlDialog {...modalState.options} onClose={closeModal} />
 			)}
 		</ModalContext.Provider>
 	);
 };
 
 interface BaseModalProps {
-	onClose: (result: any) => void;
+	onClose: (result: SwalResult) => void;
 }
 
-const ConfirmDialog: React.FC<ConfirmDialogOptions & BaseModalProps> = ({
+const LoadingModal: React.FC = () => (
+	<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+		<div className="rounded-lg bg-gray-900 p-6 shadow-xl">
+			<div className="flex items-center space-x-3">
+				<Loader2 className="h-6 w-6 animate-spin text-cyan-500" />
+				<span className="text-gray-100">Loading...</span>
+			</div>
+		</div>
+	</div>
+);
+
+const ConfirmDialog: React.FC<FireOptions & BaseModalProps> = ({
 	title,
 	text,
 	icon = 'warning',
-	confirmButtonText = 'Yes, proceed!',
+	confirmButtonText = 'OK',
+	showCancelButton = true,
+	allowOutsideClick = true,
+	allowEscapeKey = true,
 	onClose,
 }) => {
+	useEffect(() => {
+		const handleEscape = (e: KeyboardEvent) => {
+			if (e.key === 'Escape' && allowEscapeKey) {
+				onClose({ isConfirmed: false, isDismissed: true, dismiss: 'esc' });
+			}
+		};
+		window.addEventListener('keydown', handleEscape);
+		return () => window.removeEventListener('keydown', handleEscape);
+	}, [onClose, allowEscapeKey]);
+
+	const handleBackdropClick = () => {
+		if (allowOutsideClick) {
+			onClose({ isConfirmed: false, isDismissed: true, dismiss: 'backdrop' });
+		}
+	};
+
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-			<div className="w-full max-w-md rounded-lg bg-gray-900 p-6 shadow-xl">
-				<div className="mb-4 flex items-center justify-center">
-					{icon === 'warning' && <AlertTriangle className="h-12 w-12 text-yellow-500" />}
-					{icon === 'error' && <XCircle className="h-12 w-12 text-red-500" />}
-					{icon === 'success' && <CheckCircle className="h-12 w-12 text-green-500" />}
-					{icon === 'info' && <Info className="h-12 w-12 text-blue-500" />}
-					{icon === 'question' && <HelpCircle className="h-12 w-12 text-gray-400" />}
-				</div>
-				<h2 className="mb-2 text-center text-xl font-bold text-gray-100">{title}</h2>
-				<p className="mb-6 text-center text-gray-300">{text}</p>
+		<div
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+			onClick={handleBackdropClick}
+		>
+			<div
+				className="w-full max-w-md rounded-lg bg-gray-900 p-6 shadow-xl"
+				onClick={(e) => e.stopPropagation()}
+			>
+				{icon && (
+					<div className="mb-4 flex items-center justify-center">
+						{icon === 'warning' && (
+							<AlertTriangle className="h-12 w-12 text-yellow-500" />
+						)}
+						{icon === 'error' && <XCircle className="h-12 w-12 text-red-500" />}
+						{icon === 'success' && <CheckCircle className="h-12 w-12 text-green-500" />}
+						{icon === 'info' && <Info className="h-12 w-12 text-blue-500" />}
+						{icon === 'question' && <HelpCircle className="h-12 w-12 text-gray-400" />}
+					</div>
+				)}
+				{title && (
+					<h2 className="mb-2 text-center text-xl font-bold text-gray-100">{title}</h2>
+				)}
+				{text && <p className="mb-6 text-center text-gray-300">{text}</p>}
 				<div className="flex justify-center space-x-3">
 					<button
-						onClick={() => onClose(true)}
+						onClick={() => onClose({ isConfirmed: true })}
 						className="rounded bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
 					>
 						{confirmButtonText}
 					</button>
-					<button
-						onClick={() => onClose(false)}
-						className="rounded bg-gray-700 px-4 py-2 font-semibold text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
-					>
-						Cancel
-					</button>
+					{showCancelButton && (
+						<button
+							onClick={() =>
+								onClose({
+									isConfirmed: false,
+									isDismissed: true,
+									dismiss: 'cancel',
+								})
+							}
+							className="rounded bg-gray-700 px-4 py-2 font-semibold text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+						>
+							Cancel
+						</button>
+					)}
 				</div>
 			</div>
 		</div>
 	);
 };
 
-const ChoiceDialog: React.FC<ChoiceDialogOptions & BaseModalProps> = ({
+const ChoiceDialog: React.FC<FireOptions & BaseModalProps> = ({
 	title,
 	text,
+	icon = 'question',
 	confirmButtonText,
 	denyButtonText,
 	cancelButtonText = 'Cancel',
+	showCancelButton = true,
+	allowOutsideClick = true,
+	allowEscapeKey = true,
 	onClose,
 }) => {
+	useEffect(() => {
+		const handleEscape = (e: KeyboardEvent) => {
+			if (e.key === 'Escape' && allowEscapeKey) {
+				onClose({ isConfirmed: false, isDenied: false, isDismissed: true, dismiss: 'esc' });
+			}
+		};
+		window.addEventListener('keydown', handleEscape);
+		return () => window.removeEventListener('keydown', handleEscape);
+	}, [onClose, allowEscapeKey]);
+
+	const handleBackdropClick = () => {
+		if (allowOutsideClick) {
+			onClose({
+				isConfirmed: false,
+				isDenied: false,
+				isDismissed: true,
+				dismiss: 'backdrop',
+			});
+		}
+	};
+
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-			<div className="w-full max-w-md rounded-lg bg-gray-900 p-6 shadow-xl">
-				<div className="mb-4 flex items-center justify-center">
-					<HelpCircle className="h-12 w-12 text-gray-400" />
-				</div>
-				<h2 className="mb-2 text-center text-xl font-bold text-gray-100">{title}</h2>
-				<p className="mb-6 text-center text-gray-300">{text}</p>
+		<div
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+			onClick={handleBackdropClick}
+		>
+			<div
+				className="w-full max-w-md rounded-lg bg-gray-900 p-6 shadow-xl"
+				onClick={(e) => e.stopPropagation()}
+			>
+				{icon && (
+					<div className="mb-4 flex items-center justify-center">
+						{icon === 'warning' && (
+							<AlertTriangle className="h-12 w-12 text-yellow-500" />
+						)}
+						{icon === 'error' && <XCircle className="h-12 w-12 text-red-500" />}
+						{icon === 'success' && <CheckCircle className="h-12 w-12 text-green-500" />}
+						{icon === 'info' && <Info className="h-12 w-12 text-blue-500" />}
+						{icon === 'question' && <HelpCircle className="h-12 w-12 text-gray-400" />}
+					</div>
+				)}
+				{title && (
+					<h2 className="mb-2 text-center text-xl font-bold text-gray-100">{title}</h2>
+				)}
+				{text && <p className="mb-6 text-center text-gray-300">{text}</p>}
 				<div className="flex justify-center space-x-3">
 					<button
-						onClick={() => onClose('confirm')}
+						onClick={() => onClose({ isConfirmed: true, isDenied: false })}
 						className="rounded bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
 					>
 						{confirmButtonText}
 					</button>
 					<button
-						onClick={() => onClose('deny')}
+						onClick={() => onClose({ isConfirmed: false, isDenied: true })}
 						className="rounded bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
 					>
 						{denyButtonText}
 					</button>
-					<button
-						onClick={() => onClose('cancel')}
-						className="rounded bg-gray-700 px-4 py-2 font-semibold text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
-					>
-						{cancelButtonText}
-					</button>
+					{showCancelButton && (
+						<button
+							onClick={() =>
+								onClose({ isConfirmed: false, isDenied: false, isDismissed: true })
+							}
+							className="rounded bg-gray-700 px-4 py-2 font-semibold text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+						>
+							{cancelButtonText}
+						</button>
+					)}
 				</div>
 			</div>
 		</div>
 	);
 };
 
-const InputDialog: React.FC<InputDialogOptions & BaseModalProps> = ({
+const InputDialog: React.FC<FireOptions & BaseModalProps> = ({
 	title,
 	inputPlaceholder = 'Enter a value',
+	showCancelButton = true,
+	allowOutsideClick = true,
+	allowEscapeKey = true,
 	onClose,
 }) => {
 	const [inputValue, setInputValue] = useState('');
 
+	useEffect(() => {
+		const handleEscape = (e: KeyboardEvent) => {
+			if (e.key === 'Escape' && allowEscapeKey) {
+				onClose({ value: null, isConfirmed: false, isDismissed: true, dismiss: 'esc' });
+			}
+		};
+		window.addEventListener('keydown', handleEscape);
+		return () => window.removeEventListener('keydown', handleEscape);
+	}, [onClose, allowEscapeKey]);
+
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
-		onClose(inputValue || null);
+		onClose({ value: inputValue || null, isConfirmed: true });
+	};
+
+	const handleBackdropClick = () => {
+		if (allowOutsideClick) {
+			onClose({ value: null, isConfirmed: false, isDismissed: true, dismiss: 'backdrop' });
+		}
 	};
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-			<div className="w-full max-w-md rounded-lg bg-gray-900 p-6 shadow-xl">
-				<h2 className="mb-4 text-center text-xl font-bold text-gray-100">{title}</h2>
+		<div
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+			onClick={handleBackdropClick}
+		>
+			<div
+				className="w-full max-w-md rounded-lg bg-gray-900 p-6 shadow-xl"
+				onClick={(e) => e.stopPropagation()}
+			>
+				{title && (
+					<h2 className="mb-4 text-center text-xl font-bold text-gray-100">{title}</h2>
+				)}
 				<form onSubmit={handleSubmit}>
 					<input
 						type="text"
@@ -252,13 +395,22 @@ const InputDialog: React.FC<InputDialogOptions & BaseModalProps> = ({
 						>
 							OK
 						</button>
-						<button
-							type="button"
-							onClick={() => onClose(null)}
-							className="rounded bg-gray-700 px-4 py-2 font-semibold text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
-						>
-							Cancel
-						</button>
+						{showCancelButton && (
+							<button
+								type="button"
+								onClick={() =>
+									onClose({
+										value: null,
+										isConfirmed: false,
+										isDismissed: true,
+										dismiss: 'cancel',
+									})
+								}
+								className="rounded bg-gray-700 px-4 py-2 font-semibold text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+							>
+								Cancel
+							</button>
+						)}
 					</div>
 				</form>
 			</div>
@@ -266,12 +418,28 @@ const InputDialog: React.FC<InputDialogOptions & BaseModalProps> = ({
 	);
 };
 
-const CustomHtmlDialog: React.FC<CustomHtmlDialogOptions & BaseModalProps> = ({
+const CustomHtmlDialog: React.FC<FireOptions & BaseModalProps> = ({
 	title,
 	html,
 	preConfirm,
+	showCancelButton = true,
+	confirmButtonText = 'OK',
+	cancelButtonText = 'Cancel',
+	showConfirmButton = true,
+	allowOutsideClick = true,
+	allowEscapeKey = true,
 	onClose,
 }) => {
+	useEffect(() => {
+		const handleEscape = (e: KeyboardEvent) => {
+			if (e.key === 'Escape' && allowEscapeKey) {
+				onClose({ isConfirmed: false, isDismissed: true, dismiss: 'esc' });
+			}
+		};
+		window.addEventListener('keydown', handleEscape);
+		return () => window.removeEventListener('keydown', handleEscape);
+	}, [onClose, allowEscapeKey]);
+
 	const handleConfirm = async () => {
 		if (preConfirm) {
 			const result = await preConfirm();
@@ -281,25 +449,56 @@ const CustomHtmlDialog: React.FC<CustomHtmlDialogOptions & BaseModalProps> = ({
 		}
 	};
 
+	const handleBackdropClick = () => {
+		if (allowOutsideClick) {
+			onClose({ isConfirmed: false, isDismissed: true, dismiss: 'backdrop' });
+		}
+	};
+
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-			<div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg bg-gray-900 p-6 shadow-xl">
-				<h2 className="mb-4 text-center text-xl font-bold text-gray-100">{title}</h2>
-				<div className="mb-6 text-gray-100" dangerouslySetInnerHTML={{ __html: html }} />
-				<div className="flex justify-center space-x-3">
-					<button
-						onClick={handleConfirm}
-						className="rounded bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-					>
-						OK
-					</button>
-					<button
-						onClick={() => onClose({ isConfirmed: false })}
-						className="rounded bg-gray-700 px-4 py-2 font-semibold text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
-					>
-						Cancel
-					</button>
-				</div>
+		<div
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+			onClick={handleBackdropClick}
+		>
+			<div
+				className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg bg-gray-900 p-6 shadow-xl"
+				onClick={(e) => e.stopPropagation()}
+			>
+				{title && (
+					<h2 className="mb-4 text-center text-xl font-bold text-gray-100">{title}</h2>
+				)}
+				{html && (
+					<div
+						className="mb-6 text-gray-100"
+						dangerouslySetInnerHTML={{ __html: html }}
+					/>
+				)}
+				{(showConfirmButton || showCancelButton) && (
+					<div className="flex justify-center space-x-3">
+						{showConfirmButton && (
+							<button
+								onClick={handleConfirm}
+								className="rounded bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							>
+								{confirmButtonText}
+							</button>
+						)}
+						{showCancelButton && (
+							<button
+								onClick={() =>
+									onClose({
+										isConfirmed: false,
+										isDismissed: true,
+										dismiss: 'cancel',
+									})
+								}
+								className="rounded bg-gray-700 px-4 py-2 font-semibold text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+							>
+								{cancelButtonText}
+							</button>
+						)}
+					</div>
+				)}
 			</div>
 		</div>
 	);

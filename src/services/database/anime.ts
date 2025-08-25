@@ -6,7 +6,7 @@ interface AnimeItem {
 	poster_url: string;
 }
 
-interface AnimeSearchResult extends AnimeItem {
+export interface AnimeSearchResult extends AnimeItem {
 	title: string;
 }
 

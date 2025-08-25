@@ -110,7 +110,6 @@ export function ServiceCard({ service, user, onTraktLogin, onLogout }: ServiceCa
 			cancelButtonText: 'Logout',
 			confirmButtonColor: '#3085d6',
 			cancelButtonColor: '#d33',
-			reverseButtons: true,
 		}).then((result) => {
 			if (result.isDismissed && result.dismiss === Swal.DismissReason.cancel) {
 				Swal.fire({
