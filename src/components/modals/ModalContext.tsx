@@ -18,7 +18,7 @@ interface ModalContextType {
 
 const ModalContext = createContext<ModalContextType | undefined>(undefined);
 
-export const useModal = () => {
+const useModal = () => {
 	const context = useContext(ModalContext);
 	if (!context) {
 		throw new Error('useModal must be used within a ModalProvider');
@@ -28,7 +28,7 @@ export const useModal = () => {
 
 let globalModalInstance: ModalContextType | null = null;
 
-export const setGlobalModalInstance = (instance: ModalContextType) => {
+const setGlobalModalInstance = (instance: ModalContextType) => {
 	globalModalInstance = instance;
 };
 

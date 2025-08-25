@@ -1,13 +1,3 @@
-export interface TrackerStatsResponse {
-	hash: string;
-	seeders: number;
-	leechers: number;
-	downloads: number;
-	successfulTrackers: number;
-	totalTrackers: number;
-	lastChecked: string;
-}
-
 // Helper function to batch arrays into chunks
 function batchArray<T>(array: T[], batchSize: number): T[][] {
 	const batches: T[][] = [];
@@ -17,11 +7,11 @@ function batchArray<T>(array: T[], batchSize: number): T[][] {
 	return batches;
 }
 
-export async function getMultipleTrackerStats(hashes: string[]): Promise<TrackerStatsResponse[]> {
+export async function getMultipleTrackerStats(hashes: string[]): Promise<any[]> {
 	try {
 		// Batch hashes into groups of 100
 		const batches = batchArray(hashes, 100);
-		const allResults: TrackerStatsResponse[] = [];
+		const allResults: any[] = [];
 
 		// Process each batch
 		for (const batch of batches) {
@@ -60,7 +50,7 @@ export async function getCachedTrackerStats(
 	hash: string,
 	maxAgeHours: number = 24,
 	forceRefresh: boolean = false
-): Promise<TrackerStatsResponse | null> {
+): Promise<any | null> {
 	try {
 		// First, try to get stored stats
 		const storedResponse = await fetch(`/api/torrents/stats/stored?hash=${hash}`, {
@@ -70,7 +60,7 @@ export async function getCachedTrackerStats(
 			},
 		});
 
-		let stored: TrackerStatsResponse | null = null;
+		let stored: any | null = null;
 		if (storedResponse.ok) {
 			stored = await storedResponse.json();
 		}

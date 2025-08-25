@@ -7,10 +7,9 @@ import {
 	meetsTitleConditions,
 	padWithZero,
 } from '@/utils/checks';
-import axios from 'axios';
 import { getMdblistClient } from './mdblistClient';
 import { flattenAndRemoveDuplicates, ScrapeSearchResult, sortByFileSize } from './mediasearch';
-import { repository as db, Repository } from './repository';
+import { Repository } from './repository';
 
 type TvScrapeJob = {
 	titles: string[];
@@ -37,41 +36,6 @@ function convertMdbToTmdb(apiResponse: any) {
 		release_date: apiResponse.released,
 		// original_title: apiResponse.original_title, // This field does not exist in the provided API response
 	};
-}
-
-export async function cleanByImdbId(imdbId: string) {
-	let tmdbSearch, mdbInfo;
-	try {
-		tmdbSearch = await axios.get(getTmdbSearch(imdbId));
-		mdbInfo = await mdblistClient.getInfoByImdbId(imdbId);
-	} catch (error: any) {
-		console.error(error);
-		return;
-	}
-
-	const isTv = mdbInfo.type === 'show' || tmdbSearch.data.tv_results?.length > 0;
-	if (isTv) {
-		try {
-			const tmdbId = mdbInfo.tmdbid ?? tmdbSearch.data.tv_results[0]?.id;
-			const tmdbInfo = await axios.get(getTmdbTvInfo(String(tmdbId)));
-			await cleanTvScrapes(imdbId, tmdbInfo.data, mdbInfo, db);
-			return;
-		} catch (error: any) {
-			if (error.response?.status === 404 || error.message.includes("reading 'id'")) {
-				try {
-					const convertedMdb = convertMdbToTmdb(mdbInfo);
-					await cleanTvScrapes(imdbId, convertedMdb, mdbInfo, db);
-					return;
-				} catch (error: any) {
-					console.error(error);
-				}
-			} else {
-				console.error(error);
-				return;
-			}
-		}
-	}
-	return;
 }
 
 function cleanScrapes(

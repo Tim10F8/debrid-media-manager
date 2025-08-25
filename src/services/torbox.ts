@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import getConfig from 'next/config';
-import { TorBoxResponse, TorBoxStats, TorBoxTorrentInfo, TorBoxUser } from './types';
+import { TorBoxResponse, TorBoxTorrentInfo, TorBoxUser } from './types';
 
 export type { TorBoxUser };
 
@@ -129,59 +129,6 @@ export const deleteTorrent = async (
 	}
 };
 
-export const controlTorrent = async (
-	accessToken: string,
-	params: {
-		torrent_id?: number;
-		all?: boolean;
-		operation: 'reannounce' | 'delete' | 'resume' | 'pause';
-	}
-): Promise<TorBoxResponse<null>> => {
-	try {
-		const client = await createAxiosClient(accessToken);
-		const response = await client.post<TorBoxResponse<null>>(
-			`/${API_VERSION}/api/torrents/controltorrent`,
-			{
-				torrent_id: params.torrent_id,
-				all: params.all || false,
-				operation: params.operation,
-			}
-		);
-		return response.data;
-	} catch (error: any) {
-		console.error('Error controlling torrent:', error.message);
-		throw error;
-	}
-};
-
-export const requestDownloadLink = async (
-	accessToken: string,
-	params: {
-		torrent_id: number;
-		file_id?: number;
-		zip_link?: boolean;
-		torrent_file?: boolean;
-		user_ip?: string;
-	}
-): Promise<TorBoxResponse<string>> => {
-	try {
-		const client = await createAxiosClient(accessToken);
-		const response = await client.get<TorBoxResponse<string>>(
-			`/${API_VERSION}/api/torrents/requestdl`,
-			{
-				params: {
-					token: accessToken,
-					...params,
-				},
-			}
-		);
-		return response.data;
-	} catch (error: any) {
-		console.error('Error requesting download link:', error.message);
-		throw error;
-	}
-};
-
 export const getTorrentList = async (
 	accessToken: string,
 	params?: {
@@ -204,111 +151,9 @@ export const getTorrentList = async (
 	}
 };
 
-export const checkCached = async (
-	accessToken: string,
-	params: {
-		hash: string;
-		format?: 'object' | 'list';
-		list_files?: boolean;
-	}
-): Promise<TorBoxResponse<any>> => {
-	try {
-		const client = await createAxiosClient(accessToken);
-		const response = await client.get<TorBoxResponse<any>>(
-			`/${API_VERSION}/api/torrents/checkcached`,
-			{
-				params: {
-					hash: params.hash,
-					format: params.format || 'object',
-					list_files: params.list_files || false,
-				},
-			}
-		);
-		return response.data;
-	} catch (error: any) {
-		console.error('Error checking cached availability:', error.message);
-		throw error;
-	}
-};
-
-export const getTorrentInfo = async (
-	accessToken: string,
-	params: {
-		hash: string;
-		timeout?: number;
-	}
-): Promise<
-	TorBoxResponse<{
-		name: string;
-		hash: string;
-		size: number;
-		files: { name: string; size: number }[];
-	}>
-> => {
-	try {
-		const client = await createAxiosClient(accessToken);
-		const response = await client.get<TorBoxResponse>(
-			`/${API_VERSION}/api/torrents/torrentinfo`,
-			{
-				params: {
-					hash: params.hash,
-					timeout: params.timeout,
-				},
-			}
-		);
-		return response.data;
-	} catch (error: any) {
-		console.error('Error getting torrent info:', error.message);
-		throw error;
-	}
-};
-
 // General
 
-export const getUpStatus = async (): Promise<TorBoxResponse<null>> => {
-	try {
-		const response = await axios.get<TorBoxResponse<null>>(`${BASE_URL}/`);
-		return response.data;
-	} catch (error: any) {
-		console.error('Error getting up status:', error.message);
-		throw error;
-	}
-};
-
-export const getStats = async (): Promise<TorBoxResponse<TorBoxStats>> => {
-	try {
-		const response = await axios.get<TorBoxResponse<TorBoxStats>>(
-			`${BASE_URL}/${API_VERSION}/api/stats`
-		);
-		return response.data;
-	} catch (error: any) {
-		console.error('Error getting stats:', error.message);
-		throw error;
-	}
-};
-
 // User
-
-export const refreshApiToken = async (
-	accessToken: string,
-	params: {
-		session_token: string;
-	}
-): Promise<TorBoxResponse<string>> => {
-	try {
-		const client = await createAxiosClient(accessToken);
-		const response = await client.post<TorBoxResponse<string>>(
-			`/${API_VERSION}/api/user/refreshtoken`,
-			{
-				session_token: params.session_token,
-			}
-		);
-		return response.data;
-	} catch (error: any) {
-		console.error('Error refreshing API token:', error.message);
-		throw error;
-	}
-};
 
 export const getUserData = async (
 	accessToken: string,

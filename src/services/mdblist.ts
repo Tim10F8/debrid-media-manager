@@ -33,39 +33,6 @@ export type MRating = {
 	id?: string | null;
 };
 
-export type MStream = {
-	id: number;
-	name: string;
-};
-
-export type MKeyword = {
-	id: number;
-	name: string;
-};
-
-export type MSeason = {
-	tmdbid: number;
-	name: string;
-	air_date: string | null;
-	episode_count: number;
-	season_number: number;
-	tomatofresh: null;
-	poster_path: string;
-};
-
-export type MReview = {
-	updated_at: string;
-	author: string;
-	rating: number;
-	provider_id: number;
-	content: string;
-};
-
-export type MWatchProvider = {
-	id: number;
-	name: string;
-};
-
 export type MMovie = {
 	title: string;
 	year: number;
@@ -79,10 +46,10 @@ export type MMovie = {
 	tmdbid: number;
 	type: string;
 	ratings: MRating[];
-	streams: MStream[];
-	watch_providers: MWatchProvider[];
-	reviews: MReview[];
-	keywords: MKeyword[];
+	streams: any[];
+	watch_providers: any[];
+	reviews: any[];
+	keywords: any[];
 	language: string;
 	spoken_language: string;
 	country: string;
@@ -110,10 +77,10 @@ export type MShow = {
 	tmdbid: number;
 	type: string;
 	ratings: MRating[];
-	streams: MStream[];
-	watch_providers: MWatchProvider[];
-	reviews: MReview[];
-	keywords: MKeyword[];
+	streams: any[];
+	watch_providers: any[];
+	reviews: any[];
+	keywords: any[];
 	language: string;
 	spoken_language: string;
 	country: string;
@@ -127,23 +94,11 @@ export type MShow = {
 	response: boolean;
 	apiused: number;
 	tvdbid: number;
-	seasons: MSeason[];
-};
-
-export type MSearchResult = {
-	id: string;
-	title: string;
-	year: number;
-	score: number;
-	score_average: number;
-	type: string;
-	imdbid: string;
-	tmdbid: number;
-	traktid: number;
+	seasons: any[];
 };
 
 export type MSearchResponse = {
-	search: MSearchResult[];
+	search: any[];
 	total: number;
 	response: boolean;
 };

@@ -13,14 +13,6 @@ export const fileSize = (size: number) => (size / 1024).toFixed(2);
 export const btnColor = (avail: boolean, noVideos: boolean) =>
 	avail ? 'green' : noVideos ? 'gray' : 'blue';
 
-export const svcColor = (id: string) => (id.startsWith('rd:') ? '[#b5d496]' : '[#fbc730]');
-
-export const torrentTag = (id: string) =>
-	id.startsWith('rd:') ? (
-		<span className="bg-[#b5d496] text-[8px] text-black">Real-Debrid</span>
-	) : (
-		<span className="bg-[#fbc730] text-[8px] text-black">AllDebrid</span>
-	);
 export const torrentPrefix = (id: string) =>
 	id.startsWith('rd:') ? (
 		<span className="bg-[#b5d496] text-xs text-black">RD</span>

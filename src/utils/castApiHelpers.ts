@@ -3,8 +3,6 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { NextApiRequest, NextApiResponse } from 'next';
 
-export type ApiHandler = (req: NextApiRequest, res: NextApiResponse) => Promise<void>;
-
 export const validateMethod = (
 	req: NextApiRequest,
 	res: NextApiResponse,

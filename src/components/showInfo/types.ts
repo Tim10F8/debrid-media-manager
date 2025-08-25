@@ -1,6 +1,3 @@
-import { MagnetStatus } from '../../services/allDebrid';
-import { TorrentInfoResponse } from '../../services/types';
-
 interface Stream {
 	codec_type: string;
 	codec_name: string;
@@ -70,13 +67,4 @@ export interface MagnetLink {
 	filename: string;
 	link: string;
 	size: number;
-}
-
-export interface ShowInfoProps {
-	info: TorrentInfoResponse | MagnetStatus;
-	isRd: boolean;
-	rdKey: string;
-	app?: string;
-	imdbId?: string;
-	mediaType?: 'movie' | 'tv';
 }

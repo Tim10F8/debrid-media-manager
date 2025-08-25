@@ -1,10 +1,3 @@
-export interface ProcessResult<T, R = void> {
-	item: T;
-	success: boolean;
-	error?: Error;
-	result?: R;
-}
-
 /**
  * Process an array of items with a maximum concurrency limit
  * @param items Array of items to process
@@ -18,10 +11,10 @@ export async function processWithConcurrency<T, R = void>(
 	processor: (item: T) => Promise<R>,
 	concurrency: number,
 	onProgress?: (completed: number, total: number) => void
-): Promise<ProcessResult<T, R>[]> {
+): Promise<any[]> {
 	const queue = items.map((item, index) => ({ item, index }));
-	const results: ProcessResult<T, R>[] = new Array(items.length);
-	const inProgress = new Map<Promise<{ result: ProcessResult<T, R>; index: number }>, number>();
+	const results: any[] = new Array(items.length);
+	const inProgress = new Map<Promise<{ result: any; index: number }>, number>();
 	let completed = 0;
 	const total = items.length;
 
@@ -31,11 +24,11 @@ export async function processWithConcurrency<T, R = void>(
 			const { item, index } = queue.shift()!;
 			const promise = processor(item)
 				.then((result) => ({
-					result: { item, success: true, result } as ProcessResult<T, R>,
+					result: { item, success: true, result },
 					index,
 				}))
 				.catch((error) => ({
-					result: { item, success: false, error } as ProcessResult<T, R>,
+					result: { item, success: false, error },
 					index,
 				}))
 				.finally(() => {

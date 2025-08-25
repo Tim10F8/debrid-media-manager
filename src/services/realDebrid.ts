@@ -3,10 +3,8 @@ import getConfig from 'next/config';
 import qs from 'qs';
 import {
 	AccessTokenResponse,
-	AddMagnetResponse,
 	CredentialsResponse,
 	DeviceCodeResponse,
-	RdInstantAvailabilityResponse,
 	TorrentInfoResponse,
 	UnrestrictResponse,
 	UserResponse,
@@ -490,59 +488,6 @@ export const getTorrentInfo = async (
 	}
 };
 
-export const rdInstantCheck = async (
-	accessToken: string,
-	hashes: string[]
-): Promise<RdInstantAvailabilityResponse> => {
-	try {
-		// Filter out invalid hashes
-		const validHashes = hashes.filter((hash) => isValidSHA40Hash(hash));
-
-		if (validHashes.length === 0) {
-			return {}; // Return empty response if no valid hashes
-		}
-
-		const response = await realDebridAxios.get<RdInstantAvailabilityResponse>(
-			`${getProxyUrl(config.proxy)}${config.realDebridHostname}/rest/1.0/torrents/instantAvailability/${validHashes.join('/')}`,
-			{
-				headers: {
-					Authorization: `Bearer ${accessToken}`,
-				},
-			}
-		);
-		return response.data;
-	} catch (error: any) {
-		console.error('Error fetching torrent information:', error.message);
-		throw error;
-	}
-};
-
-export const addMagnet = async (
-	accessToken: string,
-	magnet: string,
-	bare: boolean = false
-): Promise<string> => {
-	try {
-		const response = await realDebridAxios.post<AddMagnetResponse>(
-			`${bare ? 'https://app.real-debrid.com' : getProxyUrl(config.proxy) + config.realDebridHostname}/rest/1.0/torrents/addMagnet`,
-			qs.stringify({ magnet }),
-			{
-				headers: {
-					'Content-Type': 'application/x-www-form-urlencoded',
-					Authorization: `Bearer ${accessToken}`,
-				},
-			}
-		);
-		if (response.status !== 201) {
-			throw new Error('Failed to add magnet, status: ' + response.status);
-		}
-		return response.data.id;
-	} catch (error: any) {
-		console.error('Error adding magnet:', error.message);
-		throw error;
-	}
-};
-
 export const addHashAsMagnet = async (
 	accessToken: string,
 	hash: string,
@@ -553,7 +498,20 @@ export const addHashAsMagnet = async (
 		throw new Error(`Invalid SHA40 hash: ${hash}`);
 	}
 
-	return await addMagnet(accessToken, `magnet:?xt=urn:btih:${hash}`, bare);
+	const response = await realDebridAxios.post(
+		`${bare ? 'https://app.real-debrid.com' : getProxyUrl(config.proxy) + config.realDebridHostname}/rest/1.0/torrents/addMagnet`,
+		qs.stringify({ magnet: `magnet:?xt=urn:btih:${hash}` }),
+		{
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Authorization: `Bearer ${accessToken}`,
+			},
+		}
+	);
+	if (response.status !== 201) {
+		throw new Error('Failed to add magnet, status: ' + response.status);
+	}
+	return response.data.id;
 };
 
 export const selectFiles = async (
@@ -595,22 +553,6 @@ export const deleteTorrent = async (
 		);
 	} catch (error: any) {
 		console.error('Error deleting torrent:', error.message);
-		throw error;
-	}
-};
-
-export const deleteDownload = async (accessToken: string, id: string): Promise<void> => {
-	try {
-		await realDebridAxios.delete(
-			`${getProxyUrl(config.proxy)}${config.realDebridHostname}/rest/1.0/downloads/delete/${id}`,
-			{
-				headers: {
-					Authorization: `Bearer ${accessToken}`,
-				},
-			}
-		);
-	} catch (error: any) {
-		console.error('Error deleting download:', error.message);
 		throw error;
 	}
 };

@@ -1,5 +1,3 @@
-import { TorrentInfoResponse } from '@/services/types';
-
 const FILE_SIZE_PCT_THRESHOLD = 0.15;
 
 export function isVideo(file: { path: string }) {
@@ -30,14 +28,6 @@ export function isVideo(file: { path: string }) {
 		filePath.endsWith('.webm') || // confirmed working
 		filePath.endsWith('.wmv') // confirmed working
 	);
-}
-
-export function getSelectableFiles(files: TorrentInfoResponse['files']) {
-	// const maxFileSize = Math.max(...files.map((obj) => obj.bytes));
-	// return files.filter(
-	// 	(f) => f.bytes >= maxFileSize * FILE_SIZE_PCT_THRESHOLD || /[ex][0123]\d/i.test(f.path)
-	// );
-	return files;
 }
 
 function hasIncreasingSequence(arr: number[]): boolean {

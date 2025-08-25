@@ -4,29 +4,18 @@ import getConfig from 'next/config';
 const TRAKT_API_URL = 'https://api.trakt.tv';
 
 const { publicRuntimeConfig: config } = getConfig();
-export interface TraktMedia {
-	title: string;
-	year: number;
-	ids?: {
-		trakt: number;
-		slug: string;
-		tvdb?: number;
-		imdb?: string;
-		tmdb: number;
-	};
-}
 
 // Generic Media Item Interface (used in responses)
 export interface TraktMediaItem {
-	movie?: TraktMedia;
-	show?: TraktMedia;
+	movie?: any;
+	show?: any;
 }
 
 export interface TraktSearchResult {
 	type: 'movie' | 'show' | 'episode' | 'person';
 	score: number;
-	movie?: TraktMedia;
-	show?: TraktMedia;
+	movie?: any;
+	show?: any;
 }
 
 // Search suggestions function
@@ -119,7 +108,7 @@ export const getPopularByGenre = async (
 			'trakt-api-key': client_id,
 		};
 
-		const response = await axios.get<TraktMedia[]>(
+		const response = await axios.get<any[]>(
 			`${TRAKT_API_URL}/${type}/popular?genres=${genre}&limit=${limit}`,
 			{ headers }
 		);
@@ -378,8 +367,8 @@ export interface TraktWatchlistItem {
 	listed_at: string;
 	notes: string | null;
 	type: 'movie' | 'show';
-	movie?: TraktMedia;
-	show?: TraktMedia;
+	movie?: any;
+	show?: any;
 }
 
 // New function to fetch watchlist movies
@@ -424,8 +413,8 @@ export const getWatchlistShows = async (accessToken: string): Promise<TraktWatch
 export interface TraktCollectionItem {
 	last_collected_at: string;
 	last_updated_at: string;
-	movie?: TraktMedia;
-	show?: TraktMedia;
+	movie?: any;
+	show?: any;
 }
 
 // New function to fetch collection movies

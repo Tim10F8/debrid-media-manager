@@ -28,34 +28,6 @@ try {
 	console.error('error loading banned wordlist 2', err);
 }
 
-export function naked(title: string): string {
-	return title
-		.toLowerCase()
-		.replace(
-			/[^a-z0-9\x00-\x7F\u0100-\u017F\u0180-\u024F\u0370-\u03FF\u0400-\u04FF\u0500-\u052F\u0590-\u05FF\u0600-\u06FF\u0700-\u074F\u0750-\u077F\u0780-\u07BF\u0800-\u083F\u0840-\u085F\u08A0-\u08FF\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF\u0B00-\u0B7F\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F\u0D80-\u0DFF\u0E00-\u0E7F\u0E80-\u0EFF\u0F00-\u0FFF\u1000-\u109F\u10A0-\u10FF\u1100-\u11FF\u1200-\u137F\u13A0-\u13FF\u1400-\u167F\u1680-\u169F\u16A0-\u16FF\u1700-\u171F\u1720-\u173F\u1740-\u175F\u1760-\u177F\u1780-\u17FF\u1800-\u18AF\u1E00-\u1EFF\u1F00-\u1FFF\u2000-\u206F\u2E00-\u2E7F\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF'!"#$%&()*+,\-.\/:;<=>?@\[\]^_`{|}~\s]/gi,
-			''
-		);
-}
-
-export function grabYears(str: string): string[] {
-	return (str.match(/\d{4}/g) ?? []).filter(
-		(n) => parseInt(n, 10) > 1900 && parseInt(n, 10) <= new Date().getFullYear()
-	);
-}
-
-export function grabPossibleSeasonNums(str: string): number[] {
-	return (str.match(/\d+/g) ?? []).map((n) => parseInt(n, 10)).filter((n) => n > 0 && n <= 100);
-}
-
-export function filenameHasGivenYear(test: string, years: string[]) {
-	return years.some(
-		(year) =>
-			test.includes(year) ||
-			test.includes(`${parseInt(year, 10) + 1}`) ||
-			test.includes(`${parseInt(year, 10) - 1}`)
-	);
-}
-
 function removeDiacritics(str: string) {
 	return str.normalize('NFD').replace(/[\u0300-\u036f]/gi, '');
 }
@@ -330,31 +302,6 @@ function romanToNumber(roman: string): number {
 	return num;
 }
 
-export function matchesYear(test: string, targetYears: number[]): boolean {
-	// Improved regex with word boundaries for precise matching
-	const yearRegex = /\b(?:189\d|19\d\d|20[012][0-5])\b/g;
-
-	// Extract years from the test string
-	const yearsFromTest = [...test.matchAll(yearRegex)]
-		.map((m) => parseInt(m[0], 10))
-		.filter((y) => y !== 1920); // Exclude the year 1920 if needed
-
-	if (
-		yearsFromTest.length > 0 &&
-		targetYears.length > 0 &&
-		!yearsFromTest.some((testYear) => {
-			return (
-				targetYears.includes(testYear) ||
-				targetYears.includes(testYear - 1) ||
-				targetYears.includes(testYear + 1)
-			);
-		})
-	) {
-		return false;
-	}
-	return true;
-}
-
 export function hasNoBannedTerms(targetTitle: string, testTitle: string): boolean {
 	const words = testTitle
 		.toLowerCase()
@@ -402,16 +349,6 @@ export function meetsTitleConditions(
 		years.map((year) => parseInt(year, 10))
 	);
 	return matchesTitle(targetTitle, years, testTitle) && yearOk;
-}
-
-export function countUncommonWords(title: string) {
-	let processedTitle = title
-		.split(/\s+/)
-		.map((word: string) =>
-			word.toLowerCase().replace(/'s/gi, '').replace(/\s&\s/gi, '').replace(/[\W]+/gi, '')
-		)
-		.filter((word: string) => word.length > 3);
-	return processedTitle.filter((word: string) => !dictionary.has(word)).length;
 }
 
 export function grabMovieMetadata(imdbId: string, tmdbData: any, mdbData: any) {
@@ -716,87 +653,84 @@ export const getSeasonNameAndCode = (season: any) => {
 
 export const getSeasonYear = (season: any): string => season.air_date?.substring(0, 4);
 
-export function levenshtein(s: string, t: string) {
-	if (s === t) {
-		return 0;
+// Internal helper functions - these were originally exported but are only used internally
+function naked(title: string): string {
+	return title
+		.toLowerCase()
+		.replace(
+			/[^a-z0-9\x00-\x7F\u0100-\u017F\u0180-\u024F\u0370-\u03FF\u0400-\u04FF\u0500-\u052F\u0590-\u05FF\u0600-\u06FF\u0700-\u074F\u0750-\u077F\u0780-\u07BF\u0800-\u083F\u0840-\u085F\u08A0-\u08FF\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF\u0B00-\u0B7F\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F\u0D80-\u0DFF\u0E00-\u0E7F\u0E80-\u0EFF\u0F00-\u0FFF\u1000-\u109F\u10A0-\u10FF\u1100-\u11FF\u1200-\u137F\u13A0-\u13FF\u1400-\u167F\u1680-\u169F\u16A0-\u16FF\u1700-\u171F\u1720-\u173F\u1740-\u175F\u1760-\u177F\u1780-\u17FF\u1800-\u18AF\u1E00-\u1EFF\u1F00-\u1FFF\u2000-\u206F\u2E00-\u2E7F\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF'!"#$%&()*+,\-.\/;<=?@\[\]^_`{|}~\s]/gi,
+			''
+		);
+}
+
+function grabYears(str: string): string[] {
+	return (str.match(/\d{4}/g) ?? []).filter(
+		(n) => parseInt(n, 10) > 1900 && parseInt(n, 10) <= new Date().getFullYear()
+	);
+}
+
+function grabPossibleSeasonNums(str: string): number[] {
+	return (str.match(/\d+/g) ?? []).map((n) => parseInt(n, 10)).filter((n) => n > 0 && n <= 100);
+}
+
+function filenameHasGivenYear(test: string, years: string[]) {
+	return years.some(
+		(year) =>
+			test.includes(year) ||
+			test.includes(`${parseInt(year, 10) + 1}`) ||
+			test.includes(`${parseInt(year, 10) - 1}`)
+	);
+}
+
+function matchesYear(test: string, targetYears: number[]): boolean {
+	const yearRegex = /\b(?:189\d|19\d\d|20[012][0-5])\b/g;
+	const yearsFromTest = [...test.matchAll(yearRegex)]
+		.map((m) => parseInt(m[0], 10))
+		.filter((y) => y !== 1920);
+
+	if (
+		yearsFromTest.length > 0 &&
+		targetYears.length > 0 &&
+		!yearsFromTest.some((testYear) => {
+			return (
+				targetYears.includes(testYear) ||
+				targetYears.includes(testYear - 1) ||
+				targetYears.includes(testYear + 1)
+			);
+		})
+	) {
+		return false;
 	}
-	var n = s.length,
-		m = t.length;
-	if (n === 0 || m === 0) {
-		return n + m;
-	}
-	var x = 0,
-		y,
-		a,
-		b,
-		c,
-		d,
-		g,
-		h,
-		k;
-	var p = new Array(n);
-	for (y = 0; y < n; ) {
+	return true;
+}
+
+function countUncommonWords(title: string) {
+	let processedTitle = title
+		.split(/\s+/)
+		.map((word: string) =>
+			word.toLowerCase().replace(/'s/gi, '').replace(/\s&\s/gi, '').replace(/[\W]+/gi, '')
+		)
+		.filter((word: string) => word.length > 3);
+	return processedTitle.filter((word: string) => !dictionary.has(word)).length;
+}
+
+function levenshtein(s: string, t: string) {
+	if (s === t) return 0;
+	const n = s.length;
+	const m = t.length;
+	if (n === 0 || m === 0) return n + m;
+
+	const p = new Array(n);
+	for (let y = 0; y < n; ) {
 		p[y] = ++y;
 	}
 
-	for (; x + 3 < m; x += 4) {
-		var e1 = t.charCodeAt(x);
-		var e2 = t.charCodeAt(x + 1);
-		var e3 = t.charCodeAt(x + 2);
-		var e4 = t.charCodeAt(x + 3);
-		c = x;
-		b = x + 1;
-		d = x + 2;
-		g = x + 3;
-		h = x + 4;
-		for (y = 0; y < n; y++) {
-			k = s.charCodeAt(y);
-			a = p[y];
-			if (a < c || b < c) {
-				c = a > b ? b + 1 : a + 1;
-			} else {
-				if (e1 !== k) {
-					c++;
-				}
-			}
-
-			if (c < b || d < b) {
-				b = c > d ? d + 1 : c + 1;
-			} else {
-				if (e2 !== k) {
-					b++;
-				}
-			}
-
-			if (b < d || g < d) {
-				d = b > g ? g + 1 : b + 1;
-			} else {
-				if (e3 !== k) {
-					d++;
-				}
-			}
-
-			if (d < g || h < g) {
-				g = d > h ? h + 1 : d + 1;
-			} else {
-				if (e4 !== k) {
-					g++;
-				}
-			}
-			p[y] = h = g;
-			g = d;
-			d = b;
-			b = c;
-			c = a;
-		}
-	}
-
-	for (; x < m; ) {
-		var e = t.charCodeAt(x);
-		c = x;
-		d = ++x;
-		for (y = 0; y < n; y++) {
-			a = p[y];
+	for (let x = 0; x < m; x++) {
+		const e = t.charCodeAt(x);
+		let c = x;
+		let d = x + 1;
+		for (let y = 0; y < n; y++) {
+			const a = p[y];
 			if (a < c || d < c) {
 				d = a > d ? d + 1 : a + 1;
 			} else {
@@ -809,8 +743,7 @@ export function levenshtein(s: string, t: string) {
 			p[y] = d;
 			c = a;
 		}
-		h = d;
 	}
 
-	return h;
+	return p[n - 1];
 }

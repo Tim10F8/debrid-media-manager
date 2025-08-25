@@ -15,7 +15,7 @@ interface TorrentStats {
 	totalTrackers: number;
 }
 
-export class TorrentScraper {
+class TorrentScraper {
 	private async scrapeTracker(
 		infoHash: string,
 		announceUrl: string,

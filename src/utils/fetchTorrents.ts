@@ -182,7 +182,7 @@ export const fetchAllDebrid = async (
 	}
 };
 
-export function convertToAllDebridUserTorrent(magnetInfo: MagnetStatus): UserTorrent {
+function convertToAllDebridUserTorrent(magnetInfo: MagnetStatus): UserTorrent {
 	// Normalize filename if it's just a hash
 	if (magnetInfo.filename === magnetInfo.hash) {
 		magnetInfo.filename = 'Magnet';
@@ -374,7 +374,7 @@ export const convertToTbUserTorrent = (info: TorBoxTorrentInfo): UserTorrent => 
 	};
 };
 
-export const getAdStatus = (magnetInfo: MagnetStatus): [UserTorrentStatus, number] => {
+const getAdStatus = (magnetInfo: MagnetStatus): [UserTorrentStatus, number] => {
 	let status: UserTorrentStatus;
 	let progress: number;
 	switch (magnetInfo.statusCode) {

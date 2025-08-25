@@ -1,4 +1,4 @@
-export const globalToastOptions = {
+const globalToastOptions = {
 	style: {
 		borderRadius: '10px',
 		background: 'rgba(255, 255, 0, 0.85)',

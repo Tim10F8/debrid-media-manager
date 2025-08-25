@@ -1,15 +1,5 @@
 import { DatabaseClient } from './client';
 
-export interface TrackerStatsData {
-	hash: string;
-	seeders: number;
-	leechers: number;
-	downloads: number;
-	successfulTrackers: number;
-	totalTrackers: number;
-	lastChecked: Date;
-}
-
 export class TrackerStatsService extends DatabaseClient {
 	public async upsertTrackerStats({
 		hash,
@@ -57,7 +47,7 @@ export class TrackerStatsService extends DatabaseClient {
 		}
 	}
 
-	public async getTrackerStats(hash: string): Promise<TrackerStatsData | null> {
+	public async getTrackerStats(hash: string): Promise<any | null> {
 		try {
 			const stats = await this.prisma.trackerStats.findUnique({
 				where: { hash },
@@ -84,7 +74,7 @@ export class TrackerStatsService extends DatabaseClient {
 		}
 	}
 
-	public async getTrackerStatsByHashes(hashes: string[]): Promise<TrackerStatsData[]> {
+	public async getTrackerStatsByHashes(hashes: string[]): Promise<any[]> {
 		try {
 			const stats = await this.prisma.trackerStats.findMany({
 				where: {
@@ -154,7 +144,7 @@ export class TrackerStatsService extends DatabaseClient {
 		return this.prisma.trackerStats.count();
 	}
 
-	public async getRecentTrackerStats(limit: number = 100): Promise<TrackerStatsData[]> {
+	public async getRecentTrackerStats(limit: number = 100): Promise<any[]> {
 		const stats = await this.prisma.trackerStats.findMany({
 			orderBy: {
 				lastChecked: 'desc',

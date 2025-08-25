@@ -162,15 +162,3 @@ export function clearTorrentCache() {
 	cachedTorrents = null;
 	cacheTimestamp = 0;
 }
-
-/**
- * Gets cache statistics for debugging
- */
-export function getCacheStats() {
-	return {
-		hasCached: cachedTorrents !== null,
-		cachedCount: cachedTorrents?.length ?? 0,
-		cacheAge: Date.now() - cacheTimestamp,
-		cacheExpired: Date.now() - cacheTimestamp > CACHE_EXPIRY,
-	};
-}

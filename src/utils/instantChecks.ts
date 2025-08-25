@@ -225,9 +225,9 @@ const processAdInstantCheck = async <T extends SearchResult | EnrichedHashlistTo
 
 					let idx = 0;
 					torrent.files = magnetData.files
-						.map((file) => {
+						.map((file: any) => {
 							if (file.e && file.e.length > 0) {
-								return file.e.map((f) => ({
+								return file.e.map((f: any) => ({
 									fileId: idx++,
 									filename: f.n,
 									filesize: f.s,
@@ -287,15 +287,6 @@ export const instantCheckInRd = (
 	sortFn: (searchResults: SearchResult[]) => SearchResult[]
 ) => processRdInstantCheck(dmmProblemKey, solution, imdbId, hashes, 100, setTorrentList, sortFn);
 
-export const instantCheckAnimeInRd = (
-	dmmProblemKey: string,
-	solution: string,
-	rdKey: string,
-	hashes: string[],
-	setTorrentList: Dispatch<SetStateAction<SearchResult[]>>,
-	sortFn: (searchResults: SearchResult[]) => SearchResult[]
-) => processRdInstantCheck(dmmProblemKey, solution, '', hashes, 100, setTorrentList, sortFn, true);
-
 export const instantCheckInRd2 = (
 	dmmProblemKey: string,
 	solution: string,
@@ -303,13 +294,6 @@ export const instantCheckInRd2 = (
 	hashes: string[],
 	setTorrentList: Dispatch<SetStateAction<EnrichedHashlistTorrent[]>>
 ) => processRdInstantCheckByHashes(dmmProblemKey, solution, hashes, 100, setTorrentList);
-
-export const instantCheckInAd = (
-	adKey: string,
-	hashes: string[],
-	setTorrentList: Dispatch<SetStateAction<SearchResult[]>>,
-	sortFn: (searchResults: SearchResult[]) => SearchResult[]
-) => processAdInstantCheck(adKey, hashes, setTorrentList, sortFn);
 
 export const instantCheckInAd2 = (
 	adKey: string,
