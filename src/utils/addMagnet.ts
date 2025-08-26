@@ -1,5 +1,10 @@
 import { restartMagnet, uploadMagnet } from '@/services/allDebrid';
-import { addHashAsMagnet, getTorrentInfo, selectFiles } from '@/services/realDebrid';
+import {
+	addHashAsMagnet,
+	addTorrentFile,
+	getTorrentInfo,
+	selectFiles,
+} from '@/services/realDebrid';
 import { createTorrent, getTorrentList } from '@/services/torbox';
 import { TorBoxTorrentInfo, TorrentInfoResponse } from '@/services/types';
 import { UserTorrent } from '@/torrent/userTorrent';
@@ -46,6 +51,67 @@ export const handleAddAsMagnetInRd = async (
 		);
 		toast.error('There was an error adding hash', magnetToastOptions);
 	}
+};
+
+export const handleAddTorrentFileInRd = async (
+	rdKey: string,
+	file: File,
+	callback?: (info: TorrentInfoResponse) => Promise<void>
+) => {
+	try {
+		const id = await addTorrentFile(rdKey, file);
+		await handleSelectFilesInRd(rdKey, `rd:${id}`);
+		const response = await getTorrentInfo(rdKey, id);
+		if (response.status === 'downloaded') {
+			toast.success('Successfully added torrent file!', magnetToastOptions);
+		} else {
+			toast.error(`Torrent file added but status is ${response.status}`, magnetToastOptions);
+		}
+		if (callback) await callback(response);
+	} catch (error: unknown) {
+		if (error instanceof AxiosError && error.response?.status === 509) {
+			toast.error('Your RD download slots are full. Retrying in 5 seconds...', {
+				...magnetToastOptions,
+				duration: 5000,
+			});
+			await new Promise((resolve) => setTimeout(resolve, 5000));
+			await handleAddTorrentFileInRd(rdKey, file, callback);
+			return;
+		} else if (error instanceof AxiosError && error.response?.status === 503) {
+			toast.error('Cannot add torrent. Infringing files are blocked by RD.', {
+				...magnetToastOptions,
+			});
+			return;
+		}
+		console.error(
+			'Error adding torrent file:',
+			error instanceof Error ? error.message : 'Unknown error'
+		);
+		toast.error('There was an error adding torrent file', magnetToastOptions);
+	}
+};
+
+export const handleAddMultipleTorrentFilesInRd = async (
+	rdKey: string,
+	files: File[],
+	callback?: () => Promise<void>
+) => {
+	let errorCount = 0;
+	for (const file of files) {
+		try {
+			const id = await addTorrentFile(rdKey, file);
+			await handleSelectFilesInRd(rdKey, `rd:${id}`);
+		} catch (error) {
+			errorCount++;
+			console.error(
+				'Error adding torrent file:',
+				error instanceof Error ? error.message : 'Unknown error'
+			);
+			toast.error('There was an error adding torrent file');
+		}
+	}
+	if (callback) await callback();
+	toast(`Successfully added ${files.length - errorCount} torrent files!`, magnetToastOptions);
 };
 
 export const handleAddMultipleHashesInRd = async (

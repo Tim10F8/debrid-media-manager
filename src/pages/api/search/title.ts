@@ -1,20 +1,10 @@
 import { getMdblistClient } from '@/services/mdblistClient';
+import { getMetadataCache } from '@/services/metadataCache';
 import { repository as db } from '@/services/repository';
-import axios from 'axios';
 import { distance } from 'fastest-levenshtein';
 import _ from 'lodash';
 import { NextApiHandler } from 'next';
 import UserAgent from 'user-agents';
-
-const omdbKey = process.env.OMDB_KEY;
-const searchOmdb = (keyword: string, year?: number, mediaType?: string) =>
-	`https://www.omdbapi.com/?s=${keyword}&y=${year ?? ''}&apikey=${omdbKey}&type=${
-		mediaType ?? ''
-	}`;
-const searchCinemetaSeries = (keyword: string) =>
-	`https://v3-cinemeta.strem.io/catalog/series/top/search=${keyword}.json`;
-const searchCinemetaMovies = (keyword: string) =>
-	`https://v3-cinemeta.strem.io/catalog/movie/top/search=${keyword}.json`;
 
 export type SearchResult = {
 	id: string;
@@ -94,14 +84,13 @@ async function searchOmdbApi(
 	year?: number,
 	mediaType?: string
 ): Promise<SearchResult[]> {
-	const searchResponse = await axios.get(
-		searchOmdb(encodeURIComponent(keyword), year, mediaType)
-	);
-	if (searchResponse.data.Error || searchResponse.data.Response === 'False') {
+	const metadataCache = getMetadataCache();
+	const searchResponse = await metadataCache.searchOmdb(keyword, year, mediaType);
+	if (searchResponse.Error || searchResponse.Response === 'False') {
 		return [];
 	}
-	// console.log('omdb search response', searchResponse.data);
-	const results: SearchResult[] = [...searchResponse.data.Search]
+	// console.log('omdb search response', searchResponse);
+	const results: SearchResult[] = [...searchResponse.Search]
 		.filter(
 			(r: OmdbSearchResult) =>
 				r.imdbID?.startsWith('tt') &&
@@ -144,6 +133,7 @@ async function searchMdbApi(
 }
 
 async function searchCinemeta(keyword: string, mediaType?: string): Promise<SearchResult[]> {
+	const metadataCache = getMetadataCache();
 	const promises = [];
 	const requestConfig = {
 		headers: {
@@ -160,18 +150,18 @@ async function searchCinemeta(keyword: string, mediaType?: string): Promise<Sear
 		},
 	};
 	if (!mediaType) {
-		promises.push(axios.get(searchCinemetaSeries(encodeURIComponent(keyword)), requestConfig));
-		promises.push(axios.get(searchCinemetaMovies(encodeURIComponent(keyword)), requestConfig));
+		promises.push(metadataCache.searchCinemetaSeries(keyword, requestConfig));
+		promises.push(metadataCache.searchCinemetaMovies(keyword, requestConfig));
 	} else if (mediaType === 'movie') {
-		promises.push(axios.get(searchCinemetaMovies(encodeURIComponent(keyword)), requestConfig));
+		promises.push(metadataCache.searchCinemetaMovies(keyword, requestConfig));
 	} else {
-		promises.push(axios.get(searchCinemetaSeries(encodeURIComponent(keyword)), requestConfig));
+		promises.push(metadataCache.searchCinemetaSeries(keyword, requestConfig));
 	}
 	const responses = await Promise.all(promises);
-	// console.log('cinemeta search responses', responses.map((r) => r.data));
+	// console.log('cinemeta search responses', responses);
 	const results: SearchResult[] = responses
-		.filter((r) => r.data && r.data.metas)
-		.map((r) => r.data.metas)
+		.filter((r) => r && r.metas)
+		.map((r) => r.metas)
 		.flat()
 		.filter(
 			(r: CinemetaSearchResult) =>

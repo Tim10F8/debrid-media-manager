@@ -14,6 +14,7 @@ import {
 	handleAddAsMagnetInRd,
 	handleAddMultipleHashesInAd,
 	handleAddMultipleHashesInRd,
+	handleAddMultipleTorrentFilesInRd,
 	handleReinsertTorrentinRd,
 	handleRestartTorrent,
 } from '@/utils/addMagnet';
@@ -1179,47 +1180,66 @@ function TorrentsPage() {
 				const files = fileInput.files;
 
 				let hashes: string[] = [];
+				let torrentFiles: File[] = [];
 
 				// Process magnet links
 				if (magnetInput) {
 					hashes.push(...extractHashes(magnetInput));
 				}
 
-				// Process torrent files
+				// Collect torrent files (don't convert to hashes)
 				if (files && files.length > 0) {
-					try {
-						const fileHashes = await Promise.all(
-							Array.from(files).map((file) => getHashOfTorrent(file))
-						);
-						hashes.push(
-							...fileHashes.filter((hash): hash is string => hash !== undefined)
-						);
-					} catch (error) {
-						Swal.showValidationMessage(`Failed to process torrent file: ${error}`);
-						return false;
-					}
+					torrentFiles = Array.from(files);
 				}
 
-				if (hashes.length === 0) {
+				if (hashes.length === 0 && torrentFiles.length === 0) {
 					Swal.showValidationMessage(
 						'Please provide either magnet links or torrent files'
 					);
 					return false;
 				}
 
-				return hashes;
+				return { hashes, torrentFiles };
 			},
 		});
 
 		if (dismiss === Swal.DismissReason.cancel || !input) return;
 
-		const hashes = input as string[];
+		const { hashes, torrentFiles } = input as { hashes: string[]; torrentFiles: File[] };
 
-		if (rdKey && hashes && debridService === 'rd') {
-			handleAddMultipleHashesInRd(rdKey, hashes, async () => await refreshLibrary());
+		if (rdKey && debridService === 'rd') {
+			// Handle torrent files first (direct upload)
+			if (torrentFiles.length > 0) {
+				handleAddMultipleTorrentFilesInRd(
+					rdKey,
+					torrentFiles,
+					async () => await refreshLibrary()
+				);
+			}
+			// Then handle magnet hashes
+			if (hashes.length > 0) {
+				handleAddMultipleHashesInRd(rdKey, hashes, async () => await refreshLibrary());
+			}
 		}
-		if (adKey && hashes && debridService === 'ad') {
-			handleAddMultipleHashesInAd(adKey, hashes, async () => await refreshLibrary());
+		if (adKey && debridService === 'ad') {
+			// AllDebrid still uses hashes only (convert torrent files to hashes)
+			let allHashes = [...hashes];
+			if (torrentFiles.length > 0) {
+				try {
+					const fileHashes = await Promise.all(
+						torrentFiles.map((file) => getHashOfTorrent(file))
+					);
+					allHashes.push(
+						...fileHashes.filter((hash): hash is string => hash !== undefined)
+					);
+				} catch (error) {
+					toast.error(`Failed to process torrent files for AllDebrid: ${error}`);
+					return;
+				}
+			}
+			if (allHashes.length > 0) {
+				handleAddMultipleHashesInAd(adKey, allHashes, async () => await refreshLibrary());
+			}
 		}
 	}
 

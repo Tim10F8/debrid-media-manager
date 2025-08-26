@@ -1,11 +1,8 @@
 import { MRating } from '@/services/mdblist';
 import { getMdblistClient } from '@/services/mdblistClient';
-import axios from 'axios';
+import { getMetadataCache } from '@/services/metadataCache';
 import { NextApiRequest, NextApiResponse } from 'next';
 import UserAgent from 'user-agents';
-
-const getCinemetaInfo = (imdbId: string) =>
-	`https://v3-cinemeta.strem.io/meta/movie/${imdbId}.json`;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	if (req.method !== 'GET') {
@@ -20,8 +17,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	try {
 		const mdblistClient = getMdblistClient();
+		const metadataCache = getMetadataCache();
+
 		const mdbPromise = mdblistClient.getInfoByImdbId(imdbid);
-		const cinePromise = axios.get(getCinemetaInfo(imdbid), {
+		const cinePromise = metadataCache.getCinemetaMovie(imdbid, {
 			headers: {
 				accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
 				'accept-language': 'en-US,en;q=0.5',
@@ -44,22 +43,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 					return rating.score as number;
 				}
 				return acc;
-			}, undefined) ?? cinemetaResponse.data.meta?.imdbRating)
-				? parseFloat(cinemetaResponse.data.meta?.imdbRating) * 10
+			}, undefined) ?? cinemetaResponse.meta?.imdbRating)
+				? parseFloat(cinemetaResponse.meta?.imdbRating) * 10
 				: null;
 
-		const title = mdbResponse.title ?? cinemetaResponse.data.meta?.name ?? 'Unknown';
+		const title = mdbResponse.title ?? cinemetaResponse.meta?.name ?? 'Unknown';
 
 		return res.status(200).json({
 			title,
-			description:
-				mdbResponse.description ?? cinemetaResponse.data.meta?.description ?? 'n/a',
-			poster: mdbResponse.poster ?? cinemetaResponse.data.meta?.poster ?? '',
+			description: mdbResponse.description ?? cinemetaResponse.meta?.description ?? 'n/a',
+			poster: mdbResponse.poster ?? cinemetaResponse.meta?.poster ?? '',
 			backdrop:
 				mdbResponse.backdrop ??
-				cinemetaResponse.data.meta?.background ??
+				cinemetaResponse.meta?.background ??
 				'https://source.unsplash.com/random/1800x300?' + title,
-			year: mdbResponse.year ?? cinemetaResponse.data.meta?.releaseInfo ?? '????',
+			year: mdbResponse.year ?? cinemetaResponse.meta?.releaseInfo ?? '????',
 			imdb_score: imdb_score ?? 0,
 		});
 	} catch (error) {

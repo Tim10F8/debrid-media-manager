@@ -1,11 +1,9 @@
 import { MRating, MShow } from '@/services/mdblist';
 import { getMdblistClient } from '@/services/mdblistClient';
+import { getMetadataCache } from '@/services/metadataCache';
 import axios from 'axios';
 import { NextApiRequest, NextApiResponse } from 'next';
 import UserAgent from 'user-agents';
-
-const getCinemetaInfo = (imdbId: string) =>
-	`https://v3-cinemeta.strem.io/meta/series/${imdbId}.json`;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	const { imdbid } = req.query;
@@ -16,8 +14,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	try {
 		const mdblistClient = getMdblistClient();
+		const metadataCache = getMetadataCache();
+
 		const mdbPromise = mdblistClient.getInfoByImdbId(imdbid);
-		const cinePromise = axios.get(getCinemetaInfo(imdbid), {
+		const cinePromise = metadataCache.getCinemetaSeries(imdbid, {
 			headers: {
 				accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
 				'accept-language': 'en-US,en;q=0.5',
@@ -39,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		let imdb_score;
 
 		let cineSeasons =
-			cinemetaResponse.data.meta?.videos.filter((video: any) => video.season > 0) || [];
+			cinemetaResponse.meta?.videos.filter((video: any) => video.season > 0) || [];
 		const uniqueSeasons: number[] = Array.from(
 			new Set(cineSeasons.map((video: any) => video.season))
 		);
@@ -75,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		}
 
 		imdb_score =
-			cinemetaResponse.data.meta?.imdbRating ??
+			cinemetaResponse.meta?.imdbRating ??
 			mdbResponse.ratings?.reduce((acc: number | undefined, rating: MRating) => {
 				if (rating.source === 'imdb') {
 					return rating.score as number;
@@ -83,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				return acc;
 			}, undefined);
 
-		const title = mdbResponse?.title ?? cinemetaResponse?.data?.meta?.name ?? 'Unknown';
+		const title = mdbResponse?.title ?? cinemetaResponse?.meta?.name ?? 'Unknown';
 
 		const season_episode_counts: Record<number, number> = {};
 
@@ -111,12 +111,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 		res.status(200).json({
 			title,
-			description:
-				mdbResponse?.description ?? cinemetaResponse?.data?.meta?.description ?? 'n/a',
-			poster: mdbResponse?.poster ?? cinemetaResponse?.data?.meta?.poster ?? '',
+			description: mdbResponse?.description ?? cinemetaResponse?.meta?.description ?? 'n/a',
+			poster: mdbResponse?.poster ?? cinemetaResponse?.meta?.poster ?? '',
 			backdrop:
 				mdbResponse?.backdrop ??
-				cinemetaResponse?.data?.meta?.background ??
+				cinemetaResponse?.meta?.background ??
 				'https://source.unsplash.com/random/1800x300?' + title,
 			season_count,
 			season_names,

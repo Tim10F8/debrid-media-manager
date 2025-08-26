@@ -1,0 +1,228 @@
+import axios, { AxiosRequestConfig } from 'axios';
+import { getMdblistCacheService } from './database/mdblistCache';
+
+export class MetadataCacheService {
+	private cache = getMdblistCacheService();
+
+	/**
+	 * Fetch data from URL with caching
+	 */
+	async fetchWithCache<T = any>(
+		url: string,
+		cacheKey: string,
+		cacheType: string,
+		config?: AxiosRequestConfig
+	): Promise<T> {
+		// Check cache first
+		const cached = await this.cache.get(cacheKey);
+		if (cached) {
+			console.log(`[MetadataCache] Using cached ${cacheType} data for: ${cacheKey}`);
+			return cached as T;
+		}
+
+		// Fetch from API
+		console.log(`[MetadataCache] Fetching ${cacheType} data from: ${url}`);
+		const response = await axios.get<T>(url, config);
+		const data = response.data;
+
+		// Cache the response
+		await this.cache.set(cacheKey, cacheType, data);
+		console.log(`[MetadataCache] Cached ${cacheType} data for: ${cacheKey}`);
+
+		return data;
+	}
+
+	/**
+	 * Fetch Cinemeta movie info with caching
+	 */
+	async getCinemetaMovie(imdbId: string, config?: AxiosRequestConfig): Promise<any> {
+		const url = `https://v3-cinemeta.strem.io/meta/movie/${imdbId}.json`;
+		const cacheKey = `cinemeta_movie_${imdbId}`;
+		return this.fetchWithCache(url, cacheKey, 'cinemeta_movie', config);
+	}
+
+	/**
+	 * Fetch Cinemeta series info with caching
+	 */
+	async getCinemetaSeries(imdbId: string, config?: AxiosRequestConfig): Promise<any> {
+		const url = `https://v3-cinemeta.strem.io/meta/series/${imdbId}.json`;
+		const cacheKey = `cinemeta_series_${imdbId}`;
+		return this.fetchWithCache(url, cacheKey, 'cinemeta_series', config);
+	}
+
+	/**
+	 * Search Cinemeta movies with caching
+	 */
+	async searchCinemetaMovies(keyword: string, config?: AxiosRequestConfig): Promise<any> {
+		const url = `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(keyword)}.json`;
+		const cacheKey = `cinemeta_search_movie_${keyword}`;
+		return this.fetchWithCache(url, cacheKey, 'cinemeta_search', config);
+	}
+
+	/**
+	 * Search Cinemeta series with caching
+	 */
+	async searchCinemetaSeries(keyword: string, config?: AxiosRequestConfig): Promise<any> {
+		const url = `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(keyword)}.json`;
+		const cacheKey = `cinemeta_search_series_${keyword}`;
+		return this.fetchWithCache(url, cacheKey, 'cinemeta_search', config);
+	}
+
+	/**
+	 * Search OMDB with caching
+	 */
+	async searchOmdb(keyword: string, year?: number, mediaType?: string): Promise<any> {
+		const omdbKey = process.env.OMDB_KEY;
+		if (!omdbKey) {
+			throw new Error('OMDB_KEY environment variable is not set');
+		}
+
+		const url = `https://www.omdbapi.com/?s=${encodeURIComponent(keyword)}&y=${year ?? ''}&apikey=${omdbKey}&type=${mediaType ?? ''}`;
+		const cacheKey = `omdb_search_${keyword}_${year || ''}_${mediaType || ''}`;
+		return this.fetchWithCache(url, cacheKey, 'omdb_search');
+	}
+
+	/**
+	 * Get OMDB info by IMDB ID with caching
+	 */
+	async getOmdbInfo(imdbId: string): Promise<any> {
+		const omdbKey = process.env.OMDB_KEY;
+		if (!omdbKey) {
+			throw new Error('OMDB_KEY environment variable is not set');
+		}
+
+		const url = `https://www.omdbapi.com/?i=${imdbId}&apikey=${omdbKey}`;
+		const cacheKey = `omdb_info_${imdbId}`;
+		return this.fetchWithCache(url, cacheKey, 'omdb_info');
+	}
+
+	/**
+	 * Search TMDB by IMDB ID with caching
+	 */
+	async searchTmdbByImdb(imdbId: string): Promise<any> {
+		const tmdbKey = process.env.TMDB_KEY;
+		if (!tmdbKey) {
+			throw new Error('TMDB_KEY environment variable is not set');
+		}
+
+		const url = `https://api.themoviedb.org/3/find/${imdbId}?api_key=${tmdbKey}&external_source=imdb_id`;
+		const cacheKey = `tmdb_find_${imdbId}`;
+		return this.fetchWithCache(url, cacheKey, 'tmdb_find');
+	}
+
+	/**
+	 * Get TMDB movie info with caching
+	 */
+	async getTmdbMovieInfo(tmdbId: string | number): Promise<any> {
+		const tmdbKey = process.env.TMDB_KEY;
+		if (!tmdbKey) {
+			throw new Error('TMDB_KEY environment variable is not set');
+		}
+
+		const url = `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${tmdbKey}`;
+		const cacheKey = `tmdb_movie_${tmdbId}`;
+		return this.fetchWithCache(url, cacheKey, 'tmdb_movie');
+	}
+
+	/**
+	 * Get TMDB TV info with caching
+	 */
+	async getTmdbTvInfo(tmdbId: string | number): Promise<any> {
+		const tmdbKey = process.env.TMDB_KEY;
+		if (!tmdbKey) {
+			throw new Error('TMDB_KEY environment variable is not set');
+		}
+
+		const url = `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${tmdbKey}`;
+		const cacheKey = `tmdb_tv_${tmdbId}`;
+		return this.fetchWithCache(url, cacheKey, 'tmdb_tv');
+	}
+
+	/**
+	 * Get Trakt trending with caching (short cache for trending data)
+	 */
+	async getTraktTrending(
+		type: 'movies' | 'shows',
+		genre?: string,
+		limit: number = 20
+	): Promise<any> {
+		const clientId = process.env.TRAKT_CLIENT_ID;
+		if (!clientId) {
+			throw new Error('TRAKT_CLIENT_ID environment variable is not set');
+		}
+
+		const url = `https://api.trakt.tv/${type}/trending?genres=${genre || ''}&limit=${limit}`;
+		const cacheKey = `trakt_trending_${type}_${genre || 'all'}_${limit}`;
+
+		const config: AxiosRequestConfig = {
+			headers: {
+				'Content-Type': 'application/json',
+				'trakt-api-version': '2',
+				'trakt-api-key': clientId,
+			},
+		};
+
+		return this.fetchWithCache(url, cacheKey, 'trakt_trending', config);
+	}
+
+	/**
+	 * Get Trakt popular with caching
+	 */
+	async getTraktPopular(
+		type: 'movies' | 'shows',
+		genre?: string,
+		limit: number = 20
+	): Promise<any> {
+		const clientId = process.env.TRAKT_CLIENT_ID;
+		if (!clientId) {
+			throw new Error('TRAKT_CLIENT_ID environment variable is not set');
+		}
+
+		const url = `https://api.trakt.tv/${type}/popular?genres=${genre || ''}&limit=${limit}`;
+		const cacheKey = `trakt_popular_${type}_${genre || 'all'}_${limit}`;
+
+		const config: AxiosRequestConfig = {
+			headers: {
+				'Content-Type': 'application/json',
+				'trakt-api-version': '2',
+				'trakt-api-key': clientId,
+			},
+		};
+
+		return this.fetchWithCache(url, cacheKey, 'trakt_popular', config);
+	}
+
+	/**
+	 * Search Trakt with caching
+	 */
+	async searchTrakt(query: string, type?: 'movie' | 'show'): Promise<any> {
+		const clientId = process.env.TRAKT_CLIENT_ID;
+		if (!clientId) {
+			throw new Error('TRAKT_CLIENT_ID environment variable is not set');
+		}
+
+		const typeParam = type ? type : 'movie,show';
+		const url = `https://api.trakt.tv/search/${typeParam}?query=${encodeURIComponent(query)}`;
+		const cacheKey = `trakt_search_${query}_${typeParam}`;
+
+		const config: AxiosRequestConfig = {
+			headers: {
+				'Content-Type': 'application/json',
+				'trakt-api-version': '2',
+				'trakt-api-key': clientId,
+			},
+		};
+
+		return this.fetchWithCache(url, cacheKey, 'trakt_search', config);
+	}
+}
+
+// Create singleton instance
+let metadataCacheInstance: MetadataCacheService | null = null;
+
+export function getMetadataCache(): MetadataCacheService {
+	if (!metadataCacheInstance) {
+		metadataCacheInstance = new MetadataCacheService();
+	}
+	return metadataCacheInstance;
+}

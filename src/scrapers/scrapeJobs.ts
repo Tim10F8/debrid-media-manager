@@ -1,18 +1,10 @@
 import { getMdblistClient } from '@/services/mdblistClient';
+import { getMetadataCache } from '@/services/metadataCache';
 import { cleanMovieScrapes } from '@/services/movieCleaner';
 import { repository as db } from '@/services/repository';
 import { cleanTvScrapes } from '@/services/tvCleaner';
-import axios from 'axios';
 import { scrapeMovies } from './movieScraper';
 import { scrapeTv } from './tvScraper';
-
-const tmdbKey = process.env.TMDB_KEY;
-const getTmdbSearch = (imdbId: string) =>
-	`https://api.themoviedb.org/3/find/${imdbId}?api_key=${tmdbKey}&external_source=imdb_id`;
-const getTmdbTvInfo = (tmdbId: string) =>
-	`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${tmdbKey}`;
-const getTmdbMovieInfo = (tmdbId: string) =>
-	`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${tmdbKey}`;
 
 const mdblistClient = getMdblistClient();
 
@@ -36,9 +28,10 @@ export async function generateScrapeJobs(
 	replaceOldScrape: boolean = false
 ) {
 	// console.log(`[scrapeJobs] Generating scrape jobs for ${imdbId}`);
+	const metadataCache = getMetadataCache();
 	let tmdbSearch, mdbInfo;
 	try {
-		tmdbSearch = await axios.get(getTmdbSearch(imdbId));
+		tmdbSearch = await metadataCache.searchTmdbByImdb(imdbId);
 		mdbInfo = await mdblistClient.getInfoByImdbId(imdbId);
 	} catch (error: any) {
 		console.error(error);
@@ -47,18 +40,17 @@ export async function generateScrapeJobs(
 
 	const isMovie =
 		mdbInfo.type === 'movie' ||
-		(tmdbSearch.data.movie_results?.length > 0 &&
-			tmdbSearch.data.movie_results[0].vote_count > 0);
+		(tmdbSearch.movie_results?.length > 0 && tmdbSearch.movie_results[0].vote_count > 0);
 	const isTv =
 		mdbInfo.type === 'show' ||
-		(tmdbSearch.data.tv_results?.length > 0 && tmdbSearch.data.tv_results[0].vote_count > 0);
+		(tmdbSearch.tv_results?.length > 0 && tmdbSearch.tv_results[0].vote_count > 0);
 
 	if (isMovie) {
 		try {
-			const tmdbId = mdbInfo.tmdbid ?? tmdbSearch.data.movie_results[0]?.id;
-			const tmdbInfo = await axios.get(getTmdbMovieInfo(String(tmdbId)));
-			await scrapeMovies(imdbId, tmdbInfo.data, mdbInfo, db, replaceOldScrape);
-			await cleanMovieScrapes(imdbId, tmdbInfo.data, mdbInfo, db);
+			const tmdbId = mdbInfo.tmdbid ?? tmdbSearch.movie_results[0]?.id;
+			const tmdbInfo = await metadataCache.getTmdbMovieInfo(String(tmdbId));
+			await scrapeMovies(imdbId, tmdbInfo, mdbInfo, db, replaceOldScrape);
+			await cleanMovieScrapes(imdbId, tmdbInfo, mdbInfo, db);
 			return;
 		} catch (error: any) {
 			if (error.response?.status === 404 || error.message.includes("reading 'id'")) {
@@ -94,10 +86,10 @@ export async function generateScrapeJobs(
 			}
 		}
 		try {
-			const tmdbId = mdbInfo.tmdbid ?? tmdbSearch.data.tv_results[0]?.id;
-			const tmdbInfo = await axios.get(getTmdbTvInfo(String(tmdbId)));
-			if (!replaceOldScrape) await cleanTvScrapes(imdbId, tmdbInfo.data, mdbInfo, db);
-			await scrapeTv(imdbId, tmdbInfo.data, mdbInfo, db, replaceOldScrape);
+			const tmdbId = mdbInfo.tmdbid ?? tmdbSearch.tv_results[0]?.id;
+			const tmdbInfo = await metadataCache.getTmdbTvInfo(String(tmdbId));
+			if (!replaceOldScrape) await cleanTvScrapes(imdbId, tmdbInfo, mdbInfo, db);
+			await scrapeTv(imdbId, tmdbInfo, mdbInfo, db, replaceOldScrape);
 			return;
 		} catch (error: any) {
 			if (error.response?.status === 404 || error.message.includes("reading 'id'")) {

@@ -514,6 +514,28 @@ export const addHashAsMagnet = async (
 	return response.data.id;
 };
 
+export const addTorrentFile = async (
+	accessToken: string,
+	file: File,
+	bare: boolean = true // Default to true to bypass proxy for binary uploads
+): Promise<string> => {
+	const arrayBuffer = await file.arrayBuffer();
+	const response = await realDebridAxios.put(
+		`${bare ? 'https://app.real-debrid.com' : getProxyUrl(config.proxy) + config.realDebridHostname}/rest/1.0/torrents/addTorrent`,
+		arrayBuffer,
+		{
+			headers: {
+				'Content-Type': 'application/octet-stream',
+				Authorization: `Bearer ${accessToken}`,
+			},
+		}
+	);
+	if (response.status !== 201) {
+		throw new Error('Failed to add torrent file, status: ' + response.status);
+	}
+	return response.data.id;
+};
+
 export const selectFiles = async (
 	accessToken: string,
 	id: string,
