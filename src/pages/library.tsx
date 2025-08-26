@@ -133,10 +133,6 @@ function TorrentsPage() {
 	// stats
 	const [totalBytes, setTotalBytes] = useState<number>(0);
 
-	const relevantList = selectedTorrents.size
-		? userTorrentsList.filter((t) => selectedTorrents.has(t.id))
-		: sortedData;
-
 	// generate STRM files for each video in torrent
 	useEffect(() => {
 		if (typeof window !== 'undefined' && rdKey) {
@@ -531,6 +527,10 @@ function TorrentsPage() {
 			(currentPage - 1) * ITEMS_PER_PAGE + ITEMS_PER_PAGE
 		);
 	}, [sortedData, currentPage]);
+
+	const relevantList = selectedTorrents.size
+		? userTorrentsList.filter((t) => selectedTorrents.has(t.id))
+		: sortedData;
 
 	const getTitleGroupings = (mediaType: UserTorrent['mediaType']) => {
 		switch (mediaType) {

@@ -517,21 +517,8 @@ export const addHashAsMagnet = async (
 export const addTorrentFile = async (
 	accessToken: string,
 	file: File,
-	bare: boolean = true // Default to true to bypass proxy for binary uploads
+	bare: boolean = false // Use proxy by default
 ): Promise<string> => {
-	// Use iframe proxy in browser environment to handle CORS
-	if (typeof window !== 'undefined') {
-		try {
-			const { getIframeProxy } = await import('./iframeProxy');
-			const proxy = getIframeProxy();
-			return await proxy.uploadTorrentFile(accessToken, file);
-		} catch (error) {
-			console.error('Iframe proxy failed, falling back to direct upload:', error);
-			// Fall through to direct upload
-		}
-	}
-
-	// Direct upload (for server-side or fallback)
 	const arrayBuffer = await file.arrayBuffer();
 	const response = await realDebridAxios.put(
 		`${bare ? 'https://app.real-debrid.com' : getProxyUrl(config.proxy) + config.realDebridHostname}/rest/1.0/torrents/addTorrent`,
