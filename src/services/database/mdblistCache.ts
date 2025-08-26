@@ -23,6 +23,29 @@ export class MdblistCacheService extends DatabaseClient {
 	}
 
 	/**
+	 * Get cached data with metadata including updatedAt timestamp
+	 */
+	async getWithMetadata(id: string): Promise<{ data: any; updatedAt: Date } | null> {
+		try {
+			const cached = await this.prisma.mdblistCache.findUnique({
+				where: { id },
+			});
+
+			if (cached) {
+				return {
+					data: cached.data,
+					updatedAt: cached.updatedAt,
+				};
+			}
+
+			return null;
+		} catch (error) {
+			console.error('Error getting MDBList cache with metadata:', error);
+			return null;
+		}
+	}
+
+	/**
 	 * Save MDBList data to cache
 	 */
 	async set(id: string, type: string, data: any): Promise<void> {

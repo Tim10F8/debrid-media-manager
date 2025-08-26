@@ -4,20 +4,41 @@ import { getMdblistCacheService } from './database/mdblistCache';
 export class MetadataCacheService {
 	private cache = getMdblistCacheService();
 
+	// Cache durations in milliseconds
+	private readonly CACHE_DURATIONS = {
+		// Permanent cache for static content
+		PERMANENT: 0,
+		// Short cache for dynamic content
+		SEARCH: 3600000, // 1 hour
+		TRENDING: 3600000, // 1 hour
+		POPULAR: 21600000, // 6 hours
+		TOP_LISTS: 86400000, // 24 hours
+	};
+
 	/**
-	 * Fetch data from URL with caching
+	 * Check if cached data is expired
+	 */
+	private isCacheExpired(updatedAt: Date, maxAge: number): boolean {
+		if (maxAge === 0) return false; // Permanent cache
+		const age = Date.now() - updatedAt.getTime();
+		return age > maxAge;
+	}
+
+	/**
+	 * Fetch data from URL with caching and optional expiration
 	 */
 	async fetchWithCache<T = any>(
 		url: string,
 		cacheKey: string,
 		cacheType: string,
-		config?: AxiosRequestConfig
+		config?: AxiosRequestConfig,
+		maxAge: number = 0 // Default to permanent cache
 	): Promise<T> {
 		// Check cache first
-		const cached = await this.cache.get(cacheKey);
-		if (cached) {
+		const cached = await this.cache.getWithMetadata(cacheKey);
+		if (cached && !this.isCacheExpired(cached.updatedAt, maxAge)) {
 			console.log(`[MetadataCache] Using cached ${cacheType} data for: ${cacheKey}`);
-			return cached as T;
+			return cached.data as T;
 		}
 
 		// Fetch from API
@@ -56,7 +77,13 @@ export class MetadataCacheService {
 	async searchCinemetaMovies(keyword: string, config?: AxiosRequestConfig): Promise<any> {
 		const url = `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(keyword)}.json`;
 		const cacheKey = `cinemeta_search_movie_${keyword}`;
-		return this.fetchWithCache(url, cacheKey, 'cinemeta_search', config);
+		return this.fetchWithCache(
+			url,
+			cacheKey,
+			'cinemeta_search',
+			config,
+			this.CACHE_DURATIONS.SEARCH
+		);
 	}
 
 	/**
@@ -65,7 +92,13 @@ export class MetadataCacheService {
 	async searchCinemetaSeries(keyword: string, config?: AxiosRequestConfig): Promise<any> {
 		const url = `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(keyword)}.json`;
 		const cacheKey = `cinemeta_search_series_${keyword}`;
-		return this.fetchWithCache(url, cacheKey, 'cinemeta_search', config);
+		return this.fetchWithCache(
+			url,
+			cacheKey,
+			'cinemeta_search',
+			config,
+			this.CACHE_DURATIONS.SEARCH
+		);
 	}
 
 	/**
@@ -79,7 +112,13 @@ export class MetadataCacheService {
 
 		const url = `https://www.omdbapi.com/?s=${encodeURIComponent(keyword)}&y=${year ?? ''}&apikey=${omdbKey}&type=${mediaType ?? ''}`;
 		const cacheKey = `omdb_search_${keyword}_${year || ''}_${mediaType || ''}`;
-		return this.fetchWithCache(url, cacheKey, 'omdb_search');
+		return this.fetchWithCache(
+			url,
+			cacheKey,
+			'omdb_search',
+			undefined,
+			this.CACHE_DURATIONS.SEARCH
+		);
 	}
 
 	/**
@@ -162,7 +201,13 @@ export class MetadataCacheService {
 			},
 		};
 
-		return this.fetchWithCache(url, cacheKey, 'trakt_trending', config);
+		return this.fetchWithCache(
+			url,
+			cacheKey,
+			'trakt_trending',
+			config,
+			this.CACHE_DURATIONS.TRENDING
+		);
 	}
 
 	/**
@@ -189,7 +234,13 @@ export class MetadataCacheService {
 			},
 		};
 
-		return this.fetchWithCache(url, cacheKey, 'trakt_popular', config);
+		return this.fetchWithCache(
+			url,
+			cacheKey,
+			'trakt_popular',
+			config,
+			this.CACHE_DURATIONS.POPULAR
+		);
 	}
 
 	/**
@@ -213,7 +264,13 @@ export class MetadataCacheService {
 			},
 		};
 
-		return this.fetchWithCache(url, cacheKey, 'trakt_search', config);
+		return this.fetchWithCache(
+			url,
+			cacheKey,
+			'trakt_search',
+			config,
+			this.CACHE_DURATIONS.SEARCH
+		);
 	}
 }
 

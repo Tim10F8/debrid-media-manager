@@ -18,11 +18,12 @@ export class MDBListClient {
 		// Create cache key from search parameters
 		const cacheKey = `search_${keyword}_${year || ''}_${mediaType || ''}`;
 
-		// Check cache first
-		const cached = await this.cache.getCachedSearch(cacheKey);
-		if (cached) {
+		// Check cache first (with 1 hour expiration for search results)
+		const cached = await this.cache.getWithMetadata(cacheKey);
+		const ONE_HOUR = 3600000;
+		if (cached && Date.now() - cached.updatedAt.getTime() < ONE_HOUR) {
 			console.log(`[MDBList] Using cached search results for: ${cacheKey}`);
-			return cached;
+			return cached.data;
 		}
 
 		const url = new URL(this.baseUrl);
@@ -161,11 +162,12 @@ export class MDBListClient {
 	async getTopLists(): Promise<MList[]> {
 		const cacheKey = 'top_lists';
 
-		// Check cache first
-		const cached = await this.cache.getCachedList(cacheKey);
-		if (cached) {
+		// Check cache first (with 24 hour expiration for top lists)
+		const cached = await this.cache.getWithMetadata(cacheKey);
+		const ONE_DAY = 86400000;
+		if (cached && Date.now() - cached.updatedAt.getTime() < ONE_DAY) {
 			console.log(`[MDBList] Using cached top lists`);
-			return cached;
+			return cached.data;
 		}
 
 		const url = new URL(`${this.baseUrl}/lists/top`);
