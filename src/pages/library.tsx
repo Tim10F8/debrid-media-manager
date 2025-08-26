@@ -135,7 +135,7 @@ function TorrentsPage() {
 
 	const relevantList = selectedTorrents.size
 		? userTorrentsList.filter((t) => selectedTorrents.has(t.id))
-		: filteredList;
+		: sortedData;
 
 	// generate STRM files for each video in torrent
 	useEffect(() => {
@@ -1051,7 +1051,7 @@ function TorrentsPage() {
 
 		if (backupChoice.isDismissed) return;
 
-		const listToBackup = backupChoice.isConfirmed ? userTorrentsList : filteredList;
+		const listToBackup = backupChoice.isConfirmed ? userTorrentsList : sortedData;
 		const backupType = backupChoice.isConfirmed ? 'full' : 'filtered';
 
 		toast('Generating a local backup file', libraryToastOptions);
