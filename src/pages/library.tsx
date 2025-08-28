@@ -41,7 +41,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import Swal from '../components/modals/modal';
+import Modal from '../components/modals/modal';
 
 const ITEMS_PER_PAGE = 100;
 
@@ -282,6 +282,21 @@ function TorrentsPage() {
 	// pressing arrow keys to navigate
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
+			// Check if modal is open (custom modal uses fixed inset-0 z-50 classes)
+			const modalContainer = document.querySelector('.fixed.inset-0.z-50');
+			const activeElement = document.activeElement;
+			const isInputFocused =
+				activeElement &&
+				(activeElement.tagName === 'INPUT' ||
+					activeElement.tagName === 'TEXTAREA' ||
+					activeElement.id === 'magnetInput' ||
+					activeElement.id === 'torrentFile');
+
+			// Don't handle keyboard shortcuts when modal is open or input is focused
+			if (modalContainer || isInputFocused) {
+				return;
+			}
+
 			if (e.key === 'ArrowLeft') {
 				handlePrevPage();
 			}
@@ -289,7 +304,13 @@ function TorrentsPage() {
 				handleNextPage();
 			}
 			const queryBox = document.getElementById('query');
-			if (!queryBox?.matches(':focus') && /^[a-zA-Z]$/.test(e.key)) {
+			// Also check for Ctrl/Cmd key to avoid interfering with paste
+			if (
+				!queryBox?.matches(':focus') &&
+				/^[a-zA-Z]$/.test(e.key) &&
+				!e.ctrlKey &&
+				!e.metaKey
+			) {
 				document.getElementById('query')?.focus();
 			}
 		};
@@ -553,7 +574,7 @@ function TorrentsPage() {
 		if (
 			relevantList.length > 0 &&
 			!(
-				await Swal.fire({
+				await Modal.fire({
 					title: 'Reinsert shown',
 					text: `This will reinsert the ${relevantList.length} torrents filtered. Are you sure?`,
 					icon: 'warning',
@@ -623,7 +644,7 @@ function TorrentsPage() {
 
 	async function handleGenerateHashlist() {
 		// get title from input popup
-		const { value: title } = await Swal.fire({
+		const { value: title } = await Modal.fire({
 			title: 'Enter a title for the hash list',
 			input: 'text',
 			inputPlaceholder: 'Enter a title',
@@ -649,7 +670,7 @@ function TorrentsPage() {
 		if (
 			relevantList.length > 0 &&
 			!(
-				await Swal.fire({
+				await Modal.fire({
 					title: 'Delete shown',
 					text: `This will delete the ${relevantList.length} torrents filtered. Are you sure?`,
 					icon: 'warning',
@@ -740,7 +761,7 @@ function TorrentsPage() {
 	}
 
 	async function dedupeBySize() {
-		const deletePreference = await Swal.fire({
+		const deletePreference = await Modal.fire({
 			title: 'Delete by size',
 			text: 'Choose which duplicate torrents to delete based on size:',
 			icon: 'question',
@@ -837,7 +858,7 @@ function TorrentsPage() {
 
 	async function dedupeByRecency() {
 		// New dialog to select whether to delete newer or older torrents
-		const deletePreference = await Swal.fire({
+		const deletePreference = await Modal.fire({
 			title: 'Delete by date',
 			text: 'Choose which duplicate torrents to delete:',
 			icon: 'question',
@@ -954,7 +975,7 @@ function TorrentsPage() {
 		if (
 			dupeHashesCount > 0 &&
 			!(
-				await Swal.fire({
+				await Modal.fire({
 					title: 'Merge same hash',
 					text: `This will combine the ${dupeHashesCount} completed torrents with identical hashes into ${dupeHashes.size} and select all streamable files. Make sure to backup before doing this. Do you want to proceed?`,
 					icon: 'question',
@@ -1029,7 +1050,7 @@ function TorrentsPage() {
 	}
 
 	async function localBackup() {
-		const backupChoice = await Swal.fire({
+		const backupChoice = await Modal.fire({
 			title: 'Backup Library',
 			text: 'Choose which torrents to backup:',
 			icon: 'question',
@@ -1135,7 +1156,7 @@ function TorrentsPage() {
 	}
 
 	async function handleAddMagnet(debridService: string) {
-		const { value: input, dismiss } = await Swal.fire({
+		const { value: input, dismiss } = await Modal.fire({
 			title: `Add to your ${debridService.toUpperCase()} library`,
 			html: `
 				<div class="bg-gray-900 p-4 rounded-lg">
@@ -1193,7 +1214,7 @@ function TorrentsPage() {
 				}
 
 				if (hashes.length === 0 && torrentFiles.length === 0) {
-					Swal.showValidationMessage(
+					Modal.showValidationMessage(
 						'Please provide either magnet links or torrent files'
 					);
 					return false;
@@ -1203,7 +1224,7 @@ function TorrentsPage() {
 			},
 		});
 
-		if (dismiss === Swal.DismissReason.cancel || !input) return;
+		if (dismiss === Modal.DismissReason.cancel || !input) return;
 
 		const { hashes, torrentFiles } = input as { hashes: string[]; torrentFiles: File[] };
 

@@ -1,12 +1,12 @@
 import { getGlobalModalInstance } from './ModalContext';
-import type { FireOptions, SwalResult } from './types';
+import type { FireOptions, ModalResult } from './types';
 
 /**
- * Swal-compatible modal API that uses React Context internally
- * This provides backward compatibility with existing code while using the unified modal system
+ * Custom modal API that uses React Context internally
+ * This provides a SweetAlert-like interface while using the unified React modal system
  */
-const Swal = {
-	fire: async (options: FireOptions): Promise<SwalResult> => {
+const Modal = {
+	fire: async (options: FireOptions): Promise<ModalResult> => {
 		const modalInstance = getGlobalModalInstance();
 		if (!modalInstance) {
 			console.error(
@@ -45,4 +45,4 @@ const Swal = {
 	},
 };
 
-export default Swal;
+export default Modal;

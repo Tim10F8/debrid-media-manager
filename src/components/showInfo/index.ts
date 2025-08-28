@@ -5,7 +5,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { handleShare } from '../../utils/hashList';
 import { isVideo } from '../../utils/selectable';
-import Swal from '../modals/modal';
+import Modal from '../modals/modal';
 import { renderButton, renderInfoTable } from './components';
 import { renderTorrentInfo } from './render';
 import { icons } from './styles';
@@ -39,7 +39,7 @@ if (typeof window !== 'undefined') {
 	window.addHashAsMagnet = addHashAsMagnet;
 	window.selectFiles = selectFiles;
 	window.handleDeleteRdTorrent = handleDeleteRdTorrent;
-	window.closePopup = () => Swal.close();
+	window.closePopup = () => Modal.close();
 	window.toast = toast;
 	window.magnetToastOptions = magnetToastOptions;
 
@@ -286,7 +286,7 @@ export const showInfoForRD = async (
 	</div>`
 	);
 
-	await Swal.fire({
+	await Modal.fire({
 		html,
 		showConfirmButton: false,
 		customClass: {
@@ -376,7 +376,7 @@ export const showInfoForAD = async (
         </div>
     </div>`;
 
-	await Swal.fire({
+	await Modal.fire({
 		html,
 		showConfirmButton: false,
 		customClass: {

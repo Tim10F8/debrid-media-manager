@@ -1,5 +1,5 @@
 import { RealDebridUser } from '@/hooks/auth';
-import Swal from '../components/modals/modal';
+import Modal from '../components/modals/modal';
 
 export async function checkPremiumStatus(rdUser: RealDebridUser) {
 	// Calculate days remaining either from premium seconds or expiration date
@@ -8,7 +8,7 @@ export async function checkPremiumStatus(rdUser: RealDebridUser) {
 		: Math.floor((new Date(rdUser.expiration).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
 	if (!rdUser.premium) {
-		const result = await Swal.fire({
+		const result = await Modal.fire({
 			title: 'Premium Required',
 			text: 'This app is only available to Real-Debrid Premium users. Click OK to become premium now.',
 			icon: 'warning',
@@ -28,7 +28,7 @@ export async function checkPremiumStatus(rdUser: RealDebridUser) {
 		const lastWarning = parseInt(localStorage.getItem('rd_premium_warning') || '0');
 		if (now - lastWarning >= 24 * 60 * 60 * 1000) {
 			// 24 hours in milliseconds
-			const result = await Swal.fire({
+			const result = await Modal.fire({
 				title: 'Premium Expiring Soon',
 				text: `Your Real-Debrid premium subscription will expire in ${daysRemaining} days. Click OK to renew now.`,
 				icon: 'warning',

@@ -28,7 +28,7 @@ export interface FireOptions {
 	inputAutoFocus?: boolean;
 }
 
-export interface SwalResult {
+export interface ModalResult {
 	isConfirmed: boolean;
 	isDenied?: boolean;
 	isDismissed?: boolean;

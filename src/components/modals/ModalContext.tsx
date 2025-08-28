@@ -8,10 +8,10 @@ import React, {
 	useMemo,
 	useState,
 } from 'react';
-import type { FireOptions, SwalResult } from './types';
+import type { FireOptions, ModalResult } from './types';
 
 interface ModalContextType {
-	fire: (options: FireOptions) => Promise<SwalResult>;
+	fire: (options: FireOptions) => Promise<ModalResult>;
 	close: () => void;
 	showLoading: () => void;
 }
@@ -52,7 +52,7 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 		resolve: () => {},
 	});
 
-	const fire = useCallback((options: FireOptions): Promise<SwalResult> => {
+	const fire = useCallback((options: FireOptions): Promise<ModalResult> => {
 		return new Promise((resolve) => {
 			if (options.willOpen) {
 				options.willOpen();
@@ -159,7 +159,7 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 };
 
 interface BaseModalProps {
-	onClose: (result: SwalResult) => void;
+	onClose: (result: ModalResult) => void;
 }
 
 const LoadingModal: React.FC = () => (

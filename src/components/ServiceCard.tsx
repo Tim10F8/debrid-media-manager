@@ -3,7 +3,7 @@ import { TraktUser } from '@/services/trakt';
 import { TorBoxUser } from '@/services/types';
 import { Check, X } from 'lucide-react';
 import Link from 'next/link';
-import Swal from '../components/modals/modal';
+import Modal from '../components/modals/modal';
 
 interface ServiceCardProps {
 	service: 'rd' | 'ad' | 'tb' | 'trakt';
@@ -102,7 +102,7 @@ export function ServiceCard({ service, user, onTraktLogin, onLogout }: ServiceCa
       `;
 		}
 
-		Swal.fire({
+		Modal.fire({
 			title,
 			html,
 			showCancelButton: true,
@@ -111,8 +111,8 @@ export function ServiceCard({ service, user, onTraktLogin, onLogout }: ServiceCa
 			confirmButtonColor: '#3085d6',
 			cancelButtonColor: '#d33',
 		}).then((result) => {
-			if (result.isDismissed && result.dismiss === Swal.DismissReason.cancel) {
-				Swal.fire({
+			if (result.isDismissed && result.dismiss === Modal.DismissReason.cancel) {
+				Modal.fire({
 					title: 'Confirm Logout',
 					text: `Are you sure you want to logout from ${title}?`,
 					icon: 'warning',

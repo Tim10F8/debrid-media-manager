@@ -6,7 +6,7 @@ import { defaultPlayer } from '@/utils/settings';
 import { filenameParse } from '@ctrl/video-filename-parser';
 import { every, some } from 'lodash';
 import { Dispatch, SetStateAction } from 'react';
-import Swal from '../components/modals/modal';
+import Modal from '../components/modals/modal';
 import { handleReinsertTorrentinRd } from './addMagnet';
 import { handleCopyOrDownloadMagnet } from './copyMagnet';
 import { handleDeleteRdTorrent } from './deleteTorrent';
@@ -118,7 +118,7 @@ export async function handleShowInfoForRD(
 			prev.delete(id);
 			return new Set(prev);
 		});
-		Swal.close();
+		Modal.close();
 	};
 	(window as any).handleCopyMagnet = handleCopyOrDownloadMagnet;
 	(window as any).handleReinsertTorrentinRd = async (
@@ -143,14 +143,14 @@ export async function handleShowInfoForRD(
 			prev.delete(torrent.id);
 			return new Set(prev);
 		});
-		Swal.close();
+		Modal.close();
 	};
 	// Note: triggerFetchLatestRDTorrents is now set in the library page component
 	// where it has access to the refreshLibrary function from cache context
-	(window as any).closePopup = Swal.close;
+	(window as any).closePopup = Modal.close;
 	(window as any).saveSelection = async (key: string, hash: string, fileIDs: string[]) => {
 		console.log('Saving selection', key, hash, fileIDs);
-		Swal.close();
+		Modal.close();
 	};
 
 	showInfoForRD(window.localStorage.getItem('settings:player') || defaultPlayer, rdKey, info);
