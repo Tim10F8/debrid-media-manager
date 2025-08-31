@@ -39,6 +39,7 @@ interface TorrentRowProps {
 	onDelete: (id: string) => void;
 	onShowInfo: (torrent: UserTorrent) => void;
 	onTypeChange: (torrent: UserTorrent) => void;
+	onRefreshLibrary?: () => Promise<void>;
 }
 
 export default function TorrentRow({
@@ -57,6 +58,7 @@ export default function TorrentRow({
 	onDelete,
 	onShowInfo,
 	onTypeChange,
+	onRefreshLibrary,
 }: TorrentRowProps) {
 	const router = useRouter();
 
@@ -235,11 +237,20 @@ export default function TorrentRow({
 						e.stopPropagation();
 						try {
 							if (rdKey && torrent.id.startsWith('rd:')) {
+								// The function now handles fetching info and preserving selection internally
 								await handleReinsertTorrentinRd(rdKey, torrent, true);
 								onDelete(torrent.id);
+								// Trigger library refresh to fetch the newly reinserted torrent
+								if (onRefreshLibrary) {
+									await onRefreshLibrary();
+								}
 							}
 							if (adKey && torrent.id.startsWith('ad:')) {
 								await handleRestartTorrent(adKey, torrent.id);
+								// AllDebrid might also need refresh
+								if (onRefreshLibrary) {
+									await onRefreshLibrary();
+								}
 							}
 						} catch (error) {
 							console.error(error);

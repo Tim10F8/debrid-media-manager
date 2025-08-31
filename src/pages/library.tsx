@@ -743,6 +743,7 @@ function TorrentsPage() {
 			try {
 				const oldId = t.id;
 				if (rdKey && t.id.startsWith('rd:')) {
+					// The function now handles fetching info and preserving selection internally
 					await handleReinsertTorrentinRd(rdKey, t, true);
 					await torrentDB.deleteById(oldId);
 					removeFromCache(oldId); // Update global cache - this will trigger re-render
@@ -1443,6 +1444,7 @@ function TorrentsPage() {
 											return newSet;
 										});
 									}}
+									onRefreshLibrary={refreshLibrary}
 									onShowInfo={async (t) => {
 										if (t.id.startsWith('rd:') && rdKey) {
 											const info = await getTorrentInfo(

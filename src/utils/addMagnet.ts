@@ -164,12 +164,27 @@ export const handleReinsertTorrentinRd = async (
 ) => {
 	const oldId = torrent.id;
 	try {
+		// If no selectedFileIds provided, fetch current selection from RD
+		let fileIdsToSelect = selectedFileIds;
+		if (!fileIdsToSelect || fileIdsToSelect.length === 0) {
+			// Fetch current torrent info to preserve file selection
+			const currentInfo = await getTorrentInfo(rdKey, torrent.id.substring(3));
+			const currentlySelectedFiles = currentInfo.files
+				.filter((f: any) => f.selected === 1)
+				.map((f: any) => String(f.id));
+
+			if (currentlySelectedFiles.length > 0) {
+				fileIdsToSelect = currentlySelectedFiles;
+			}
+		}
+
 		const newId = await addHashAsMagnet(rdKey, torrent.hash);
 
-		// Use selected file IDs if provided, otherwise use the default selection logic
-		if (selectedFileIds && selectedFileIds.length > 0) {
-			await selectFiles(rdKey, newId, selectedFileIds);
+		// Use the determined file selection
+		if (fileIdsToSelect && fileIdsToSelect.length > 0) {
+			await selectFiles(rdKey, newId, fileIdsToSelect);
 		} else {
+			// Fallback to default video selection if no files were previously selected
 			await handleSelectFilesInRd(rdKey, `rd:${newId}`);
 		}
 
