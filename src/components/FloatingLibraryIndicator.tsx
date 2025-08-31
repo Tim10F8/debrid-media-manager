@@ -13,37 +13,60 @@ export default function FloatingLibraryIndicator() {
 	const adKey = useAllDebridApiKey();
 	const tbKey = useTorBoxAccessToken();
 	const [mounted, setMounted] = useState(false);
-	const [refreshKey, setRefreshKey] = useState(0);
+	const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+	// Check authentication status directly from localStorage
+	const checkAuthStatus = () => {
+		if (typeof window === 'undefined') return false;
+		const hasRd = !!localStorage.getItem('rd:accessToken');
+		const hasAd = !!localStorage.getItem('ad:apiKey');
+		const hasTb = !!localStorage.getItem('tb:apiKey');
+		return hasRd || hasAd || hasTb;
+	};
 
 	// Handle client-side mounting to avoid hydration mismatch
 	useEffect(() => {
 		setMounted(true);
+		setIsLoggedIn(checkAuthStatus());
 	}, []);
 
-	// Listen for storage changes to detect logout
+	// Listen for storage changes to detect logout/login
 	useEffect(() => {
 		const handleStorageChange = (e: StorageEvent) => {
-			// Check if any auth-related keys were removed
+			// Check if any auth-related keys were added or removed
 			if (
 				e.key &&
 				(e.key.startsWith('rd:') || e.key.startsWith('ad:') || e.key.startsWith('tb:'))
 			) {
-				setRefreshKey((prev) => prev + 1);
+				setIsLoggedIn(checkAuthStatus());
 			}
 		};
 
 		const handleLogout = () => {
-			setRefreshKey((prev) => prev + 1);
+			// Immediately hide the floating window on logout
+			setIsLoggedIn(false);
+		};
+
+		const handleLogin = () => {
+			// Show the floating window on login
+			setIsLoggedIn(checkAuthStatus());
 		};
 
 		window.addEventListener('storage', handleStorageChange);
 		window.addEventListener('logout', handleLogout);
+		window.addEventListener('login', handleLogin);
 
 		return () => {
 			window.removeEventListener('storage', handleStorageChange);
 			window.removeEventListener('logout', handleLogout);
+			window.removeEventListener('login', handleLogin);
 		};
 	}, []);
+
+	// Sync with auth hooks when they change
+	useEffect(() => {
+		setIsLoggedIn(checkAuthStatus());
+	}, [rdToken, adKey, tbKey]);
 
 	// Don't render until mounted to avoid hydration issues
 	if (!mounted) {
@@ -51,7 +74,6 @@ export default function FloatingLibraryIndicator() {
 	}
 
 	// Don't show if user is not logged in to any service
-	const isLoggedIn = rdToken || adKey || tbKey;
 	if (!isLoggedIn) {
 		return null;
 	}
