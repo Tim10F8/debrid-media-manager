@@ -216,8 +216,7 @@ export const handleAddAsMagnetInAd = async (
 ) => {
 	try {
 		const resp = await uploadMagnet(adKey, [hash]);
-		if (resp.data.magnets.length === 0 || resp.data.magnets[0].error)
-			throw new Error('no_magnets');
+		if (resp.magnets.length === 0 || resp.magnets[0].error) throw new Error('no_magnets');
 		if (callback) await callback();
 		toast('Successfully added hash!', magnetToastOptions);
 	} catch (error) {
@@ -233,10 +232,9 @@ export const handleAddMultipleHashesInAd = async (
 ) => {
 	try {
 		const resp = await uploadMagnet(adKey, hashes);
-		if (resp.data.magnets.length === 0 || resp.data.magnets[0].error)
-			throw new Error('no_magnets');
+		if (resp.magnets.length === 0 || resp.magnets[0].error) throw new Error('no_magnets');
 		if (callback) await callback();
-		toast(`Successfully added ${resp.data.magnets.length} hashes!`, magnetToastOptions);
+		toast(`Successfully added ${resp.magnets.length} hashes!`, magnetToastOptions);
 	} catch (error) {
 		console.error(
 			'Error adding hash:',

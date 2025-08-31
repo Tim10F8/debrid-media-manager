@@ -1,0 +1,2835 @@
+General informations
+Introduction
+Welcome to the Alldebrid API v4 ! You can use this API to access various Alldebrid services from custom applications or scripts.
+
+Our API is organized around REST, returns JSON-encoded responses and use standard HTTP response codes.
+
+All calls are to be made on the HTTPS endpoints. Some are public, others require to be authentificated with an apikey (see Authentication).
+
+This API version is namespaced as v4, as such all endpoint start with /v4/ or /v4.X/, such like http://api.alldebrid.com/v4/ping or http://api.alldebrid.com/v4.1/ping.
+
+This API v4 should be the final version regarding general response format and errors (hopefully).
+
+If you have any issue or question, feel free to contact us.
+
+Response format
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/ping');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this :
+
+{
+    "status": "success",
+    "data": {
+        "ping": "pong"
+    }
+}
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/endpointDontExist');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this :
+
+{
+    "status": "error",
+    "error": {
+        "code": "404",
+        "message": "Endpoint doesn't exist"
+    }
+}
+All responses return JSON with 2 attributes. The status attribute is always returned, and has a value of either success or error.
+
+If the response is valid, you will get "status" : "success" and a data attribute, containing the response data.
+
+If the request is invalid or an error occured, you will get "status" : "error" and an error attribute, containing the error details. All error codes and messages can be found in the errors section.
+
+If a request doesn't return valid JSON or JSON without a status attribute, you can consider that this request failed.
+
+This API also use HTTP status code to signal how a request went through. Codes in the 2xx range indicate success. Codes in the 4xx range indicate an error that failed given the information provided (e.g., a required parameter was omitted, a linkunlocking, etc.). Codes in the 5xx range indicate an error with Alldebrid's servers (these are rare).
+
+HTTP Status	Description
+200 - OK
+404 - Not Found	Api endpoint doesn't exist
+429 - Too Many Requests	Too many requests hit the API too quickly, see Rate limiting
+500, 502, 503, 504 - Server Errors	Something went wrong on Alldebrid's end
+Authentication
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/ping');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this :
+
+{
+    "status": "success",
+    "data": {
+        "ping": "pong"
+    }
+}
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/user'); // Authentificated endpoint with no apikey
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+
+The above request returns JSON structured like this :
+
+{
+    "status": "error",
+    "error": {
+        "code": "AUTH_MISSING_APIKEY",
+        "message": "The auth apikey was not sent"
+    }
+}
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/user');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this :
+
+{
+    "status": "success",
+    "data": {
+        "user": {
+            // (...)
+        }
+    }
+}
+The Alldebrid API uses API keys to authenticate requests. You can view and manage your API keys in your Apikey dashboard, or generate them remotely (with user action) through the PIN flow.
+
+You must send the apikey either in an Authorization: Bearer YourApikeyHere header.
+
+All endpoints need a valid apikey except for a few public endpoints that are documented as such.
+
+The following errors can be returned if your authentication fails.
+
+Code	Description
+AUTH_MISSING_APIKEY	The auth apikey was not sent
+AUTH_BAD_APIKEY	The auth apikey is invalid
+AUTH_BLOCKED	This apikey is geo-blocked or ip-blocked
+AUTH_USER_BANNED	This account is banned
+Rate limiting
+There is rate limiting in place for the API.
+
+Current limits are at 12 requests per second and 600 requests per minute.
+
+Any request in excess of those limits will return a 429 or 503 errors.
+
+If you intend to make more requests than those limits, please consider throttling or grouped calls.
+
+Demo responses
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/user');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer staticDemoApikeyPrem']);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this :
+
+{
+    "status": "success",
+    "demo": "true",
+    "data": {
+        "user": {
+            "username": "demoUserPremium",
+            "email": "demo@example.com",
+            "isPremium": true,
+            // (...)
+        }
+    }
+}
+The endpoints will respond with demo static data when called with the following static apikeys :
+
+staticDemoApikeyPrem : Premium user
+
+staticDemoApikeyTria : Trial user
+
+staticDemoApikeyFree : Free user
+
+Demo responses will have a demo property set to true.
+
+Those apikeys are used for the Demos button on this documentation.
+
+All endpoints
+GET Public Requests
+https://api.alldebrid.com/v4/ping
+
+https://api.alldebrid.com/v4.1/pin/get
+
+https://api.alldebrid.com/v4/hosts
+
+https://api.alldebrid.com/v4/hosts/domains
+
+https://api.alldebrid.com/v4/hosts/priority
+
+GET Requests
+https://api.alldebrid.com/v4/user
+
+https://api.alldebrid.com/v4.1/user/hosts
+
+https://api.alldebrid.com/v4/user/links
+
+https://api.alldebrid.com/v4/user/history
+
+POST Requests
+https://api.alldebrid.com/v4/pin/check
+
+https://api.alldebrid.com/v4/user/verif
+
+https://api.alldebrid.com/v4/user/verif/resend
+
+https://api.alldebrid.com/v4/user/notification/clear
+
+https://api.alldebrid.com/v4/link/infos
+
+https://api.alldebrid.com/v4/link/redirector
+
+https://api.alldebrid.com/v4/link/unlock
+
+https://api.alldebrid.com/v4/link/streaming
+
+https://api.alldebrid.com/v4/link/delayed
+
+https://api.alldebrid.com/v4/magnet/upload
+
+https://api.alldebrid.com/v4/magnet/upload/file
+
+https://api.alldebrid.com/v4.1/magnet/status
+
+https://api.alldebrid.com/v4/magnet/files
+
+https://api.alldebrid.com/v4/magnet/delete
+
+https://api.alldebrid.com/v4/magnet/restart
+
+https://api.alldebrid.com/v4/user/links/save
+
+https://api.alldebrid.com/v4/user/links/delete
+
+https://api.alldebrid.com/v4/user/history/delete
+
+/v4.1/ Requests
+https://api.alldebrid.com/v4.1/user/hosts
+
+https://api.alldebrid.com/v4.1/pin/get
+
+https://api.alldebrid.com/v4.1/magnet/status
+
+Recent modifications
+Check the Changelog for a complete list.
+
+20/01/2025
+
+API : Updated /user/hosts to /v4.1/, removing streams and redirectors from the response, use /hosts to get those static data
+15/01/2025
+
+API : Removed agent and version requirements
+API : Enabled POST requests and changed the default API usage to use POST to send data
+Doc : Added All endpoints section to list all endpoints grouped by HTTP method and versions
+API : Updated /pin/get endpoint to version /v4.1/ removing the check_url response property
+17/10/2024
+
+API : Added quotaMax property to the /user/hosts endpoint
+16/10/2024
+
+API : Updated /magnet/status endpoint to version /v4.1/, moving magnets files informations to their dedicated endpoint
+API : Deprecated /v4/magnet/status in favor of /v4.1/magnet/status
+API : Added deprecation status property deprecated on deprecated endpoints
+Pin auth
+You can authenticate users in your application by using a PIN-auth flow. The steps are :
+
+Get a pin code using /pin/get and display it to the user
+
+The user submits the pin code on the Alldebrid pin page
+
+Once submitted, the auth apikey will be available on /pin/check
+
+Get pin
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4.1/pin/get');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+$pinInfo = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "pin": "ABCD",
+        "check": "664c3ca2635c99f291d28e11ea18e154750bd21aDMM🧲",
+        "expires_in": 600,
+        "user_url": "https:\/\/alldebrid.com\/pin\/?pin=ABCD",
+        "base_url": "https:\/\/alldebrid.com\/pin\/",
+    }
+}
+ This documentation is for the /v4.1/ up-to-date endpoint. Documentation of deprecated endpoint can be found in the deprecated section.
+HTTP Request
+GET https://api.alldebrid.com/v4.1/pin/get
+
+ Demo : Get pin
+Response attributes
+Key	Type	Description
+pin	String	Pin code to display to your user
+check	String	Check token needed for the pin/check endpoint
+expires_in	Integer	Number of second before the code expire
+user_url	String	Url to display with PIN included
+base_url	String	Base url
+Check the pin status
+<?php
+
+// Full flow in action
+
+$ch = curl_init('https://api.alldebrid.com/v4/pin/get');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+$pinInfo = json_decode($response, true);
+
+curl_close($ch);
+
+do {
+    $ch = curl_init('https://api.alldebrid.com/v4/pin/check');
+
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+        'pin' => $pinInfo['pin'],
+        'check' => $pinInfo['check']
+    ]));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+    $response = curl_exec($ch);
+    $pinCheck = json_decode($response, true);
+    curl_close($ch);
+
+    if ($pinCheck['status'] == 'error')
+        die("Either PIN has expired or check endpoint is invalid, check errorCode");
+
+    sleep(5);
+} while ($pinCheck['data']['activated'] == false);
+
+$authApikey = $pinCheck['data']['apikey'];
+This check endpoint returns JSON structured like this if the PIN hasn't been submitted yet :
+
+{
+    "status": "success",
+    "data": {
+        "activated": false,
+        "expires_in": 581
+    }
+}
+Once the PIN has been submitted, the endpoin returns JSON structured like this if the PIN hasn't been submitted yet :
+
+{
+    "status": "success",
+    "data": {
+        "apikey": "abcdefABCDEF12345678",
+        "activated": true,
+        "expires_in": 570
+    }
+}
+The endpoint where the auth apikey will be available after the user submitted the PIN code on the Alldebrid website. The endpoint is available for 10 minutes after the PIN code is generated.
+
+You should pool on the endpoint until the user has submitted the PIN code and an auth apikey is returned, or until the endpoint expires after 600 seconds.
+
+HTTP Request
+POST https://api.alldebrid.com/v4/pin/check
+
+ Demo : Waiting code Apikey available Expired pin Invalid pin
+ The check endpoint is ephemeral and will only be available for 10 minutes after the PIN generation.
+Post parameters
+Parameter	Required	Type	Description
+check	true	string	Check ID from /pin/get
+pin	true	string	Pin code from /pin/get
+Response attributes
+Key	Always returned	Type	Description
+activated	Yes	Boolean	false if user didn't enter the pin on website yet
+expires_in	Yes	Integer	Seconds left before PIN expires
+apikey	No	String	Auth apikey, available once user has submitted the pin code.
+Endpoint errors
+Code	Description
+PIN_EXPIRED	The pin has expired
+PIN_INVALID	This endpoint check parameter is invalid
+Hosts
+Use these endpoints to get a list of all the hosts we support, and the services of redirection (adf.ly, bit.ly) or protection we can extract links from.
+
+If you want a live list of hosts the user can actually use depending on its subscription status, please use the authentificated /user/host endpoint.
+
+Please consider caching the result of these calls for a few hours.
+
+ All `/v4/hosts/*` endpoints are public, authentication apikey is optional.
+Supported hosts
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/hosts');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this :
+
+{
+    "status": "success",
+    "data": {
+        "hosts": {
+            "mega": {
+                "name": "mega",
+                "type": "premium",
+                "domains": ["mega.nz", "mega.co.nz"],
+                "regexp": "(mega(\\.co)?\\.com\/#!([0-9a-zA-Z_]{20,36}))",
+                "status": true
+            }
+        },
+        "streams": {
+            "twitch": {
+                "name": "twitch",
+                "type": "free",
+                "domains": [
+                    "twitch.tv",
+                    "player.twitch.tv",
+                    "m.twitch.tv",
+                    "go.twitch.tv",
+                    "clips.twitch.tv"
+                ],
+                "regexp": "(https?:\/\/(?:(?:www|go|m)\\.)?twitch\\.tv\/[^\/]+\/b\/(?P<id>\\d+))|(https?:\/\/(?:(?:www|go|m)\\.)?twitch\\.tv\/(?P<id>[^\/]+)\/videos\/highlights)",
+            },
+        },
+        "redirectors": {
+            "dlprotect": {
+                "name": "dlprotect",
+                "type": "premium",
+                "domains": [
+                    "dl-protect1.com",
+                    "dl-protect1.co"
+                ],
+                "regexp": "((dl-protect1.com\/[0-9a-z]+))|((dl\\-protect1\\.co\/go\/[0-9a-zA-Z_\\-]+))|((dl\\-protect\\.net\/[0-9a-z]+))"
+            }
+        }
+    }
+}
+
+Use this endpoint to retrieve informations about what hosts we support and all related informations about it.
+
+HTTP Request
+GET https://api.alldebrid.com/v4/hosts
+
+ Demo : Get hosts
+GET parameters
+Parameter	Required	Description
+hostsOnly	false	Endpoint will only return "hosts" data
+Response attributes
+Key	Type	Description
+hosts	Object	Supported hosts services.
+streams	Object	Supported streams services.
+redirectors	Object	Supported redirectors services.
+Service object
+Key	Always returned	type	Description
+name	Yes	String	Host name.
+type	Yes	String	Either "premium" or "free". Premium hosts need a premium subscription.
+domains	Yes	Array of String	Host domains.
+regexp	Yes	String	Rgexp matching link format that Alldebrid supports.
+status	No	Boolean	Is the host currently (< 5 min) working on Alldebrid (only tested on some hosts, updated every ~ 10 min).
+Domains only
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/hosts/domains');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this :
+
+{
+    "status": "success",
+    "data": {
+        "hosts": ["mega.nz", "mega.co.nz", "vimeo.com"],
+        "streams": ["youtube.com", "youtu.be", "twitch.tv"],
+        "redirectors": ["dl-protecte.com", "dl-protecte.org", "adf.ly"]
+    }
+}
+Use this endpoint to only retrieve the list of supported hosts domains and redirectors as an array. This will also include any alternative domain the hosts or redirectors have. Please use regexps availables in /hosts or /user/hosts endpoints to validate supported links.
+
+HTTP Request
+GET https://api.alldebrid.com/v4/hosts/domains
+
+ Demo : Get hosts domains
+Response attributes
+Key	Type	Description
+hosts	Array of strings	Supported hosts services domains.
+streams	Array of strings	Supported streams services domains.
+redirectors	Array of strings	Supported redirectors services domains.
+Hosts priority
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/hosts/priority');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this :
+
+{
+    "status": "success",
+    "data": {
+        "hosts": {
+            "1fichier": 1,
+            "4shared": 2,
+            "backin": 3,
+            "bdupload": 4
+        }
+    }
+}
+
+Not all hosts are created equal, so some hosts are more limited than other.
+
+Use this endpoint to retrieve an ordered list of main domain of hosts, from more open to more restricted.
+
+HTTP Request
+GET https://api.alldebrid.com/v4/hosts/priority
+
+ Demo : Get hosts priority
+Response attributes
+Key	Type	Description
+hosts	Object	Supported hosts services with their priority.
+User
+Informations
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/user');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "user": {
+            "username": "MyUsername",
+            "email": "some.email@example.com",
+            "isPremium": true,
+            "isSubscribed": false,
+            "isTrial": false,
+            "premiumUntil": "1545757200",
+            "lang": "fr",
+            "preferedDomain": "fr",
+            "fidelityPoints": 200,
+            "limitedHostersQuotas": {
+                "someHost": 1024,
+                "otherHost": 5000,
+                "oneLast": 2000
+            },
+            "notifications": [ "FREEDAYS_USED_QUOTA" ]
+        }
+    }
+}
+Use this endpoint to get user informations.
+
+HTTP Request
+GET https://api.alldebrid.com/v4/user
+
+ Demo : Premium user Trial user Free user
+Response attributes
+Key	Type	Description
+user	Object	User data.
+User object
+Key	Always returned	Type	Description
+username	Yes	String	User username.
+email	Yes	String	User email.
+isPremium	Yes	Boolean	true is premium, false if not.
+isSubscribed	Yes	Boolean	true is user has active subscription, false if not.
+isTrial	Yes	Boolean	true is account is in freedays trial, false if not.
+premiumUntil	Yes	Integer	0 if user is not premium, or timestamp until user is premium.
+lang	Yes	String	Language used by the user on Alldebrid, eg. 'en', 'fr'. Default to fr.
+preferedDomain	Yes	String	Preferer TLD used by the user, eg. 'fr', 'es'. Default to fr.
+fidelityPoints	Yes	Integer	Number of fidelity points.
+limitedHostersQuotas	Yes	Array	Remaining quotas for the limited hosts (in MB).
+remainingTrialQuota	No	Integer	When in trial mode, remaining global traffic quota available (in MB).
+notifications	Yes	Array	Codes of current notifications.
+Available hosts
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4.1/user/hosts');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "hosts": {
+            "mega": {
+                "name": "mega",
+                "type": "premium",
+                "domains": ["mega.nz", "mega.co.nz"],
+                "regexp": "mega(\.co)?\.nz/([0-9a-zA-Z_]{20,36})",
+                "status": true
+            }
+        }
+    }
+}
+This endpoint retrieves a complete list of all available hosts for this user. Depending of the account subscription status (free user, trial mode, premium user), the list and limitations will vary.
+
+The limits and quota are updated in real time. Use this page to have an up-to-date list of service the user can use on Alldebrid.
+
+Quotas will reset every day for premium users.
+
+ This documentation is for the /v4.1/ up-to-date endpoint. Documentation of deprecated endpoint can be found in the deprecated section.
+HTTP Request
+GET https://api.alldebrid.com/v4.1/user/hosts
+
+ Demo : Test it
+Response attributes
+Key	Type	Description
+hosts	Object	Hosts infos.
+Host object
+Key	Always returned	type	Description
+name	Yes	String	Host name.
+type	Yes	String	Either "premium" or "free". Premium hosts need a premium subscription.
+domains	Yes	Array	Host domains.
+regexps	Yes	Array	Regexps matching the supported urls for this host.
+status	No	Boolean	Is the host currently (< 5 min) working on Alldebrid (only tested on some hosts, updated every ~ 10 min).
+quota	No	Integer	Remaining quota for this host, if any.
+quotaMax	No	Integer	Daily quota for this host, if any.
+quotaType	No	String	Specify if the quota is the remaining traffic available in MB ("traffic" type) or the number of remaining downloads possible ("nb_download" type)
+limitSimuDl	No	Integer	We limit the number of simultaneous downloads for some hosts, this will display the remaining download slot available for the user at this time.
+Verification email status
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/user/verif');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'token' => 'verificationToken'
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+When receiving an AUTH_BLOCKED error formatted like this :
+
+{
+    "status": "error",
+    "error": {
+        "code": "AUTH_BLOCKED",
+        "message": "You are logging from a new location, device or app. An <b>email has been sent<\/b> to confirm the new sign in.",
+        "token": "verificationToken75ec0643f9eb0db"
+    }
+}
+The above request returns JSON structured like this if waiting for mail confirmation :
+
+{
+    "status": "success",
+    "data": {
+        "verif": "waiting",
+        "resendable": true,
+    }
+}
+The above request returns JSON structured like this if connexion has been approved :
+
+{
+    "status": "success",
+    "data": {
+        "verif": "allowed",
+        "apikey": "someValidApikey"
+    }
+}
+The above request returns JSON structured like this if connexion has been denied :
+
+{
+    "status": "success",
+    "data": {
+        "verif": "denied"
+    }
+}
+When connecting from a new place, you may be asked to verify this new connection for security measures. This include the API use.
+
+If you trigguer such security, an email is sent to the user to confirm the new location. In those case, the api returns an AUTH_BLOCKED error, along with an token parameter as documented in the code example.
+
+You can use this endpoint to track the status of the new connexion validation, and retreive the apikey when the request has been confirmed by email.
+
+HTTP Request
+POST https://api.alldebrid.com/v4/user/verif
+
+ Demo : Waiting Allowed Denied Expired
+Post parameters
+Parameter	Required	Description
+token	true	Verification token returned along with the AUTH_BLOCKED error
+Response attributes
+Key	Always returned	type	Description
+verif	Yes	String	Verification status, either waiting, allowed or denied
+resendable	No	Boolean	Whether the verification email is resensable with /user/verif/resend, returned when verif = waiting
+apikey	No	String	The apikey, returned when verif = allowed
+Specific errors
+Code	Description
+PIN_EXPIRED	Verification token is invalid
+Resend verification email
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4/user/verif/resend');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'token' => 'verificationToken'
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this if email was sent :
+
+{
+    "status": "success",
+    "data": {
+        "sent": true
+    }
+}
+Allow to send again the verification email, allowed once. We can referrer to the resendable property of the /user/verif response to know if you can request a resend.
+
+HTTP Request
+POST https://api.alldebrid.com/v4/user/verif/resend
+
+ Demo : Resend Already resent Expired
+Post parameters
+Parameter	Required	Description
+token	true	Verification token returned along with the AUTH_BLOCKED error
+Response attributes
+Key	type	Description
+sent	Boolean	Email was sent again
+Specific errors
+Code	Description
+PIN_EXPIRED	Verification token is invalid
+ALREADY_SENT	Verification email has already been se againnt
+Clear notification
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/user/notification/clear');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'code' => 'NOTIF_CODE'
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this :
+
+{
+    "status": "success",
+    "data": {
+        "message": "Notification was cleared"
+    }
+}
+This endpoint clears a user notification with its code. Current notifications codes can be retreive from the /user endpoint.
+
+HTTP Request
+POST https://api.alldebrid.com/v4/user/notification/clear
+
+ Demo : Clear notif
+Post parameters
+Parameter	Required	Description
+code	true	Notification code to clear
+Response attributes
+Key	Type	Description
+message	String	Clearing confirmation
+Links
+Informations
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4/link/infos');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'link' => ["http://example.com/somefile", "http://notsupported.com/error"],
+    'password' => 'optionalPassword',
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The single link request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "infos": [
+            {
+                "link": "http:\/\/example.com\/somefile",
+                "filename": "somefile.txt",
+                "size": 699400192,
+                "host": "example",
+                "hostDomain": "example.com",
+            }
+        ]
+    }
+}
+The multiple links request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "infos": [
+            {
+                "link": "https:\/\/example.com\/somefile",
+                "filename": "somefile.txt",
+                "size": 699400192,
+                "host": "example",
+                "hostDomain": "example.com",
+
+            },
+            {
+                "link": "http:\/\/notsupported.com/error",
+                "error": {
+                    "code": "LINK_HOST_NOT_SUPPORTED",
+                    "message": "This host or link is not supported",
+                }
+            }
+        ]
+    }
+}
+Use this endpoint to retrieve informations about a link. If it is in our systems, you'll have the filename and size (if available).
+
+If the host is not supported or the link is down, an error will be returned for that link.
+
+This endpoint only support host links, not redirectors links. Use the link/redirector endpoint for this.
+
+HTTP Request
+POST https://api.alldebrid.com/v4/link/infos
+
+ Demo : Example file Errors
+Post parameters
+Parameter	Required	Type	Description
+link[]	true	array of string	The array of links you request informations about.
+password	false	string	Link password.
+Response attributes
+Key	Type	Description
+infos	Array	Array of info objects
+Info object
+Key	Type	Description
+link	string	Requested link
+filename	string	Link's file filename.
+size	Integer	Link's file size in bytes.
+host	string	Link host.
+hostDomain	string	Host main domain
+Link errors
+Code	Description
+LINK_IS_MISSING	No link was sent
+LINK_HOST_NOT_SUPPORTED	This host or link is not supported
+LINK_DOWN	This link is not available on the file hoster website
+LINK_PASS_PROTECTED	Link is password protected
+LINK_TEMPORARY_UNAVAILABLE	link is temporary unavalible on hoster website
+Redirectors
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/link/redirector');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'link' => "http://example.com/somefile"
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The request returns JSON structured like this :
+
+{
+    "status": "success",
+    "data": {
+        "links": ["https:\/\/redirect.alldebrid.com\/mnsaj-0-fcdeaf3287a502c6e97359372afee2465043d9d8f7662f8ad18cbde0a882a42d", "https:\/\/redirect.alldebrid.com\/mnsaj-1-fcdeaf3287a502c6e97359372afee2465043d9d8f7662f8ad18cbde0a882a42d"]
+    }
+}
+Use this endpoint to retrieve links protected by a redirector or link protector. Returned links will be encrypted (in the form https://redirect.alldebrid.com/mnsaj-0-fcdeaf3287a502c6e97359372afee2465043d9d8f7662f8ad18cbde0a882a42d) but will be usable on the /link/unlock endpoint.
+
+Thos encrypted links are "virtual", as in they will only work when submitted to the link/unlock and link/infos endpoints (or used on /service/ on the main Website).
+
+HTTP Request
+POST https://api.alldebrid.com/v4/link/redirector
+
+ Demo : Get links Not supported Rate limited Error
+Post parameters
+Parameter	Required	Type	Description
+link	true	string	The redirector or protector link to extract links.
+Response attributes
+Key	Type	Description
+links	array	Encrypted link(s) extracted.
+Errors
+Code	Description
+REDIRECTOR_NOT_SUPPORTED	Redirector not supported.
+REDIRECTOR_ERROR	Could not extract links.
+Download link
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4/link/unlock');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'link' => "http://example.com/somefile",
+    'password' => 'optionalPassword',
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "link": "http:\/\/ombfyx.debrid.it\/dl\/abcdefgh12\/somefile.txt",
+        "host": "example",
+        "filename": "somefile.txt",
+        "paws": false,
+        "filesize": 699400192,
+        "streams": [
+            //(...)
+        ],
+        "id": "abcdefgh12",
+        "hostDomain": "example.com"
+}
+This endpoint unlocks a given link.
+
+This endpoint can return a delayed ID. In that case, you must follow the delayed link flow.
+
+HTTP Request
+POST https://api.alldebrid.com/v4/link/unlock
+
+ Demo : Get download link Delayed link Streaming link Not supported Down
+Post parameters
+Parameter	Required	Type	Description
+link	true	string	The link to unlock.
+password	false	string	Link password.
+Response attributes
+Key	Type	Description
+link	String	Requested link, simplified if it was not in canonical form.
+filename	string	Link's file filename.
+host	String	Link host minified.
+streams	Array	List of alternative links with other resolutions for some video links. See code example for more infos.
+paws	Boolean	Unused.
+filesize	Interger	Filesize of the link's file.
+id	Integer	Generation ID
+hostDomain	String	Matched host main domain
+delayed	Integer	Delayed ID if link need time to generate
+Errors
+Code	Description
+LINK_HOST_NOT_SUPPORTED	This link is not supported.
+LINK_DOWN	This link is not available on the file hoster website.
+LINK_HOST_UNAVAILABLE	Host under maintenance or not available.
+LINK_TOO_MANY_DOWNLOADS	Too many concurrent downloads.
+LINK_HOST_FULL	All servers are full for this host, please retry later.
+LINK_HOST_LIMIT_REACHED	You have reached the download limit for this host.
+LINK_PASS_PROTECTED	Link is password protected.
+LINK_ERROR	Generic unlocking error.
+LINK_NOT_SUPPORTED	The link is not supported for this host.
+LINK_TEMPORARY_UNAVAILABLE	link is temporary unavalible on hoster website
+MUST_BE_PREMIUM	You must be premium to process this link.
+FREE_TRIAL_LIMIT_REACHED	You have reached the free trial limit (7 days // 25GB downloaded or host uneligible for free trial).
+NO_SERVER	Server are not allowed to use this feature. Visit https://alldebrid.com/vpn if you're using a VPN.
+Streaming links
+<?php
+// Authentificated endpoint with valid apikey
+
+$ch = curl_init('https://api.alldebrid.com/v4/link/unlock');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'link' => 'https://www.dailymotion.com/video/x8pnn16',
+]));
+
+$response = curl_exec($ch);
+$linkInfos = json_decode($response, true);
+
+curl_close($ch);
+
+$id = $linkInfos['id'];
+$stream = $linkInfos['streams'][0]['id'];
+
+$ch = curl_init('https://api.alldebrid.com/v4/link/streaming');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'id' => $id,
+    'stream' => $stream,
+]));
+
+$response = curl_exec($ch);
+$streamLinkDLInfos = json_decode($response, true);
+
+curl_close($ch);
+The first request to get stream links infos, returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "link": "",
+        "host": "stream",
+        "filename": "Rick Astley - Never Gonna Give You Up (Video)",
+        "filesize": 0,
+        "id": "1nsjw3315ad",
+        "streams": [{
+                "id": "140",
+                "ext": "mp3",
+                "quality": "mp3",
+                "filesize": 3433538,
+                "proto": "https",
+                "name": "",
+                "tb": 130.621,
+                "abr": 128
+            },
+            {
+                "id": "137+140",
+                "ext": "mp4",
+                "quality": 1080,
+                "filesize": 75910363,
+                "proto": "https",
+                "name": ""
+            },
+            {
+                "id": "398+140",
+                "ext": "mp4",
+                "quality": 720,
+                "filesize": 32752789,
+                "proto": "https",
+                "name": ""
+            },
+        ]
+    }
+}
+The second request returns JSON structured like this if successfull :
+
+    "status": "success",
+    "data": {
+        "link": "https://p1cjev.alldeb.ovh/dl/1nsjw3315ad/Rick%20Astley%20-%20Never%20Gonna%20Give%20You%20Up%20%28Video%29.360.mp4",
+        "filename": "Rick Astley - Never Gonna Give You Up (Video).360.mp4",
+        "filesize": 113129149
+    }
+}
+The second request returns JSON structured like this if successfull, is case of delayed link :
+
+{
+    "status": "success",
+    "data": {
+        "filename": "Rick Astley - Never Gonna Give You Up (Video).360.mp4",
+        "filesize": 113129149,
+        "delayed": 2277564
+    }
+}
+The unlocking flow for streaming link is a bit more complex.
+
+First hit the usual link/unlock endpoint. Two cases :
+
+Stream link has only one quality : downloading link is available immediatly.
+OR
+
+Stream links has multiple qualities : you must select the desired quality to obtain a download link or delayed id by using the link/streaming endpoint.
+Depending of the stream website, you'll either get a download link, or a delayed id (see Delayed link section for delayed links).
+
+HTTP Request
+POST https://api.alldebrid.com/v4/link/streaming
+
+ Demo : Choose quality Invalid gen Invalid stream
+Post parameters
+Parameter	Required	Type	Description
+id	true	string	The link ID you received from the /link/unlock call.
+stream	true	string	The stream ID you choosed from the stream qualities list returned by /link/unlock.
+Response attributes
+Key	Type	Description
+link	String	Optional. Download link, ONLY if available. This attribute WONT BE RETURNED if download link is a delayed link.
+filename	string	Link's file filename.
+filesize	Interger	Filesize of the link's file.
+delayed	Interger	Optional. Delayed ID to get download link with delayed link flow (see next section)
+Errors
+Code	Description
+STREAM_INVALID_GEN_ID	Invalid generation ID
+STREAM_INVALID_STREAM_ID	Invalid stream ID
+Delayed links
+<?php
+
+$delayedID = 2457; // From /link/unlock
+
+$ch = curl_init('https://api.alldebrid.com/v4/link/delayed');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'id' => $delayedID,
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this if still delayed :
+
+{
+    "status": "success",
+    "data": {
+        "status": 1,
+        "time_left": 45
+    }
+}
+The above request returns JSON structured like this if link is available :
+
+{
+    "status": "success",
+    "data": {
+        "status": 2,
+        "time_left": 0,
+        "link": "http:\/\/ombfyx.debrid.it\/dl\/abcdefgh12\/ubuntu-16.04.1-server-amd64.iso"
+    }
+}
+This endpoint give the status of a delayed link.
+
+Some links need time to generate, this endpoint send the status of such delayed links.
+
+You should pool every 5 seconds or more the link/delayed endpoint until given the download link.
+
+HTTP Request
+POST https://api.alldebrid.com/v4/link/delayed
+
+ Demo : Still processing Link ready Invalid id
+Post parameters
+Parameter	Required	Type	Description
+id	true	integer	Delayed ID received in /link/unlock.
+Response attributes
+Key	Always returned	Type	Description
+status	Yes	Integer	Current status.
+time_left	Yes	Integer	Estimated time left to wait.
+link	No	String	Download link, available when it is ready.
+Status code
+Status	Description
+1	Still processing.
+2	Download link is available.
+3	Error, could not generate download link.
+Errors
+Code	Description
+DELAYED_INVALID_ID	This delayed link id is invalid
+Magnet
+Upload magnet
+Upload a magnet with its URI or hash.
+
+You can either send the magnets in GET parameters, or in POST.
+
+<?php
+$magnet1 = 'magnet:?xt=urn:btih:842783e3005495d5d1637f5364b59343c7844707&dn=ubuntu-18.04.2-live-server-amd64.iso';
+$magnet2 = '6be434d1f4ebefa14c4051e4bb0543cf47a8';
+$magnet3 = '194257a7bf4eaea978f4b5b7fbd3b4efcdd99e43';
+
+$ch = curl_init('https://api.alldebrid.com/v4/magnet/upload?apikey=REDACTED_ALLDEBRID_API_KEY');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'magnets' => [$magnet1, $magnet2, $magnet3],
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "magnets" : [
+            {
+                "magnet": "magnet:?xt=urn:btih:842783e3005495d5d1637f5364b59343c7844707&dn=ubuntu-18.04.2-live-server-amd64.iso",
+                "hash": "842783e3005495d5d1637f5364b59343c7844707",
+                "name": "ubuntu-18.04.2-live-server-amd64.iso",
+                "size": 875773970,
+                "ready": true,
+                "id": 123456
+            },
+            {
+                "magnet": "6be434d1f4ebefa14c4051e4bb0543cf47a8",
+                "error": {
+                    "code": "MAGNET_INVALID_URI",
+                    "message": "Magnet is not valid"
+                }
+            },
+            {
+                "magnet": "194257a7bf4eaea978f4b5b7fbd3b4efcdd99e43",
+                "hash": "194257a7bf4eaea978f4b5b7fbd3b4efcdd99e43",
+                "name": "ubuntu-18.04.3-live-server-amd64.iso",
+                "size": 9024340026,
+                "ready": true,
+                "id": 234567
+            }
+        ]
+    }
+}
+HTTP Request
+POST https://api.alldebrid.com/v4/magnet/upload
+
+ Demo : Upload magnet Error
+Post parameters
+Parameter	Required	Type	Description
+magnets[]	true	array of string	Magnet(s) URI or hash. Must send magnet either in GET param or in POST data.
+Response attributes
+Key	Type	Description
+magnets	Array	Array of magnet objects
+Magnet object
+Key	Type	Description
+magnet	string	Magnet sent.
+name	string	Magnet filename, or 'noname' if could not parse it.
+id	integer	Magnet id, used to query status.
+hash	string	Magnet hash.
+size	integer	Magnet files size.
+ready	boolean	Whether the magnet is already available.
+Endpoint errors
+Code	Description
+MAGNET_NO_URI	No magnet provided.
+MAGNET_INVALID_URI	Magnet is not valid.
+MAGNET_MUST_BE_PREMIUM	You must be premium to use this feature.
+MAGNET_NO_SERVER	Server are not allowed to use this feature. Visit https://alldebrid.com/vpn if you're using a VPN.
+MAGNET_TOO_MANY_ACTIVE	Already have maximum allowed active magnets (30).
+Upload file
+Upload torrent files.
+
+This endpoint should be POSTed on. It expects a multipart formdata file upload.
+
+<?php
+
+$filePath = 'ubuntu-18.04.2-live-server-amd64.iso.torrent';
+$file = new CURLFile($filePath, 'application/x-bittorrent');
+
+$filePath2 = 'not.a.torrent.zip';
+$file2 = new CURLFile($filePath2, 'application/x-bittorrent');
+
+$ch = curl_init('https://api.alldebrid.com/v4/magnet/upload/file');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, ['files[0]' => $file, 'files[1]' => $file2 ]);
+
+$result = curl_exec($ch);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "files": [
+            {
+                "file": "ubuntu-18.04.2-live-server-amd64.iso.torrent",
+                "name": "Ubuntu 18.04.2 live server amd64",
+                "size": 1954210119,
+                "hash": "842783e3005495d5d1637f5364b59343c7844707",
+                "ready": false,
+                "id": 123456
+            },
+            {
+                "file": "not.a.torrent.zip",
+                "error": {
+                    "code": "MAGNET_INVALID_FILE",
+                    "message": "File is not a valid torrent"
+                }
+            }
+        ]
+    }
+}
+HTTP Request
+POST https://api.alldebrid.com/v4/magnet/upload/file
+
+ Demo : Upload torrent Error
+Post parameters
+Parameter	Required	Type	Description
+files	true	array of files	Magnet files.
+Response attributes
+Key	Type	Description
+files	array	array of file objects
+File object
+Key	Type	Description
+file	string	File name sent.
+name	string	Torrent filename, or 'noname' if could not parse it.
+hash	string	Torrent hash.
+id	integer	Torrent id, used to query status.
+size	integer	Torrent files size.
+ready	boolean	Whether the torrent is already available.
+Endpoint errors
+Code	Description
+MAGNET_INVALID_FILE	File is not a valid torrent
+MAGNET_MUST_BE_PREMIUM	You must be premium to use this feature.
+MAGNET_NO_SERVER	Server are not allowed to use this feature. Visit https://alldebrid.com/vpn if you're using a VPN.
+MAGNET_TOO_MANY_ACTIVE	Already have maximum allowed active magnets (30).
+MAGNET_FILE_UPLOAD_FAILED	File upload failed
+Get Status
+Get the status of current magnets, or only one if you specify a magnet ID.
+
+ This documentation is for the /v4.1/ up-to-date endpoint. Documentation of deprecated endpoint can be found in the deprecated section.
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4.1/magnet/status');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+
+// Optional magnet id or status
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'id' => $magnetID,
+    'status' => 'active',
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+
+curl_close($ch);
+The above request could return JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "magnets": [
+        {
+            "id": 123456,
+            "filename": "ubuntu-16.04.2-live-server-amd64.iso",
+            "size": 587400285,
+            "status": "Downloading",
+            "statusCode": 1,
+            "downloaded": 255400192,
+            "uploaded": 0,
+            "seeders": 7,
+            "downloadSpeed": 18874368,
+            "uploadSpeed": 0,
+            "uploadDate": 1557133868,
+            "completionDate" : 0,
+        }, {
+            "id": 56789,
+            "filename": "ubuntu-20.04.2-live-server-amd64.iso",
+            "size": 256400192,
+            "status": "Ready",
+            "statusCode": 4,
+            "uploadDate": 1657133868,
+            "completionDate" : 1657133968,
+        }]
+    }
+}
+HTTP Request
+POST https://api.alldebrid.com/v4.1/magnet/status
+
+ Demo : Get all Get magnet status Get active magnets
+Post parameters
+Parameter	Required	Type	Description
+id	false	interger	Magnet ID.
+status	false	string	Magnets status filter. Either active, ready, expired or error
+Response attributes
+Key	Type	Description
+magnets	array	Array of magnet objects
+Magnet object
+Key	Type	Description
+id	integer	Magnet id.
+filename	string	Magnet filename.
+size	integer	Magnet filesize.
+status	string	Status in plain English.
+statusCode	integer	Status code. See next table.
+downloaded	integer	Downloaded data so far.
+uploaded	integer	Uploaded data so far.
+seeders	integer	Seeders count.
+downloadSpeed	integer	Download speed.
+uploadSpeed	integer	Upload speed.
+uploadDate	integer	Timestamp of the date of the magnet upload.
+completionDate	integer	Timestamp of the date of the magnet completion.
+files	array	Magnet files, available if a specific magnet was requested. To request multiple magnet files, use the /magnets/files endpoint instead. The files tree structure is explained here.
+Status code
+Code	Type	Description
+0	Processing	In Queue.
+1	Processing	Downloading.
+2	Processing	Compressing / Moving.
+3	Processing	Uploading.
+4	Finished	Ready.
+5	Error	Upload fail.
+6	Error	Internal error on unpacking.
+7	Error	Not downloaded in 20 min.
+8	Error	File too big.
+9	Error	Internal error.
+10	Error	Download took more than 72h.
+11	Error	Deleted on the hoster website
+12	Error	Proccessing failed
+13	Error	Proccessing failed
+14	Error	Error while contacting tracker
+15	Error	File not available - no peer
+Endpoint errors
+Code	Description
+MAGNET_INVALID_ID	Magnet ID is invalid.
+Get Status - Live Mode
+The Live Mode allows to only get the new data of the status of current magnets. It is designed to make a "live" panel or monitoring system more performant when consuming the magnet/status endpoint very frequently.
+
+It requires a session ID and a counter, and using cache on the API side only the differences between the last state and the current state are sent, greatly reducing the amount of data returned by the API on each call.
+
+The client using this mode must keep the current state of the magnets status locally between each call in order to apply the new data on the last state to get the whole current state.
+
+A fixed session ID (integer) must be randomly set, and a counter starting at 0 will be used. On the first call (id=123, counter=0) with a new session ID, all the current data will be sent back, with the fullsync property set to true to make it clear, and the next counter to use. On the next call the updated counter is used (id=123, counter=1), and only the differences with the previous state will be send back.
+
+If the magnets property returned is empty, then no change happened since the last call. If some changes happened, the magnets array will have some magnet objects (see Status) with its id and the properties changed, like this :
+
+{ "id": 123456, "downloaded": 258879224, "downloadSpeed": 20587738 }
+
+You can them apply those diff to the last state you kept to get the current magnets status state.
+
+If you send a counter that is not in sync with the last call response (like sending the same counter twice in a row), then the endpoint will consider your counter invalid and will return a full fullsync reponse with a reseted counter.
+
+If you want to see a live implementation of this mode, it is currently in use on the magnet dashboard on Alldebrid.
+
+ This documentation is for the /v4.1/ up-to-date endpoint. Documentation of deprecated endpoint can be found in the deprecated section.
+The above request could return JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "counter": 1,
+        "fullsync": true,
+        "magnets": [
+        {
+            "id": 123456,
+            "filename": "ubuntu-16.04.2-live-server-amd64.iso",
+            "size": 587400285,
+            "status": "Downloading",
+            "statusCode": 1,
+            "downloaded": 255400192,
+            "uploaded": 0,
+            "seeders": 7,
+            "downloadSpeed": 18874368,
+            "uploadSpeed": 0,
+            "uploadDate": 1557133868,
+            "completionDate" : 0,
+        }, {
+            "id": 234567,
+            "filename": "ubuntu-24.04.1-desktop-amd64.iso",
+            "size": 6203355136,
+            "status": "Ready",
+            "statusCode": 4,
+            "uploadDate": 1557133868,
+            "completionDate" : 1557133968,
+        },
+        ],
+    }
+}
+<?php
+// Authentificated endpoint with valid apikey
+$session = 123;
+$counter = 0;
+
+$ch = curl_init('https://api.alldebrid.com/v4.1/magnet/status');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+
+// Optional magnet id or status
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'session' => $session,
+    'counter' => $counter,
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+
+curl_close($ch);
+The above request could return JSON structured like this if successfull and some changes happened :
+
+{
+    "status": "success",
+    "data": {
+        "counter": 2,
+        "magnets": [
+            {
+                "id": 123456,
+                "downloaded": 258879224,
+                "downloadSpeed": 20587738
+            }
+        ]
+    }
+}
+The above request could return JSON structured like this if successfull but no change happended :
+
+{
+    "status": "success",
+    "data": {
+        "counter": 2,
+        "magnets": []
+    }
+}
+HTTP Request
+POST https://api.alldebrid.com/v4.1/magnet/status
+
+ Demo : First data fetch Delta sync
+Post parameters
+Parameter	Required	Type	Description
+session	false	interger	Session ID
+counter	false	interger	Counter
+Response attributes
+Key	Type	Description
+magnets	array	Array of magnet objects
+counter	integer	Counter to use on the next call
+fullsync	boolean	If returned to true, the response is the start of a new session, all data was returned and a new counter was set
+Get Files and Links
+<?php
+// Authentificated endpoint with valid apikey
+$magnetID = 123; // From magnet/status
+$magnetID2 = 456;
+$magnetID3 = 789;
+
+
+$ch = curl_init('https://api.alldebrid.com/v4/magnet/files');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+
+// Optional magnet id or status
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'id' => [ $magnetID, $magnetID2, $magnetID3 ]
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+
+curl_close($ch);
+The above request could return JSON structured like this if successfull :
+
+{
+  "status": "success",
+  "data": {
+    "magnets": [
+      {
+        "id": "123",
+        "files": [
+          {
+            "n": "ubuntu-24.10-desktop-amd64.iso",
+            "s": 5665497088,
+            "l": "https://alldebrid.com/f/xxxxxx"
+          }
+        ]
+      },
+      {
+        "id": "456",
+        "error": {
+            "code": "MAGNET_INVALID_ID",
+            "message": "This magnet ID does not exists or is invalid",
+        }
+      },
+      {
+        "id": "789",
+        "files": [
+          {
+            "n": "Subfolder",
+            "e": [
+                {
+                    "n": "subfile.txt",
+                    "s": 112345,
+                    "l": "https://alldebrid.com/f/xxxxxx"
+                },
+                {
+                    "n": "Sub-sub folder",
+                    "e": [
+                        {
+                            "n": "deep.file.txt",
+                            "s": 456,
+                            "l": "https://alldebrid.com/f/xxxxxx"
+                        },
+                        {
+                            "n": "deep.file.2.txt",
+                            "s": 7946,
+                            "l": "https://alldebrid.com/f/xxxxxx"
+                        },
+                    ]
+                },
+
+            ]
+          },
+          {
+            "n": "other.file.txt",
+            "s": 123456,
+            "l": "https://alldebrid.com/f/xxxxxx"
+          },
+          {
+            "n": "third.file.txt",
+            "s": 258147,
+            "l": "https://alldebrid.com/f/xxxxxx"
+          }
+        ]
+      },
+    ]
+  }
+}
+HTTP Request
+POST https://api.alldebrid.com/v4/magnet/files
+
+ Demo : Get files Error
+Post parameters
+Parameter	Required	Type	Description
+id	true	array of integer	Magnet ids
+Response attributes
+Key	Type	Description
+magnets	array	Array of magnet objects
+Magnet object
+Key	Type	Description
+id	integer	Magnet id
+files	array	Array of files objects
+Files property structure
+Single file at root :
+
+[{
+    "n": "some.file.avi",
+    "s" : 45466546,
+    "l": "https://alldebrid.com/f/4564654"
+}]
+Single file in subfolder :
+
+[{
+    "n": "subfolderName",
+    "e": [
+        {
+            "n": "some.file.avi",
+            "s" : 45466546,
+            "l": "https://alldebrid.com/f/4564654"
+        }
+    ]
+}]
+Single file in deeply nested subfolder :
+
+[{
+    "n": "subfolderName",
+    "e": [
+        {
+        "n": "deepSubfolder",
+        "e": [
+            {
+                "n": "some.file.avi",
+                "s" : 45466546,
+                "l": "https://alldebrid.com/f/4564654"
+            }
+        ]
+        }
+    ]
+}]
+Multiple files
+
+[
+    {
+        "n": "subfolderName",
+        "e": [
+            {
+                "n": "deepSubfolder",
+                "e": [
+                    {
+                        "n": "some.file.txt",
+                        "s" : 456546,
+                        "l": "https://alldebrid.com/f/45654"
+                    },
+                ]
+            },
+            {
+                "n": "otherSubfolder",
+                "e": [
+                    {
+                        "n": "other.file.txt",
+                        "s" : 12211,
+                        "l": "https://alldebrid.com/f/111111"
+                    },
+                ]
+            }
+        ]
+    },
+    {
+        "n": "file.at.root.avi",
+        "s" : 1000000000,
+        "l": "https://alldebrid.com/f/5555555"
+    }
+]
+files is an array of one or multiple objects representing the folder tree, with its sub-folders, sub-files and associated links. This format keeps the original magnet folder tree informations.
+
+Folder node structure :
+
+Parameter	Type	Description
+n	string	name of the folder
+e	array	sub-nodes
+File node structure :
+
+Parameter	Type	Description
+n	string	filename
+s	int	filesize
+l	string	download link
+Endpoint errors
+Code	Description
+MAGNET_INVALID_ID	Magnet ID is invalid.
+Delete
+Delete a magnet.
+
+<?php
+
+$magnetID = 123456;
+
+$ch = curl_init('https://api.alldebrid.com/v4/magnet/delete');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'id' => $magnetID
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "message": "Magnet was successfully deleted"
+    }
+}
+HTTP Request
+POST https://api.alldebrid.com/v4/magnet/delete
+
+ Demo : Delete magnet Error
+Post parameters
+Parameter	Required	Type	Description
+id	true	integer	Magnet ID.
+Endpoint errors
+Code	Description
+MAGNET_INVALID_ID	Magnet ID is invalid
+Restart
+Restart a failed magnet, or multiple failed magnets at once.
+
+<?php
+
+$magnetID = 123456;
+$magnetID2 = 9123456;
+
+$ch = curl_init('https://api.alldebrid.com/v4/magnet/restart');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'id' => $magnetID
+]));
+
+// Or multiple
+
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'ids' => [$magnetID, $magnetID2 ]
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+The above request with one ID returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "message": "Magnet was successfully restarted"
+    }
+}
+The above request with multipls IDs returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "magnets": [{
+            "magnet": "81951197",
+            "message": "Magnet was successfully restarted"
+        }, {
+            "magnet": "79101305",
+            "error": {
+                "code": "MAGNET_PROCESSING",
+                "message": "Magnet is processing or completed"
+            }
+        }]
+    }
+}
+HTTP Request
+POST https://api.alldebrid.com/v4/magnet/restart
+
+ Demo : Restart magnet Error
+Post parameters
+Parameter	Required	Type	Description
+id	false	integer	Magnet ID.
+ids	false	array	Array of Magnet ID.
+Endpoint errors
+Code	Description
+MAGNET_INVALID_ID	Magnet ID is invalid
+MAGNET_PROCESSING	Magnet is processing or completed
+User links
+Saved links
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4/user/links');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "links": [
+            {
+                "link": "https:\/\/example.com\/somefile1",
+                "filename": "somefile1.txt",
+                "size": 751267520,
+                "date": 1569420668,
+                "host": "example"
+            },
+            {
+                "link": "https:\/\/example.com\/somefile2",
+                "filename": "somefile.txt",
+                "size": 795126720,
+                "date": 1569420668,
+                "host": "example"
+            },
+            {
+                "link": "http:\/\/youtube.com\/watch?v=dQw4w9WgXcQ",
+                "filename": "",
+                "size": 0,
+                "date": 1583253075,
+                "host": "stream"
+            },
+        ]
+    }
+}
+Use this endpoint to get links the user saved for later use.
+
+HTTP Request
+GET https://api.alldebrid.com/user/links
+
+ Demo : Get user links
+Response attributes
+Key	Type	Description
+links	Array	Saved links.
+Link object
+Key	Type	Description
+link	String	Link URL.
+filename	String	Link file name.
+size	Integer	Link file size.
+date	Integer	When the link was saved.
+host	String	Link host.
+Save new link
+Save a link.
+
+<?php
+
+$myLink = 'https://example.com/somefile';
+$myLink2 = 'https://example.com/somefile2';
+
+$ch = curl_init('https://api.alldebrid.com/v4/user/links/save');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'links' => [ $myLink, $myLink2 ]
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "message": "Link was successfully saved"
+    }
+}
+HTTP Request
+POST https://api.alldebrid.com/v4/user/links/save
+
+ Demo : Save links
+Post parameters
+Parameter	Required	Type	Description
+links	true	Arrayof string	Links to save.
+Delete saved link
+Delete a saved link.
+
+<?php
+
+$myLink = 'https://example.com/somefile';
+$myLink2 = 'https://example.com/somefile2';
+
+$ch = curl_init('https://api.alldebrid.com/v4/user/links/delete');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'links' => [ $myLink, $myLink2 ]
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "message": "Link was successfully deleted"
+    }
+}
+HTTP Request
+POST https://api.alldebrid.com/v4/user/links/delete
+
+ Demo : Delete link
+Post parameters
+Parameter	Required	Type	Description
+links	false	Array of String	Links to delete.
+Recent links
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4/user/history');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "links": [
+            {
+                "link": "https:\/\/example.com\/somefile",
+                "filename": "somefile.txt",
+                "size": 751267520,
+                "date": 1569420668,
+                "host": "example"
+            },
+            {
+                "link": "https:\/\/example.com\/somefile2",
+                "filename": "somefile2.txt",
+                "size": 795126720,
+                "date": 1569420668,
+                "host": "example"
+            },
+            {
+                "link": "http:\/\/youtube.com\/watch?v=dQw4w9WgXcQ",
+                "filename": "",
+                "size": 0,
+                "date": 1583253075,
+                "host": "stream"
+            },
+        ]
+    }
+}
+Use this endpoint to get recent links. Recent link logging being disabled by default, this will return nothing until history logging has been activated in your account settings.
+
+Links older than 3 days are automatically deleted from the recent history. To keep links in your account, use the Saved links.
+
+ You HAVE to enable history links loggging in your account settings before seeing any links being saved in this recent history. Recent link logging is disabled by default.
+HTTP Request
+GET https://api.alldebrid.com/user/history
+
+ Demo : Get history
+Response attributes
+Key	Type	Description
+links	Array	Saved links.
+Link object
+Key	Type	Description
+link	String	Link URL.
+filename	String	Link file name.
+size	Integer	Link file size.
+date	Integer	When the link was saved.
+host	String	Link host.
+Purge recent links
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4/user/history/delete');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "message": "Links were successfully deleted"
+    }
+}
+Use this endpoint to delete all links currently in your recent links history. Links older than 3 days are automatically deleted from the recent history.
+
+ You HAVE to enable history links loggging in your account settings before seeing any links being saved in this recent history. Recent link logging is disabled by default.
+HTTP Request
+POST https://api.alldebrid.com/user/history/delete
+
+ Demo : Purge history
+Resellers Vouchers
+Accredited Alldebrid reseller can use these endpoints to manage vouchers and check their current balance.
+
+ All `/v4/voucher/*` endpoints are reserved exclusively for official Alldebrid reseller.
+Balance
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4/voucher/balance');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "balance": 51.6
+    }
+}
+Use this endpoint to get your current reseller balance.
+
+HTTP Request
+GET https://api.alldebrid.com/voucher/balance
+
+Response attributes
+Key	Type	Description
+balance	Float	Current reseller balance.
+Get Vouchers
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4/voucher/get');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'duration' => 30,
+    'nb' => 5
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "codes": [
+            "AAAAAA-BBBBBB-CCCCCC-DDDDDD",
+            "EEEEEE-FFFFFF-GGGGGG-HHHHHH",
+            "IIIIII-JJJJJJ-KKKKKK-LLLLLL"
+        ]
+    }
+}
+The partial list request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "codes": [
+            "MMMMMM-NNNNNN-OOOOOO-PPPPPP",
+            "QQQQQQ-RRRRRR-SSSSSS-TTTTTT",
+            "UUUUUU-VVVVVV-WWWWWW-XXXXXX",
+            "YYYYYY-ZZZZZZ-111111-222222",
+            "333333-444444-555555-666666",
+            "777777-888888-999999-000000"
+        ],
+        "partialList": true
+    }
+}
+Use this endpoint to get available vouchers from your reseller account. You must specify a duration and a voucher number. If some voucher request are available but not enough to fulfill the requested number, a partial list will be return with the associated response property set. If no voucher are available, an error will be returned.
+
+HTTP Request
+POST https://api.alldebrid.com/voucher/get
+
+Post parameters
+Parameter	Required	Description
+duration	true	One of the current voucher duration (15, 30, 90, 180, 365)
+nb	true	Number of voucher to get, between 1 and 10.
+Response attributes
+Key	Type	Description
+codes	Array	Array of generated vouchers.
+partialList	Boolean	Return as true if reseller account doesn't have enough voucher to fulfill request.
+Endpoint errors
+Code	Description
+VOUCHER_DURATION_INVALID	Invalid voucher duration (must be either 15, 30, 90, 180 or 365)
+VOUCHER_NB_INVALID	Invalid voucher number, must be between 1 and 10
+NO_MORE_VOUCHER	No voucher of this type available in your account
+Balance
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4/voucher/generate');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'duration' => 30,
+    'nb' => 2
+]));
+
+$response = curl_exec($ch);
+$result = json_decode($response);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "codes": [
+            "AAAAAA-BBBBBB-CCCCCC-DDDDDD",
+            "EEEEEE-FFFFFF-GGGGGG-HHHHHH",
+            "IIIIII-JJJJJJ-KKKKKK-LLLLLL"
+        ],
+        "pricePerVoucher": 3.2,
+        "total": 9.6,
+        "balance": 18.21
+    }
+}
+Use this endpoint to get available vouchers from your reseller account. You must specify a duration and a voucher number.
+
+HTTP Request
+POST https://api.alldebrid.com/voucher/generate
+
+Post parameters
+Parameter	Required	Description
+duration	true	One of the current voucher duration (15, 30, 90, 180, 365)
+nb	true	Number of voucher to generate, between 1 and 10.
+Response attributes
+Key	Type	Description
+codes	Array	Array of generated vouchers.
+pricePerVoucher	Float	Price paid per voucher.
+total	Float	Total price for the request.
+balance	Float	Current reseller balance after vouchers generation.
+Endpoint errors
+Code	Description
+VOUCHER_DURATION_INVALID	Invalid voucher duration (must be either 15, 30, 90, 180 or 365)
+VOUCHER_NB_INVALID	Invalid voucher number, must be between 1 and 10
+INSUFFICIENT_BALANCE	Your current reseller balance is not enough to generate the requested vouchers.
+Deprecated endpoints
+When an endpoint get a major update, it's api version is bumped and the old endpoint is flaggued as deprectated. Those deprecated endpoints return a deprecated flag alongside the status property.
+
+Deprecated endpoint documentation can be found below.
+
+V4 Available hosts
+<?php
+$ch = curl_init('https://api.alldebrid.com/v4/user/hosts');
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer someValidApikeyYouGenerated']);
+
+$response = curl_exec($ch);
+$result = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "hosts": {
+            "mega": {
+                "name": "mega",
+                "type": "premium",
+                "domains": ["mega.nz", "mega.co.nz"],
+                "regexp": "mega(\.co)?\.nz/([0-9a-zA-Z_]{20,36})",
+                "status": true
+            }
+        },
+        "streams": {
+            "youtube": {
+                "name": "youtube",
+                "type": "free",
+                "domains": [ "youtube.com", "youtu.be" ],
+                "regexps": [ "https?:\/\/(?:www\\.)?youtube\\.com\/show\/(?P<id>[^?#]*)", "https?:\/\/(?:www\\.)?youtube\\.com\/feed\/history|:ythistory" ],
+            }
+        },
+        "redirectors": {
+            "protected": {
+                "name": "protected",
+                "type": "premium",
+                "domains": ["protected.org", "protected.com"],
+                "regexp": "(protected\.com/[0-9a-zA-Z]+)|(protected\.org/[0-9a-zA-Z]+)"
+            }
+        }
+    }
+}
+ This documentation is for the deprecated /v4/ version. See Available hosts for the /v4.1/ up-to-date endpoint.
+This endpoint retrieves a complete list of all available hosts for this user. Depending of the account subscription status (free user, trial mode, premium user), the list and limitations will vary.
+
+The limits and quota are updated in real time. Use this page to have an up-to-date list of service the user can use on Alldebrid.
+
+Quotas will reset every day for premium users.
+
+HTTP Request
+GET https://api.alldebrid.com/v4/user/hosts
+
+Post parameters
+Parameter	Required	Description
+hostsOnly	false	Endpoint will only return "hosts" data
+Response attributes
+Key	Type	Description
+hosts	Object	Hosts infos.
+streams	Object	Streaming websites infos.
+redirectors	Object	Redirectors infos.
+Host object
+Key	Always returned	type	Description
+name	Yes	String	Host name.
+type	Yes	String	Either "premium" or "free". Premium hosts need a premium subscription.
+domains	Yes	Array	Host domains.
+regexps	Yes	Array	Regexps matching the supported urls for this host.
+status	No	Boolean	Is the host currently (< 5 min) working on Alldebrid (only tested on some hosts, updated every ~ 10 min).
+quota	No	Integer	Remaining quota for this host, if any.
+quotaMax	No	Integer	Daily quota for this host, if any.
+quotaType	No	String	Specify if the quota is the remaining traffic available in MB ("traffic" type) or the number of remaining downloads possible ("nb_download" type)
+limitSimuDl	No	Integer	We limit the number of simultaneous downloads for some hosts, this will display the remaining download slot available for the user at this time.
+/v4/ Get pin
+<?php
+
+$ch = curl_init('https://api.alldebrid.com/v4/pin/get');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+$pinInfo = json_decode($response, true);
+
+curl_close($ch);
+The above request returns JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "pin": "ABCD",
+        "check": "664c3ca2635c99f291d28e11ea18e154750bd21a",
+        "expires_in": 600,
+        "user_url": "https:\/\/alldebrid.com\/pin\/?pin=ABCD",
+        "base_url": "https:\/\/alldebrid.com\/pin\/",
+        "check_url": "https:\/\/api.alldebrid.com\/pin\/check?check=664c3ca2635c99f291d28e11ea18e154750bd21a&pin=ABCD&agent=myAppName"
+    }
+}
+ This documentation is for the deprecated /v4/ version. See Get pin for the /v4.1/ up-to-date endpoint.
+HTTP Request
+GET https://api.alldebrid.com/v4/pin/get
+
+Response attributes
+Key	Type	Description
+pin	String	Pin code to display to your user
+check	String	Check token needed for the pin/check endpoint
+expires_in	Integer	Number of second before the code expire
+user_url	String	Url to display with PIN included
+base_url	String	Base url
+check_url	String	Endpoint to pool to get auth apikey once user submitted the PIN code
+/v4/ Magnet Status
+Get the status of current magnets, or only one if you specify a magnet ID.
+
+<?php
+$context = stream_context_create([ 'http' => [ 'ignore_errors' => true ] ]); // Suppress PHP warnings on HTTP status code >= 400
+
+// Authentificated endpoint with valid apikey
+$magnetID = 123456;
+$apiEndpoint = "https://api.alldebrid.com/v4/magnet/status?apikey=someValidApikeyYouGenerated";
+$apiEndpointOnlyOne = "https://api.alldebrid.com/v4/magnet/status?apikey=someValidApikeyYouGenerated&id=" . urlencode($magnetID);
+$apiEndpointOnlyActive = "https://api.alldebrid.com/v4/magnet/status?apikey=someValidApikeyYouGenerated&status=active";
+
+$response = json_decode(file_get_contents($apiEndpoint, false, $context));
+The above request could return JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "deprecated": true,
+    "data": {
+        "magnets": [
+        {
+            "id": 123456,
+            "filename": "ubuntu-16.04.2-live-server-amd64.iso",
+            "size": 587400285,
+            "status": "Downloading",
+            "statusCode": 1,
+            "downloaded": 255400192,
+            "uploaded": 0,
+            "seeders": 7,
+            "downloadSpeed": 18874368,
+            "uploadSpeed": 0,
+            "uploadDate": 1557133868,
+            "completionDate" : 0,
+            "links": []
+        }, {
+            "id": 56789,
+            "filename": "ubuntu-20.04.2-live-server-amd64.iso",
+            "size": 256400192,
+            "status": "Ready",
+            "statusCode": 4,
+            "downloaded": 256400192,
+            "uploaded": 0,
+            "seeders": 12,
+            "downloadSpeed": 0,
+            "uploadSpeed": 0,
+            "uploadDate": 1657133868,
+            "completionDate" : 1657133968,
+            "links": [
+                {
+                    "link": "https:\/\/alldebrid.com\/f\/aaaabbbbzzzz",
+                    "filename": "ubuntu-20.04.2-live-server-amd64.iso",
+                    "size": 256458252,
+                    "files": [
+                        {
+                            "n": "ubuntu-20.04.2-live-server-amd64.iso"
+                        }
+                    ]
+                },
+                {
+                    "link": "https:\/\/alldebrid.com\/f\/aaaabbbbqqqq",
+                    "filename": "ubuntu-20.04.2-full-package-server-amd64.iso",
+                    "size": 256458252,
+                    "files": [
+                        {
+                            "n": "full-package",
+                            "e": [
+                                {
+                                    "n": "ubuntu-20.04.2-full-server-amd64.iso"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "link": "https:\/\/alldebrid.com\/f\/aaaabbbbxxxx",
+                    "filename": "ubuntu-20.04.2-live-server-amd64.rar",
+                    "size": 7845117,
+                    "files": [
+                        {
+                            "n": "docs",
+                            "e": [
+                                {
+                                    "n": "README.txt"
+                                },
+                                {
+                                    "n": "INSTALL.txt"
+                                },
+                                {
+                                    "n": "french",
+                                    "e": [
+                                        {
+                                            "n": "LISEZ-MOI.txt"
+                                        },
+                                        {
+                                            "n": "INSTALLATION.txt"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "n": "some.other.file.in.root.folder.zip",
+                        }
+                    ]
+                }
+            ],
+        }]
+    }
+}
+HTTP Request
+POST https://api.alldebrid.com/v4/magnet/status
+
+Post parameters
+Parameter	Required	Type	Description
+id	false	interger	Magnet ID.
+status	false	string	Magnets status filter. Either active, ready, expired or error
+session	false	interger	Session ID for Live mode (see Live Mode).
+counter	false	interger	Counter for Live mode (see Live Mode).
+Response attributes
+Key	Type	Description
+magnets	array	Array of magnet objects
+Magnet object
+Key	Type	Description
+id	integer	Magnet id.
+filename	string	Magnet filename.
+size	integer	Magnet filesize.
+status	string	Status in plain English.
+statusCode	integer	Status code. See next table.
+downloaded	integer	Downloaded data so far.
+uploaded	integer	Uploaded data so far.
+seeders	integer	Seeders count.
+downloadSpeed	integer	Download speed.
+uploadSpeed	integer	Upload speed.
+uploadDate	integer	Timestamp of the date of the magnet upload.
+completionDate	integer	Timestamp of the date of the magnet completion.
+links	array of object	an array of link objects
+Link object
+Key	Type	Description
+link	integer	Download link
+filename	string	File name
+size	integer	File size.
+files	array	different format depending of version property
+files is an array of 1 or multiple objects representing the folder and files of the file or files. This format keep folder path informations.
+
+Each object always have a name n string property, and an entries e array property if the object represent a folder.
+
+Single file at root : [{"n": "some.file.avi"}]
+
+Single file in subfolder : [{ "n": "subfolderName", "e": [ {"n": "some.file.avi"} ] }]
+
+Single file in deeply nested subfolder : [{ "n": "subfolderName", "e": [{ "n": "deepSubfolder", "e": [ {"n": "some.file.avi"} ] }] }]
+
+Multiple files [ { "n": "subfolderName", "e": [ {"n": "some.file.txt"}, { "n": "deepSubfolder", "e": [ {"n": "some.file.txt"}, {"n": "some.file2.doc"}, {"n": "some.file3.doc"} ] }, { "n": "otherSubfolder", "e": [ {"n": "other.file.txt"}, {"n": "other.file2.doc"} ] } ] }, {"n": "file.at.root.avi"} ]
+
+Status code
+Code	Type	Description
+0	Processing	In Queue.
+1	Processing	Downloading.
+2	Processing	Compressing / Moving.
+3	Processing	Uploading.
+4	Finished	Ready.
+5	Error	Upload fail.
+6	Error	Internal error on unpacking.
+7	Error	Not downloaded in 20 min.
+8	Error	File too big.
+9	Error	Internal error.
+10	Error	Download took more than 72h.
+11	Error	Deleted on the hoster website
+Endpoint errors
+Code	Description
+MAGNET_INVALID_ID	Magnet ID is invalid.
+/v4/ Magnet Status - Live Mode
+ This documentation is for the deprecated /v4/ version. See Get Status - Live Mode for the /v4.1/ up-to-date endpoint.
+The Live Mode allows to only get the new data of the status of current magnets. It is designed to make a "live" panel or monitoring system more performant when consuming the magnet/status endpoint very frequently.
+
+It requires a session ID and a counter, and using cache on the API side only the differences between the last state and the current state are sent, greatly reducing the amount of data returned by the API on each call.
+
+The client using this mode must keep the current state of the magnets status locally between each call in order to apply the new data on the last state to get the whole current state.
+
+A fixed session ID (integer) must be randomly set, and a counter starting at 0 will be used. On the first call (id=123, counter=0) with a new session ID, all the current data will be sent back, with the fullsync property set to true to make it clear, and the next counter to use. On the next call the updated counter is used (id=123, counter=1), and only the differences with the previous state will be send back.
+
+If the magnets property returned is empty, then no change happened since the last call. If some changes happened, the magnets array will have some magnet objects (see Status) with its id and the properties changed, like this :
+
+{ "id": 123456, "downloaded": 258879224, "downloadSpeed": 20587738 }
+
+You can them apply those diff to the last state you kept to get the current magnets status state.
+
+If you send a counter that is not in sync with the last call response (like sending the same counter twice in a row), then the endpoint will consider your counter invalid and will return a full fullsync reponse with a reseted counter.
+
+If you want to see a live implementation of this mode, it is currently in use on the magnet dashboard on Alldebrid.
+
+<?php
+$context = stream_context_create([ 'http' => [ 'ignore_errors' => true ] ]); // Suppress PHP warnings on HTTP status code >= 400
+
+// Authentificated endpoint with valid apikey
+$session = 123;
+$counter = 0;
+
+$apiEndpoint = "https://api.alldebrid.com/v4/magnet/status?apikey=someValidApikeyYouGenerated&session=" . urlencode($session) . "&counter=" . urlencode($counter);
+
+$response = json_decode(file_get_contents($apiEndpoint, false, $context));
+
+
+The above request could return JSON structured like this if successfull :
+
+{
+    "status": "success",
+    "data": {
+        "counter": 1,
+        "fullsync": true,
+        "magnets": [
+        {
+            "id": 123456,
+            "filename": "ubuntu-16.04.2-live-server-amd64.iso",
+            "size": 587400285,
+            "status": "Downloading",
+            "statusCode": 1,
+            "downloaded": 255400192,
+            "uploaded": 0,
+            "seeders": 7,
+            "downloadSpeed": 18874368,
+            "uploadSpeed": 0,
+            "uploadDate": 1557133868,
+            "completionDate" : 0,
+            "links": []
+        }, {
+            "id": 234567,
+            "filename": "ubuntu-18.04.2-live-server-amd64.iso",
+            "size": 699400192,
+            "status": "Ready",
+            "statusCode": 4,
+            "downloaded": 699400192,
+            "uploaded": 0,
+            "seeders": 7,
+            "downloadSpeed": 0,
+            "uploadSpeed": 0,
+            "uploadDate": 1557133868,
+            "completionDate" : 1557133968,
+            "links": [
+                {
+                    "link": "https:\/\/alldebrid.com\/f\/aaaabbbbcccc",
+                    "filename": "ubuntu-18.04.2-live-server-amd64.iso",
+                    "size": 685458252,
+                    "files": null
+                },
+                {
+                    "link": "https:\/\/alldebrid.com\/f\/aaaabbbbdddd",
+                    "filename": "ubuntu-18.04.2-live-server-amd64.rar",
+                    "size": 7845117,
+                    "files": [
+                        "README.txt",
+                        "some.other.file.zip"
+                    ]
+                }
+            ],
+        }]
+    }
+}
+<?php
+$context = stream_context_create([ 'http' => [ 'ignore_errors' => true ] ]); // Suppress PHP warnings on HTTP status code >= 400
+
+// Authentificated endpoint with valid apikey
+$session = 123;
+$counter = 1;
+
+$apiEndpoint = "https://api.alldebrid.com/v4/magnet/status?apikey=someValidApikeyYouGenerated&session=" . urlencode($session) . "&counter=" . urlencode($counter);
+
+$response = json_decode(file_get_contents($apiEndpoint, false, $context));
+
+
+The above request could return JSON structured like this if successfull and some changes happened :
+
+{
+    "status": "success",
+    "data": {
+        "counter": 2,
+        "magnets": [
+            {
+                "id": 123456,
+                "downloaded": 258879224,
+                "downloadSpeed": 20587738
+            }
+        ]
+    }
+}
+The above request could return JSON structured like this if successfull but no change happended :
+
+{
+    "status": "success",
+    "data": {
+        "counter": 2,
+        "magnets": []
+    }
+}
+HTTP Request
+GET https://api.alldebrid.com/v4/magnet/status?apikey=someValidApikeyYouGenerated&session=123&counter=0
+
+GET https://api.alldebrid.com/v4/magnet/status?apikey=someValidApikeyYouGenerated&session=123&counter=1
+
+Post parameters
+Parameter	Required	Type	Description
+apikey	true	string	User apikey.
+session	false	interger	Session ID
+counter	false	interger	Counter
+Response attributes
+Key	Type	Description
+magnets	array	Array of magnet objects
+counter	integer	Counter to use on the next call
+fullsync	boolean	If returned to true, the response is the start of a new session, all data was returned and a new counter was set
+All errors
+<?php
+$apiErrors = [
+    "GENERIC" => "An orror occured",
+    "404" => "Endpoint doesn't exist",
+    "MAINTENANCE" => "Alldebrid is under maintenance, please retry later",
+    "AUTH_MISSING_APIKEY" => "The auth apikey was not sent",
+    "AUTH_BAD_APIKEY" => "The auth apikey is invalid",
+    "AUTH_BLOCKED" => "This apikey is geo-blocked or ip-blocked",
+    "AUTH_USER_BANNED" => "This account is banned",
+    "ALREADY_SENT" => "The verification email has already been sent again",
+    "NO_SERVER" => "Servers are not allowed to use this feature. Visit https://alldebrid.com/vpn if you're using a VPN.",
+    "LINK_IS_MISSING" => "No link was sent",
+    "BAD_LINK" => "Sent link in not valid",
+    "LINK_HOST_NOT_SUPPORTED" => "This host or link is not supported",
+    "LINK_DOWN" => "This link is not available on the file hoster website",
+    "LINK_PASS_PROTECTED" => "Link is password protected",
+    "LINK_HOST_UNAVAILABLE" => "Host under maintenance or not available",
+    "LINK_TOO_MANY_DOWNLOADS" => "Too many concurrent downloads for this host",
+    "LINK_HOST_FULL" => "All servers are full for this host, please retry later",
+    "LINK_HOST_LIMIT_REACHED" => "You have reached the download limit for this host",
+    "LINK_ERROR" => "Could not unlock this link",
+    "LINK_TEMPORARY_UNAVAILABLE" => "The link is temporary unavalible on the website",
+    "LINK_NOT_SUPPORTED" => "The link is not supported for this host",
+    "REDIRECTOR_NOT_SUPPORTED" => "Redirector not supported",
+    "REDIRECTOR_ERROR" => "Could not extract links",
+    "STREAM_INVALID_GEN_ID" => "Invalid generation ID",
+    "STREAM_INVALID_STREAM_ID" => "Invalid stream ID",
+    "DELAYED_INVALID_ID" => "This delayed link id is invalid",
+    "FREE_TRIAL_LIMIT_REACHED" => "You have reached the free trial limit (7 days / 25GB downloaded or host uneligible for free trial)",
+    "MUST_BE_PREMIUM" => "You must be premium to process this link",
+    "MAGNET_INVALID_ID" => "This magnet ID does not exists or is invalid",
+    "MAGNET_INVALID_URI" => "Magnet is not valid",
+    "MAGNET_INVALID_FILE" => "File is not a valid torrent",
+    "MAGNET_FILE_UPLOAD_FAILED" => "File upload failed",
+    "MAGNET_NO_URI" => "No magnet sent",
+    "MAGNET_PROCESSING" => "Magnet is processing or completed",
+    "MAGNET_TOO_MANY_ACTIVE" => "Already have maximum allowed active magnets (30)",
+    "MAGNET_TOO_MANY" => "Magnets limit reached (1000 accross all tabs)",
+    "MAGNET_MUST_BE_PREMIUM" => "You must be premium to use this feature",
+    "MAGNET_TOO_LARGE" => "Magnet files are too large (max 1TB)",
+    "MAGNET_UPLOAD_FAILED" => "Upload fail",
+    "MAGNET_INTERNAL_ERROR" => "Internal error",
+    "MAGNET_CANT_BOOTSTRAP" => "Not downloaded in 20 min",
+    "MAGNET_MAGNET_TOO_BIG" => "File too big, more than 1TB",
+    "MAGNET_TOOK_TOO_LONG" => "Download took more than 72h",
+    "MAGNET_LINKS_REMOVED" => "Removed from hoster website",
+    "MAGNET_PROCESSING_FAILED" => "Proccessing failed (bad torrent ?)",
+    "PIN_ALREADY_AUTHED" => "You already have a valid auth apikey",
+    "PIN_EXPIRED" => "The pin is expired",
+    "PIN_INVALID" => "The pin is invalid",
+    "USER_LINK_MISSING" => "No link provided",
+    "USER_LINK_INVALID" => "Can't save those links",
+    "MISSING_NOTIF_ENDPOINT" => "You must provide an endpoint to unsubscribe",
+    "VOUCHER_DURATION_INVALID" => "Duration is invalid",
+    "VOUCHER_NB_INVALID" => "Voucher number is invalid",
+    "NO_MORE_VOUCHER" => "No more available vouchers for this duration",
+    "INSUFFICIENT_BALANCE" => "No enough balance",
+    "DOWNLOAD_FAILED" => "Download failed",
+    "ACCOUNT_INVALID" => "This account doens't have access to this endpoint",
+    "NO_JSON_PARAM" => "Missing json payload",
+    "JSON_INVALID" => "json payload is not valid JSON",
+    "FREEDAYS_INVALID_COUNTRY" => "Invalid country code",
+    "FREEDAYS_INVALID_PHONE" => "Invalid phone",
+    "FREEDAYS_INVALID_PROVIDER" => "Invalid provider",
+    "FREEDAYS_USED_PHONE" => "Phone number already used",
+    "FREEDAYS_ALREADY_REQUESTED" => "A freedays request has already been started",
+    "FREEDAYS_INVALID_STATUS" => "Bad status",
+    "FREEDAYS_TOO_MUCH_RETRIES" => "Too much retries",
+    "FREEDAYS_INVALID_CODE" => "Invalid code",
+    "FREEDAYS_DENIED" => "Freedays can't be activated",
+    "FREEDAYS_ERROR_SENDING" => "Could not send the message",
+];
+You can find all possible errors here, available in PHP array and JSON format if needed.
+
+Some errors will return an HTTP code 401 or 429, depending of the error.
+
+Code	Description
+GENERIC	An orror occured
+404	Endpoint doesn't exist
+MAINTENANCE	Alldebrid is under maintenance, please retry later
+AUTH_MISSING_APIKEY	The auth apikey was not sent
+AUTH_BAD_APIKEY	The auth apikey is invalid
+AUTH_BLOCKED	This apikey is geo-blocked or ip-blocked
+AUTH_USER_BANNED	This account is banned
+ALREADY_SENT	The verification email has already been sent again
+NO_SERVER	Servers are not allowed to use this feature. Visit https://alldebrid.com/vpn if you're using a VPN.
+LINK_IS_MISSING	No link was sent
+BAD_LINK	Sent link in not valid
+LINK_HOST_NOT_SUPPORTED	This host or link is not supported
+LINK_DOWN	This link is not available on the file hoster website
+LINK_PASS_PROTECTED	Link is password protected
+LINK_HOST_UNAVAILABLE	Host under maintenance or not available
+LINK_TOO_MANY_DOWNLOADS	Too many concurrent downloads for this host
+LINK_HOST_FULL	All servers are full for this host, please retry later
+LINK_HOST_LIMIT_REACHED	You have reached the download limit for this host
+LINK_ERROR	Could not unlock this link
+LINK_TEMPORARY_UNAVAILABLE	The link is temporary unavalible on the website
+LINK_NOT_SUPPORTED	The link is not supported for this host
+REDIRECTOR_NOT_SUPPORTED	Redirector not supported
+REDIRECTOR_ERROR	Could not extract links
+STREAM_INVALID_GEN_ID	Invalid generation ID
+STREAM_INVALID_STREAM_ID	Invalid stream ID
+DELAYED_INVALID_ID	This delayed link id is invalid
+FREE_TRIAL_LIMIT_REACHED	You have reached the free trial limit (7 days / 25GB downloaded or host uneligible for free trial)
+MUST_BE_PREMIUM	You must be premium to process this link
+MAGNET_INVALID_ID	This magnet ID does not exists or is invalid
+MAGNET_INVALID_URI	Magnet is not valid
+MAGNET_INVALID_FILE	File is not a valid torrent
+MAGNET_FILE_UPLOAD_FAILED	File upload failed
+MAGNET_NO_URI	No magnet sent
+MAGNET_PROCESSING	Magnet is processing or completed
+MAGNET_TOO_MANY_ACTIVE	Already have maximum allowed active magnets (30)
+MAGNET_TOO_MANY	Magnets limit reached (1000 accross all tabs)
+MAGNET_MUST_BE_PREMIUM	You must be premium to use this feature
+MAGNET_TOO_LARGE	Magnet files are too large (max 1TB)
+MAGNET_UPLOAD_FAILED	Upload fail
+MAGNET_INTERNAL_ERROR	Internal error
+MAGNET_CANT_BOOTSTRAP	Not downloaded in 20 min
+MAGNET_MAGNET_TOO_BIG	File too big, more than 1TB
+MAGNET_TOOK_TOO_LONG	Download took more than 72h
+MAGNET_LINKS_REMOVED	Removed from hoster website
+MAGNET_PROCESSING_FAILED	Proccessing failed (bad torrent ?)
+PIN_ALREADY_AUTHED	You already have a valid auth apikey
+PIN_EXPIRED	The pin is expired
+PIN_INVALID	The pin is invalid
+USER_LINK_MISSING	No link provided
+USER_LINK_INVALID	Can't save those links
+MISSING_NOTIF_ENDPOINT	You must provide an endpoint to unsubscribe
+VOUCHER_DURATION_INVALID	Duration is invalid
+VOUCHER_NB_INVALID	Voucher number is invalid
+NO_MORE_VOUCHER	No more available vouchers for this duration
+INSUFFICIENT_BALANCE	No enough balance
+DOWNLOAD_FAILED	Download failed
+ACCOUNT_INVALID	This account doens't have access to this endpoint
+NO_JSON_PARAM	Missing json payload
+JSON_INVALID	json payload is not valid JSON
+FREEDAYS_INVALID_COUNTRY	Invalid country code
+FREEDAYS_INVALID_PHONE	Invalid phone
+FREEDAYS_INVALID_PROVIDER	Invalid pro16/10/2024
+Changelog
+20/01/2025
+
+API : Updated /user/hosts to /v4.1/, removing streams and redirectors from the response, use /hosts to get those static data
+15/01/2025
+
+API : Removed agent and version requirements
+API : Enabled POST requests and changed the default API usage to use POST to send data
+Doc : Added All endpoints section to list all endpoints grouped by HTTP method and versions
+API : Updated /pin/get endpoint to version /v4.1/ removing the check_url response property
+17/10/2024
+
+API : Added quotaMax property to the /user/hosts endpoint
+16/10/2024
+
+API : Updated /magnet/status endpoint to version /v4.1/, moving magnets files informations to their dedicated endpoint
+API : Deprecated /v4/magnet/status in favor of /v4.1/magnet/status
+API : Added deprecation status property deprecated on deprecated endpoints
+14/11/2023
+
+API : Removed HTTP status code for 400 and 401
+16/08/2023
+
+API : Added documentaion for the reseller /user/verif/resend endpoint
+15/08/2023
+
+API : Added documentaion for the reseller /user/verif endpoint
+07/12/2022
+
+API : Added documentaion for the reseller voucher/* endpoints
+10/04/2022
+
+API : link/redirector endpoint now return encrypted links
+06/04/2021
+
+API : hosts/regexp endpoint removed
+API : added Live Mode documentation for the magnet/status endpoint
+21/08/2020
+
+API : user/links/add endpoint now accepts multiple links
+31/07/2020
+
+API : Added status filter parameter to magnet/status endpoint
+API : magnet/restart endpoint now accepts multiple IDs with the ids parameter
+API : Added completionDate property to magnet/status endpoint response
+22/07/2020
+
+API : Added isSubscribed property to user endpoint
+30/03/2020
+
+API : Added remainingTrialQuota property to user endpoint
+27/03/2020
+
+API : Documented NO_SERVER error
+API : Added hostsOnly parameter to /hosts and /user/hosts
+API : Added isTrial property to /user endpoint
+26/03/2020
+
+API : Major format change for /hosts : Added host name as keys, added "streams" properties, and unified this endpoint with /user/hosts response format, including name, type, regexp and status when available.
+API : Added "streams" properties for /hosts/domains
+API : Changed keys from host domain to host name in /hosts/priority to unify response formats across the API.
+API : Deprecating /hosts/regexps
+API : Added explicit "name" property to /user/hosts
+04/03/2020
+
+API : Documented user links endpoints : /user/links, /user/links/save, /user/links/delete, /user/history and /user/history/delete
+03/03/2020
+
+API : Added support of Authentication : Bearer <apikey>
+01/03/2020
+
+API : On /hosts, changed response format to match /user/hosts : domain and altDomains merged into the domains property.
+28/02/2020
+
+API : On /pin/get, changed expired_in property to expires_in and added an explicit check property
+API : On /user, added fidelityPoints property
+01/02/2020
+
+API : API docs creation !
+
+API : user/links/add endpoint now accepts multiple links
+
+31/07/2020
+
+API : Added status filter parameter to magnet/status endpoint
+API : magnet/restart endpoint now accepts multiple IDs with the ids parameter
+API : Added completionDate property to magnet/status endpoint response
+22/07/2020
+
+API : Added isSubscribed property to user endpoint
+30/03/2020
+
+API : Added remainingTrialQuota property to user endpoint
+27/03/2020
+
+DOC : Documented NO_SERVER error
+API : Added hostsOnly parameter to /hosts and /user/hosts
+API : Added isTrial property to /user endpoint
+26/03/2020
+
+API : Major format change for /hosts : Added host name as keys, added "streams" properties, and unified this endpoint with /user/hosts response format, including name, type, regexp and status when available.
+API : Added "streams" properties for /hosts/domains
+API : Changed keys from host domain to host name in /hosts/priority to unify response formats across the API.
+API : Deprecating /hosts/regexps
+API : Added explicit "name" property to /user/hosts
+04/03/2020
+
+DOC : Documented user links endpoints : /user/links, /user/links/save, /user/links/delete, /user/history and /user/history/delete

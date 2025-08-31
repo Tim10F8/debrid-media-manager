@@ -162,7 +162,7 @@ export const fetchAllDebrid = async (
 	try {
 		// Step 1: Get all magnets from AllDebrid
 		const response = await getMagnetStatus(adKey);
-		const magnetInfos = response.data.magnets;
+		const magnetInfos = response.data?.magnets || [];
 
 		if (!magnetInfos.length) {
 			await callback([]);
@@ -238,7 +238,7 @@ function convertToAllDebridUserTorrent(magnetInfo: MagnetStatus): UserTorrent {
 		}
 	}
 
-	const date = new Date(magnetInfo.uploadDate * 1000);
+	const date = new Date((magnetInfo.uploadDate || 0) * 1000);
 	const serviceStatus = `${magnetInfo.statusCode}`;
 	// Explicitly type the destructured values
 	const [adStatus, adProgress] = getAdStatus(magnetInfo);
@@ -261,9 +261,9 @@ function convertToAllDebridUserTorrent(magnetInfo: MagnetStatus): UserTorrent {
 		title: getMediaId(info, mediaType, false) || magnetInfo.filename,
 		id: `ad:${magnetInfo.id}`,
 		filename: magnetInfo.filename,
-		hash: magnetInfo.hash,
+		hash: magnetInfo.hash || '',
 		bytes: magnetInfo.size,
-		seeders: magnetInfo.seeders,
+		seeders: magnetInfo.seeders || 0,
 		progress: adProgress,
 		status: adStatus,
 		serviceStatus,
@@ -348,12 +348,12 @@ export const convertToTbUserTorrent = (info: TorBoxTorrentInfo): UserTorrent => 
 			fileId: index,
 			filename: file.name,
 			filesize: file.size,
-			link: file.s3_path,
+			link: file.s3_path || '',
 		})) ?? [];
 
 	return {
 		id: `tb:${info.id}`,
-		links: selectedFiles.map((f) => f.link),
+		links: selectedFiles.map((f) => f.link).filter(Boolean),
 		seeders: info.seeds,
 		speed: info.download_speed,
 		title:
@@ -386,7 +386,7 @@ const getAdStatus = (magnetInfo: MagnetStatus): [UserTorrentStatus, number] => {
 		case 2:
 		case 3:
 			status = UserTorrentStatus.downloading;
-			progress = (magnetInfo.downloaded / (magnetInfo.size || 1)) * 100;
+			progress = ((magnetInfo.downloaded || 0) / (magnetInfo.size || 1)) * 100;
 			break;
 		case 4:
 			status = UserTorrentStatus.finished;

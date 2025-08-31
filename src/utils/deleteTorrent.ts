@@ -44,7 +44,7 @@ export const handleDeleteTbTorrent = async (
 	disableToast: boolean = false
 ) => {
 	try {
-		await deleteTbTorrent(tbKey, id.substring(3));
+		await deleteTbTorrent(tbKey, parseInt(id.substring(3)));
 		if (!disableToast) toast(`Torrent deleted (${id})`, magnetToastOptions);
 	} catch (error) {
 		console.error(

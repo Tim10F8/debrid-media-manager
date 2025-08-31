@@ -115,6 +115,19 @@ export interface TorBoxResponse<T = any> {
 	data: T;
 }
 
+export interface TorBoxFile {
+	id: number;
+	md5?: string;
+	s3_path?: string;
+	name: string;
+	size: number;
+	mimetype?: string;
+	short_name?: string;
+	path?: string;
+	bytes?: number;
+	selected?: number;
+}
+
 export interface TorBoxTorrentInfo {
 	id: number;
 	hash: string;
@@ -138,7 +151,7 @@ export interface TorBoxTorrentInfo {
 	expires_at: string;
 	download_present: boolean;
 	download_finished: boolean;
-	files: any[];
+	files: TorBoxFile[];
 	inactive_check: number;
 	availability: number;
 }
@@ -173,4 +186,60 @@ export interface TorBoxStats {
 	total_torrent_downloads: number;
 	total_web_downloads: number;
 	total_servers: number;
+}
+
+export interface TorBoxCachedItem {
+	name: string;
+	size: number;
+	hash: string;
+	files?: Array<{
+		name: string;
+		size: number;
+	}>;
+}
+
+export interface TorBoxCachedResponse {
+	[hash: string]: TorBoxCachedItem;
+}
+
+export interface TorBoxTorrentMetadata {
+	name: string;
+	hash: string;
+	size: number;
+	trackers: string[];
+	seeds: number;
+	peers: number;
+	files: Array<{
+		name: string;
+		size: number;
+	}>;
+}
+
+export interface TorBoxCreateTorrentResponse {
+	torrent_id?: number;
+	queued_id?: number;
+	auth_id?: string;
+	hash?: string;
+}
+
+export interface TorBoxUsenetDownload {
+	id: number;
+	hash: string;
+	created_at: string;
+	updated_at: string;
+	name: string;
+	original_name: string;
+	size: number;
+	original_size: number;
+	active: boolean;
+	auth_id: string;
+	download_state: string;
+	progress: number;
+	download_speed: number;
+	eta: number;
+	server: number;
+	expires_at: string;
+	download_present: boolean;
+	download_finished: boolean;
+	files: TorBoxFile[];
 }

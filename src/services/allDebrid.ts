@@ -1,88 +1,64 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import getConfig from 'next/config';
 
 const { publicRuntimeConfig: config } = getConfig();
 
-interface PinResponse {
-	status: string;
-	data: {
-		pin: string;
-		check: string;
-		expires_in: number;
-		user_url: string;
-		base_url: string;
-		check_url: string;
-	};
-}
-
-export const getPin = async () => {
-	try {
-		let endpoint = `${config.allDebridHostname}/v4/pin/get?agent=${config.allDebridAgent}`;
-		const response = await axios.get<PinResponse>(endpoint);
-		return response.data.data;
-	} catch (error) {
-		console.error('Error fetching PIN:', (error as any).message);
-		throw error;
-	}
-};
-
-interface PinCheckResponse {
-	status: string;
-	data: {
-		activated: boolean;
-		expires_in: number;
-		apikey?: string;
-	};
-}
-
-export const checkPin = async (pin: string, check: string) => {
-	let endpoint = `${config.allDebridHostname}/v4/pin/check?agent=${config.allDebridAgent}&check=${check}&pin=${pin}`;
-	try {
-		let pinCheck = await axios.get<PinCheckResponse>(endpoint);
-
-		while (!pinCheck.data.data.activated) {
-			await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds before polling again.
-			pinCheck = await axios.get<PinCheckResponse>(endpoint);
-		}
-
-		return pinCheck.data;
-	} catch (error) {
-		console.error('Error checking PIN:', (error as any).message);
-		throw error;
-	}
-};
-
-interface UserResponse {
-	status: string;
-	data: {
-		user: {
-			username: string;
-			email: string;
-			isPremium: boolean;
-			isSubscribed: boolean;
-			isTrial: boolean;
-			premiumUntil: number;
-			lang: string;
-			preferedDomain: string;
-			fidelityPoints: number;
-			limitedHostersQuotas: Record<string, number>;
-			remainingTrialQuota?: number;
-			notifications: string[];
+// Helper function to create axios config with Bearer token
+const getAxiosConfig = (apikey?: string): AxiosRequestConfig => {
+	const axiosConfig: AxiosRequestConfig = {};
+	if (apikey) {
+		axiosConfig.headers = {
+			Authorization: `Bearer ${apikey}`,
 		};
+	}
+	return axiosConfig;
+};
+
+// API Response wrapper
+interface ApiResponse<T> {
+	status: 'success' | 'error';
+	data?: T;
+	error?: {
+		code: string;
+		message: string;
 	};
 }
 
-export const getAllDebridUser = async (apikey: string) => {
-	let endpoint = `${config.allDebridHostname}/v4/user?agent=${config.allDebridAgent}&apikey=${apikey}`;
-	try {
-		const response = await axios.get<UserResponse>(endpoint);
-		return response.data.data.user;
-	} catch (error) {
-		console.error('Error fetching user info:', (error as any).message);
-		throw error;
-	}
-};
+// Pin interfaces
+interface PinData {
+	pin: string;
+	check: string;
+	expires_in: number;
+	user_url: string;
+	base_url: string;
+	check_url?: string; // For backward compatibility
+}
 
+interface PinCheckData {
+	activated: boolean;
+	expires_in: number;
+	apikey?: string;
+}
+
+// User interfaces
+interface UserData {
+	user: {
+		username: string;
+		email: string;
+		isPremium: boolean;
+		isSubscribed: boolean;
+		isTrial: boolean;
+		premiumUntil: number;
+		lang: string;
+		preferedDomain: string;
+		fidelityPoints: number;
+		limitedHostersQuotas: Record<string, number>;
+		remainingTrialQuota?: number;
+		notifications: string[];
+	};
+}
+
+// Magnet interfaces
 interface MagnetObject {
 	magnet: string;
 	name?: string;
@@ -96,48 +72,11 @@ interface MagnetObject {
 	};
 }
 
-interface MagnetUploadResponse {
-	status: string;
-	data: {
-		magnets: MagnetObject[];
-	};
+interface MagnetUploadData {
+	magnets: MagnetObject[];
 }
 
-export const uploadMagnet = async (apikey: string, hashes: string[]) => {
-	try {
-		let endpoint = `${config.allDebridHostname}/v4/magnet/upload?agent=${config.allDebridAgent}&apikey=${apikey}`;
-		for (const hash of hashes) {
-			endpoint += `&magnets[]=${hash}`;
-		}
-		const response = await axios.post<MagnetUploadResponse>(endpoint);
-		return response.data;
-	} catch (error) {
-		console.error('Error uploading magnet:', (error as any).message);
-		throw error;
-	}
-};
-
-export interface MagnetStatus {
-	id: number;
-	filename: string;
-	size: number;
-	hash: string;
-	status: string;
-	statusCode: number;
-	downloaded: number;
-	uploaded: number;
-	processingPerc: number;
-	seeders: number;
-	downloadSpeed: number;
-	uploadSpeed: number;
-	uploadDate: number;
-	completionDate: number;
-	links: LinkObject[];
-	type: string;
-	notified: boolean;
-	version: number;
-}
-
+// For backward compatibility with existing code
 interface LinkObject {
 	link: string;
 	filename: string;
@@ -145,11 +84,202 @@ interface LinkObject {
 	files: { n: string; s?: number }[];
 }
 
+export interface MagnetStatus {
+	id: number;
+	filename: string;
+	size: number;
+	hash?: string;
+	status: string;
+	statusCode: number;
+	downloaded?: number;
+	uploaded?: number;
+	processingPerc?: number;
+	seeders?: number;
+	downloadSpeed?: number;
+	uploadSpeed?: number;
+	uploadDate?: number;
+	completionDate?: number;
+	links: LinkObject[]; // For backward compatibility
+	type?: string;
+	notified?: boolean;
+	version?: number;
+	files?: MagnetFile[]; // v4.1 structure
+}
+
+interface MagnetStatusData {
+	magnets: MagnetStatus[];
+	counter?: number;
+	fullsync?: boolean;
+}
+
+export interface MagnetFile {
+	n: string; // name
+	s?: number; // size
+	l?: string; // link
+	e?: MagnetFile[]; // sub-entries (folders)
+}
+
+interface MagnetFilesData {
+	magnets: Array<{
+		id: string;
+		files?: MagnetFile[];
+		error?: {
+			code: string;
+			message: string;
+		};
+	}>;
+}
+
+interface MagnetDeleteData {
+	message: string;
+}
+
+interface MagnetRestartData {
+	message?: string;
+	magnets?: Array<{
+		magnet: string;
+		message?: string;
+		error?: {
+			code: string;
+			message: string;
+		};
+	}>;
+}
+
+interface MagnetInstantData {
+	data: {
+		magnets: Array<{
+			magnet: string;
+			hash: string;
+			instant: boolean;
+			files?: MagnetFile[];
+			error?: {
+				code: string;
+				message: string;
+			};
+		}>;
+	};
+}
+
+// Response type to maintain backward compatibility
 interface MagnetStatusResponse {
 	status: string;
 	data: {
 		magnets: MagnetStatus[];
 	};
+}
+
+// Public endpoints (no auth required)
+export const getPin = async (): Promise<PinData> => {
+	try {
+		const endpoint = `${config.allDebridHostname}/v4.1/pin/get`;
+		const response = await axios.get<ApiResponse<PinData>>(endpoint);
+
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Unknown error');
+		}
+
+		return response.data.data!;
+	} catch (error) {
+		console.error('Error fetching PIN:', (error as any).message);
+		throw error;
+	}
+};
+
+export const checkPin = async (pin: string, check: string): Promise<PinCheckData> => {
+	const endpoint = `${config.allDebridHostname}/v4/pin/check`;
+	try {
+		let pinCheck = await axios.post<ApiResponse<PinCheckData>>(endpoint, {
+			pin,
+			check,
+		});
+
+		if (pinCheck.data.status === 'error') {
+			throw new Error(pinCheck.data.error?.message || 'Unknown error');
+		}
+
+		while (!pinCheck.data.data!.activated) {
+			await new Promise((resolve) => setTimeout(resolve, 5000));
+			pinCheck = await axios.post<ApiResponse<PinCheckData>>(endpoint, {
+				pin,
+				check,
+			});
+
+			if (pinCheck.data.status === 'error') {
+				throw new Error(pinCheck.data.error?.message || 'Unknown error');
+			}
+		}
+
+		// Return in old format for backward compatibility
+		return pinCheck.data.data!;
+	} catch (error) {
+		console.error('Error checking PIN:', (error as any).message);
+		throw error;
+	}
+};
+
+// Authenticated endpoints
+export const getAllDebridUser = async (apikey: string) => {
+	const endpoint = `${config.allDebridHostname}/v4/user`;
+	try {
+		const response = await axios.get<ApiResponse<UserData>>(endpoint, getAxiosConfig(apikey));
+
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Unknown error');
+		}
+
+		return response.data.data!.user;
+	} catch (error) {
+		console.error('Error fetching user info:', (error as any).message);
+		throw error;
+	}
+};
+
+export const uploadMagnet = async (apikey: string, hashes: string[]): Promise<MagnetUploadData> => {
+	try {
+		const endpoint = `${config.allDebridHostname}/v4/magnet/upload`;
+		const response = await axios.post<ApiResponse<MagnetUploadData>>(
+			endpoint,
+			{ magnets: hashes },
+			getAxiosConfig(apikey)
+		);
+
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Unknown error');
+		}
+
+		return response.data.data!;
+	} catch (error) {
+		console.error('Error uploading magnet:', (error as any).message);
+		throw error;
+	}
+};
+
+// Helper function to convert MagnetFile structure to LinkObject for backward compatibility
+function convertFilesToLinks(files?: MagnetFile[]): LinkObject[] {
+	if (!files || files.length === 0) return [];
+
+	const links: LinkObject[] = [];
+
+	function processFile(file: MagnetFile, parentPath: string = ''): void {
+		const fullPath = parentPath ? `${parentPath}/${file.n}` : file.n;
+
+		if (file.l) {
+			// It's a file with a link
+			links.push({
+				link: file.l,
+				filename: fullPath,
+				size: file.s || 0,
+				files: [],
+			});
+		} else if (file.e) {
+			// It's a folder with sub-entries
+			file.e.forEach((subFile) => processFile(subFile, fullPath));
+		}
+	}
+
+	files.forEach((file) => processFile(file));
+	return links;
 }
 
 export const getMagnetStatus = async (
@@ -159,87 +289,156 @@ export const getMagnetStatus = async (
 	session?: number,
 	counter?: number
 ): Promise<MagnetStatusResponse> => {
-	let endpoint = `${config.allDebridHostname}/v4/magnet/status?agent=${config.allDebridAgent}&apikey=${apikey}`;
+	const endpoint = `${config.allDebridHostname}/v4.1/magnet/status`;
+	const params: any = {};
+
 	if (magnetId) {
-		endpoint += `&id=${magnetId}`;
+		params.id = magnetId;
 	} else if (statusFilter) {
-		endpoint += `&status=${statusFilter}`;
+		params.status = statusFilter;
 	}
-	if (session) {
-		endpoint += `&session=${session}`;
+
+	if (session !== undefined) {
+		params.session = session;
 	}
-	if (counter) {
-		endpoint += `&counter=${counter}`;
+
+	if (counter !== undefined) {
+		params.counter = counter;
 	}
+
 	try {
-		const response = await axios.get<MagnetStatusResponse>(endpoint);
-		return response.data;
+		const response = await axios.post<ApiResponse<MagnetStatusData>>(
+			endpoint,
+			params,
+			getAxiosConfig(apikey)
+		);
+
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Unknown error');
+		}
+
+		// Get files for ready magnets if needed (for backward compatibility)
+		const magnets = response.data.data!.magnets;
+		const readyMagnets = magnets.filter((m) => m.statusCode === 4);
+
+		if (readyMagnets.length > 0 && !magnetId) {
+			// Batch fetch files for ready magnets
+			try {
+				const filesResponse = await getMagnetFiles(
+					apikey,
+					readyMagnets.map((m) => m.id)
+				);
+
+				// Map files back to magnets
+				filesResponse.magnets.forEach((fileData) => {
+					const magnet = magnets.find((m) => m.id === parseInt(fileData.id));
+					if (magnet && fileData.files) {
+						magnet.files = fileData.files;
+						magnet.links = convertFilesToLinks(fileData.files);
+					}
+				});
+			} catch (error) {
+				console.warn('Failed to fetch magnet files:', error);
+				// Initialize empty links array for backward compatibility
+				magnets.forEach((m) => {
+					if (!m.links) m.links = [];
+				});
+			}
+		} else {
+			// Initialize empty links array for backward compatibility
+			magnets.forEach((m) => {
+				if (!m.links) m.links = [];
+			});
+		}
+
+		// Return in old format for backward compatibility
+		return {
+			status: response.data.status,
+			data: {
+				magnets: magnets,
+			},
+		};
 	} catch (error) {
 		console.error('Error fetching magnet status:', (error as any).message);
 		throw error;
 	}
 };
 
-interface MagnetDeleteResponse {
-	message: string;
-}
+export const getMagnetFiles = async (
+	apikey: string,
+	magnetIds: number[]
+): Promise<MagnetFilesData> => {
+	const endpoint = `${config.allDebridHostname}/v4/magnet/files`;
 
-export const deleteMagnet = async (apikey: string, id: string): Promise<MagnetDeleteResponse> => {
-	let endpoint = `${config.allDebridHostname}/v4/magnet/delete?agent=${config.allDebridAgent}&apikey=${apikey}&id=${id}`;
 	try {
-		const response = await axios.get<MagnetDeleteResponse>(endpoint);
-		return response.data;
+		const response = await axios.post<ApiResponse<MagnetFilesData>>(
+			endpoint,
+			{ id: magnetIds },
+			getAxiosConfig(apikey)
+		);
+
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Unknown error');
+		}
+
+		return response.data.data!;
+	} catch (error) {
+		console.error('Error fetching magnet files:', (error as any).message);
+		throw error;
+	}
+};
+
+export const deleteMagnet = async (apikey: string, id: string): Promise<MagnetDeleteData> => {
+	const endpoint = `${config.allDebridHostname}/v4/magnet/delete`;
+	try {
+		const response = await axios.post<ApiResponse<MagnetDeleteData>>(
+			endpoint,
+			{ id },
+			getAxiosConfig(apikey)
+		);
+
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Unknown error');
+		}
+
+		return response.data.data!;
 	} catch (error) {
 		console.error('Error deleting magnet:', (error as any).message);
 		throw error;
 	}
 };
 
-interface MagnetRestartResponse {
-	message?: string;
-	error?: {
-		code: string;
-		message: string;
-	};
-	magnet?: number | string;
-}
-
-export const restartMagnet = async (apikey: string, id: string): Promise<MagnetRestartResponse> => {
-	let endpoint = `${config.allDebridHostname}/v4/magnet/restart?agent=${config.allDebridAgent}&apikey=${apikey}&id=${id}`;
+export const restartMagnet = async (apikey: string, id: string): Promise<MagnetRestartData> => {
+	const endpoint = `${config.allDebridHostname}/v4/magnet/restart`;
 	try {
-		const response = await axios.get<MagnetRestartResponse>(endpoint);
-		if (response.data.error) throw new Error(response.data.error.message);
-		return response.data;
+		const response = await axios.post<ApiResponse<MagnetRestartData>>(
+			endpoint,
+			{ id },
+			getAxiosConfig(apikey)
+		);
+
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Unknown error');
+		}
+
+		return response.data.data!;
 	} catch (error) {
 		console.error('Error restarting magnet:', (error as any).message);
 		throw error;
 	}
 };
 
-export interface MagnetFile {
-	n: string;
-	s: number;
-	e?: MagnetFile[];
-}
-
-interface MagnetData {
-	magnet: string;
-	hash: string;
-	instant: boolean;
-	files?: MagnetFile[];
-	error?: {
-		code: string;
-		message: string;
-	};
-}
-
-export const adInstantCheck = async (apikey: string, hashes: string[]): Promise<any> => {
-	let endpoint = `${config.allDebridHostname}/v4/magnet/instant?agent=${config.allDebridAgent}&apikey=${apikey}`;
-	for (const hash of hashes) {
-		endpoint += `&magnets[]=${hash}`;
-	}
+export const adInstantCheck = async (
+	apikey: string,
+	hashes: string[]
+): Promise<MagnetInstantData> => {
+	const endpoint = `${config.allDebridHostname}/v4/magnet/instant`;
 	try {
-		const response = await axios.get<any>(endpoint);
+		const response = await axios.get<MagnetInstantData>(endpoint, {
+			...getAxiosConfig(apikey),
+			params: { magnets: hashes },
+		});
+
 		return response.data;
 	} catch (error: any) {
 		console.error('Error fetching magnet availability:', error.message);
