@@ -124,6 +124,8 @@ function IndexPage() {
 
 	const handleClearLocalStorage = () => {
 		localStorage.clear();
+		// Dispatch logout event to update UI immediately
+		window.dispatchEvent(new Event('logout'));
 		window.location.reload();
 	};
 

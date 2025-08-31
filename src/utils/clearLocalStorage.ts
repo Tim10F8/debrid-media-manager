@@ -6,4 +6,6 @@ export const clearRdKeys = () => {
 			window.localStorage.removeItem(key);
 		}
 	}
+	// Dispatch logout event to update UI immediately
+	window.dispatchEvent(new Event('logout'));
 };

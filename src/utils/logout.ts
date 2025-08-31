@@ -8,9 +8,13 @@ export function handleLogout(prefix: string | undefined, router: NextRouter) {
 			if (key && key.startsWith(prefix)) localStorage.removeItem(key);
 			i--;
 		}
+		// Dispatch logout event to update UI immediately
+		window.dispatchEvent(new Event('logout'));
 		router.reload();
 	} else {
 		localStorage.clear();
+		// Dispatch logout event to update UI immediately
+		window.dispatchEvent(new Event('logout'));
 		router.push('/start');
 	}
 }

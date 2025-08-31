@@ -1,8 +1,27 @@
-import { useDebridLogin } from '@/hooks/auth';
+import {
+	useAllDebridApiKey,
+	useDebridLogin,
+	useRealDebridAccessToken,
+	useTorBoxAccessToken,
+} from '@/hooks/auth';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
+import { useEffect } from 'react';
 
 export default function StartPage() {
+	const router = useRouter();
 	const { loginWithRealDebrid, loginWithAllDebrid, loginWithTorbox } = useDebridLogin();
+	const [rdToken] = useRealDebridAccessToken();
+	const adKey = useAllDebridApiKey();
+	const tbKey = useTorBoxAccessToken();
+
+	// Redirect to index if already logged in
+	useEffect(() => {
+		const isLoggedIn = rdToken || adKey || tbKey;
+		if (isLoggedIn) {
+			router.push('/');
+		}
+	}, [rdToken, adKey, tbKey, router]);
 
 	return (
 		<div className="flex h-screen flex-col items-center justify-center">

@@ -1,12 +1,60 @@
 import { useLibraryCache } from '@/contexts/LibraryCacheContext';
+import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 
 export default function FloatingLibraryIndicator() {
 	const { libraryItems, isLoading, isFetching, lastFetchTime, error, refreshLibrary } =
 		useLibraryCache();
 	const router = useRouter();
+	const [rdToken] = useRealDebridAccessToken();
+	const adKey = useAllDebridApiKey();
+	const tbKey = useTorBoxAccessToken();
+	const [mounted, setMounted] = useState(false);
+	const [refreshKey, setRefreshKey] = useState(0);
+
+	// Handle client-side mounting to avoid hydration mismatch
+	useEffect(() => {
+		setMounted(true);
+	}, []);
+
+	// Listen for storage changes to detect logout
+	useEffect(() => {
+		const handleStorageChange = (e: StorageEvent) => {
+			// Check if any auth-related keys were removed
+			if (
+				e.key &&
+				(e.key.startsWith('rd:') || e.key.startsWith('ad:') || e.key.startsWith('tb:'))
+			) {
+				setRefreshKey((prev) => prev + 1);
+			}
+		};
+
+		const handleLogout = () => {
+			setRefreshKey((prev) => prev + 1);
+		};
+
+		window.addEventListener('storage', handleStorageChange);
+		window.addEventListener('logout', handleLogout);
+
+		return () => {
+			window.removeEventListener('storage', handleStorageChange);
+			window.removeEventListener('logout', handleLogout);
+		};
+	}, []);
+
+	// Don't render until mounted to avoid hydration issues
+	if (!mounted) {
+		return null;
+	}
+
+	// Don't show if user is not logged in to any service
+	const isLoggedIn = rdToken || adKey || tbKey;
+	if (!isLoggedIn) {
+		return null;
+	}
 
 	// Don't show on library page
 	if (router.pathname === '/library') {

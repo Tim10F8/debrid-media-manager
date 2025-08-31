@@ -1,3 +1,17 @@
+/**
+ * @deprecated This HOC violates SOLID principles and has mixed concerns.
+ * Please use the new auth system:
+ * - For new components: import { withAuthMigration } from '@/utils/authMigration'
+ * - For direct auth access: import { useAuth } from '@/contexts/AuthContext'
+ *
+ * Migration guide:
+ * 1. Replace: export default withAuth(Component)
+ *    With: export default withAuthMigration(Component)
+ *
+ * 2. For components that don't need auth:
+ *    export default withAuthMigration(Component, { requireAuth: false })
+ */
+
 import { Logo } from '@/components/Logo';
 import { useAllDebridApiKey, useRealDebridAccessToken } from '@/hooks/auth';
 import { useRouter } from 'next/router';
