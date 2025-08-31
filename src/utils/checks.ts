@@ -68,8 +68,14 @@ function replaceRomanWithDecimal(input: string): string {
 }
 
 function strictEqual(title1: string, title2: string) {
+	const original1 = title1;
+	const original2 = title2;
 	title1 = title1.replace(/\s+/gi, '');
 	title2 = title2.replace(/\s+/gi, '');
+	// For very short strings, be more strict - don't match if originals had different spacing patterns
+	if (title1.length < 10 && original1 !== original2) {
+		return false;
+	}
 	return (
 		(title1.length && title1 === title2) ||
 		(naked(title1).length && naked(title1) === naked(title2)) ||
@@ -163,6 +169,11 @@ function countTestTermsInTarget(test: string, target: string, shouldBeInSequence
 }
 
 export function flexEq(test: string, target: string, targetYears: string[]) {
+	// For very short strings with spaces in target but not in test, don't match
+	if (target.includes(' ') && !test.includes(' ') && target.replace(/\s+/gi, '').length < 10) {
+		return false;
+	}
+
 	const targetNoSpc = target.replace(/\s+/gi, '');
 	const testNoSpc = test.replace(/\s+/gi, '');
 
@@ -201,7 +212,8 @@ export function flexEq(test: string, target: string, targetYears: string[]) {
 		return true;
 	} else if (
 		targetNoSpc.length >= Math.ceil(magicLength * 1.5) &&
-		testNoSpc.includes(targetNoSpc)
+		testNoSpc.includes(targetNoSpc) &&
+		testNoSpc !== targetNoSpc // Require inclusion, not exact match for short strings
 	) {
 		// console.log(`🎲 Test:plain '${target2}' is found in '${test2}' | ${test}`);
 		return true;

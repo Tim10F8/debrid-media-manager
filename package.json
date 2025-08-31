@@ -37,6 +37,9 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/bencode": "^2.0.4",
     "@types/file-saver": "^2.0.7",
     "@types/lodash": "^4.17.16",
@@ -50,6 +53,7 @@
     "eslint": "^8.49.0",
     "eslint-config-next": "^13.5.2",
     "husky": "^9.1.7",
+    "jsdom": "^26.1.0",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
     "prettier-plugin-organize-imports": "^4.1.0",
