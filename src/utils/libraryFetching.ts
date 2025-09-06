@@ -114,7 +114,9 @@ export async function fetchLatestADTorrents(
 	setUserTorrentsList: (fn: (prev: UserTorrent[]) => UserTorrent[]) => void,
 	setLoading: (loading: boolean) => void,
 	setAdSyncing: (syncing: boolean) => void,
-	setSelectedTorrents: Dispatch<SetStateAction<Set<string>>>
+	setSelectedTorrents: Dispatch<SetStateAction<Set<string>>>,
+	customLimit?: number,
+	forceRefresh?: boolean
 ) {
 	const oldTorrents = await torrentDB.all();
 	const oldIds = new Set(
@@ -136,38 +138,48 @@ export async function fetchLatestADTorrents(
 		setLoading(false);
 		setAdSyncing(false);
 	} else {
-		await fetchAllDebrid(adKey, async (torrents: UserTorrent[]) => {
-			// add all new torrents to the database
-			torrents.forEach((torrent) => newIds.add(torrent.id));
-			const newTorrents = torrents.filter((torrent) => !oldIds.has(torrent.id));
-			setUserTorrentsList((prev) => {
-				const newTorrentIds = new Set(newTorrents.map((t) => t.id));
-				const filteredPrev = prev.filter((t) => !newTorrentIds.has(t.id));
-				return [...newTorrents, ...filteredPrev];
-			});
-			await torrentDB.addAll(newTorrents);
-
-			// refresh the torrents that are in progress
-			const inProgressTorrents = torrents.filter(
-				(torrent) =>
-					torrent.status === UserTorrentStatus.waiting ||
-					torrent.status === UserTorrentStatus.downloading ||
-					inProgressIds.has(torrent.id)
-			);
-			setUserTorrentsList((prev) => {
-				return prev.map((t) => {
-					const found = inProgressTorrents.find((i) => i.id === t.id);
-					if (found) {
-						return found;
-					}
-					return t;
+		// Note: forceRefresh doesn't affect AllDebrid since it doesn't use caching yet
+		// but we keep the parameter for consistency and future implementation
+		await fetchAllDebrid(
+			adKey,
+			async (torrents: UserTorrent[]) => {
+				// add all new torrents to the database
+				torrents.forEach((torrent) => newIds.add(torrent.id));
+				const newTorrents = torrents.filter((torrent) => !oldIds.has(torrent.id));
+				setUserTorrentsList((prev) => {
+					const newTorrentIds = new Set(newTorrents.map((t) => t.id));
+					const filteredPrev = prev.filter((t) => !newTorrentIds.has(t.id));
+					return [...newTorrents, ...filteredPrev];
 				});
-			});
-			await torrentDB.addAll(inProgressTorrents);
+				await torrentDB.addAll(newTorrents);
 
-			setLoading(false);
-		});
+				// refresh the torrents that are in progress
+				const inProgressTorrents = torrents.filter(
+					(torrent) =>
+						torrent.status === UserTorrentStatus.waiting ||
+						torrent.status === UserTorrentStatus.downloading ||
+						inProgressIds.has(torrent.id)
+				);
+				setUserTorrentsList((prev) => {
+					return prev.map((t) => {
+						const found = inProgressTorrents.find((i) => i.id === t.id);
+						if (found) {
+							return found;
+						}
+						return t;
+					});
+				});
+				await torrentDB.addAll(inProgressTorrents);
+
+				setLoading(false);
+			},
+			customLimit
+		);
 		setAdSyncing(false);
+
+		// this is just a small sync
+		if (customLimit) return;
+
 		// Toast notification removed for better UX
 	}
 

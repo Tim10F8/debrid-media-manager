@@ -205,7 +205,9 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 						setLibraryItems,
 						setIsLoading,
 						setAdSyncing,
-						setSelectedTorrents
+						setSelectedTorrents,
+						undefined, // customLimit
+						forceRefresh
 					);
 				}
 
