@@ -74,6 +74,11 @@ export const withAuth = <P extends object>(Component: ComponentType<P>) => {
 			}
 		}, [rdKey, rdLoading, rdIsRefreshing, hasRefreshCredentials, adKey, tbKey, router]);
 
+		// Log when auth loading screen shows/hides
+		useEffect(() => {
+			console.log(`withAuth loading screen: ${isLoading ? 'shown' : 'hidden'}`);
+		}, [isLoading]);
+
 		if (isLoading) {
 			// Render a loading indicator or placeholder on initial load
 			return (

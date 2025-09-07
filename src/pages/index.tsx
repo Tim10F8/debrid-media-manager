@@ -42,6 +42,11 @@ function IndexPage() {
 
 	useCastToken();
 
+	// Log when home page switches between loading and ready states
+	useEffect(() => {
+		console.log(`index page: isLoading=${isLoading}`);
+	}, [isLoading]);
+
 	useEffect(() => {
 		if (typeof window !== 'undefined') {
 			(window as any).registerMagnetHandler = () => {

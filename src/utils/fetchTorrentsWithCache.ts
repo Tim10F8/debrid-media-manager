@@ -30,6 +30,9 @@ export async function fetchRealDebridWithCache(
 	customLimit?: number
 ): Promise<FetchResult> {
 	try {
+		console.log(
+			`fetchRealDebridWithCache start (useCache=${useCache}, customLimit=${customLimit ?? 'none'})`
+		);
 		// Step 1: Fetch the first page to get total count and check cache
 		const pageSize = 5000; // Using our increased page size
 		const { data: firstPageData, totalCount } = await getUserTorrentsList(
@@ -39,6 +42,7 @@ export async function fetchRealDebridWithCache(
 		);
 
 		if (!firstPageData.length || !totalCount || totalCount === 0) {
+			console.log('fetchRealDebridWithCache early end: no data');
 			return { torrents: [], totalCount: 0, cacheHit: false };
 		}
 
@@ -47,11 +51,13 @@ export async function fetchRealDebridWithCache(
 
 		// If custom limit is small, just return the first page
 		if (customLimit && customLimit <= pageSize) {
-			return {
+			const result: FetchResult = {
 				torrents: firstPageTorrents.slice(0, customLimit),
 				totalCount: customLimit,
 				cacheHit: false,
 			};
+			console.log('fetchRealDebridWithCache end (customLimit)');
+			return result;
 		}
 
 		// Step 2: Check for cache hit (Zurg's smart caching logic)
@@ -92,11 +98,13 @@ export async function fetchRealDebridWithCache(
 								cachedTorrents = allTorrents;
 								cacheTimestamp = Date.now();
 
-								return {
+								const result: FetchResult = {
 									torrents: allTorrents,
 									totalCount: allTorrents.length,
 									cacheHit: true,
 								};
+								console.log('fetchRealDebridWithCache end (cache hit)');
+								return result;
 							}
 						}
 					}
@@ -116,11 +124,13 @@ export async function fetchRealDebridWithCache(
 			cachedTorrents = firstPageTorrents;
 			cacheTimestamp = Date.now();
 
-			return {
+			const result: FetchResult = {
 				torrents: firstPageTorrents,
 				totalCount: firstPageTorrents.length,
 				cacheHit: false,
 			};
+			console.log('fetchRealDebridWithCache end (single page)');
+			return result;
 		}
 
 		// Fetch remaining pages in parallel
@@ -144,11 +154,13 @@ export async function fetchRealDebridWithCache(
 		cachedTorrents = allTorrents;
 		cacheTimestamp = Date.now();
 
-		return {
+		const result: FetchResult = {
 			torrents: allTorrents,
 			totalCount: allTorrents.length,
 			cacheHit: false,
 		};
+		console.log('fetchRealDebridWithCache end');
+		return result;
 	} catch (error) {
 		console.error('Error fetching torrents with cache:', error);
 		throw error;

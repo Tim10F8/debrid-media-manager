@@ -55,9 +55,15 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 	const retryCountRef = useRef(0);
 	const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const lastLibraryState = useRef<LibraryState | null>(null);
+	const isFetchingRef = useRef(false);
+	const activeRdKeyRef = useRef<string | null>(null);
 
-	const [rdKey] = useRealDebridAccessToken();
+	const [rdKey, rdLoading] = useRealDebridAccessToken();
 	const adKey = useAllDebridApiKey();
+
+	// Track previous RD key and pending refetch to detect and act on changes
+	const prevRdKeyRef = useRef<string | null | undefined>(undefined);
+	const pendingRefetchRef = useRef(false);
 
 	// Load last fetch time and state from localStorage
 	useEffect(() => {
@@ -153,7 +159,12 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 
 	// Full fetch from services (but still uses cache strategy internally)
 	const fetchFromServices = useCallback(
-		async (forceRefresh: boolean = false) => {
+		async (forceRefresh: boolean = false, reason: string = 'manual/unknown') => {
+			// Synchronous re-entrancy guard
+			if (isFetchingRef.current) {
+				console.log(`Library fetch skipped: already fetching (reason=${reason})`);
+				return;
+			}
 			if (!rdKey && !adKey) {
 				setIsLoading(false);
 				setError('No debrid service configured');
@@ -161,7 +172,10 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 			}
 
 			// Prevent multiple simultaneous fetches
-			if (isFetching) return;
+			if (isFetching) {
+				console.log(`Library fetch skipped due to isFetching=true (reason=${reason})`);
+				return;
+			}
 
 			// Clear any pending retry
 			if (retryTimeoutRef.current) {
@@ -169,8 +183,12 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 				retryTimeoutRef.current = null;
 			}
 
-			// Set fetching flag immediately
+			// Set fetching flags immediately
+			isFetchingRef.current = true;
 			setIsFetching(true);
+			const startTs = Date.now();
+			console.log(`Library fetch start (reason=${reason}, forceRefresh=${forceRefresh})`);
+			activeRdKeyRef.current = rdKey ?? null;
 			setError(null);
 
 			try {
@@ -240,16 +258,20 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 					retryCountRef.current++;
 					const retryDelay = Math.pow(2, retryCountRef.current) * 1000; // 2s, 4s, 8s
 					console.log(
-						`Retrying fetch (attempt ${retryCountRef.current}/3) in ${retryDelay}ms`
+						`Retrying fetch (attempt ${retryCountRef.current}/3) in ${retryDelay}ms; reason=${reason}`
 					);
 					retryTimeoutRef.current = setTimeout(() => {
 						retryTimeoutRef.current = null;
-						fetchFromServices(forceRefresh);
+						fetchFromServices(forceRefresh, 'retry');
 					}, retryDelay);
 				}
 			} finally {
+				const ms = Date.now() - startTs;
+				console.log(`Library fetch end (reason=${reason}) in ${ms}ms`);
+				isFetchingRef.current = false;
 				setIsFetching(false);
 				setIsLoading(false);
+				// Keep activeRdKeyRef as the last-used RD key for decision making
 			}
 		},
 		[rdKey, adKey, isFetching, getCurrentLibraryState]
@@ -268,14 +290,14 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 		}
 
 		console.log('Library changes detected, performing full refresh');
-		await fetchFromServices(false);
+		await fetchFromServices(false, 'smart-refresh');
 	}, [isFetching, getCurrentLibraryState, hasLibraryChanged, fetchFromServices]);
 
 	// Manual refresh (always does full refresh)
 	const refreshLibrary = useCallback(async () => {
 		// Debounce refresh requests
 		if (isFetching) return;
-		await fetchFromServices(true);
+		await fetchFromServices(true, 'manual-refresh');
 	}, [fetchFromServices, isFetching]);
 
 	// Optimistic update functions
@@ -307,6 +329,10 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 
 	// Initial load - skip if cache is fresh (< 10 minutes old)
 	useEffect(() => {
+		// Wait for RD auth resolution to avoid duplicate fetches (initial + token-change)
+		if (rdLoading) return;
+		// Avoid kicking off another fetch if one is already running
+		if (isFetching) return;
 		const storedTime = localStorage.getItem(LAST_FETCH_KEY);
 		if (storedTime) {
 			const lastFetch = new Date(storedTime);
@@ -324,20 +350,58 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 						return;
 					}
 					// If no local items, fetch anyway
-					fetchFromServices(true);
+					fetchFromServices(true, 'initial-load:empty-db');
 				});
 				return;
 			}
 		}
 		// Cache is stale or doesn't exist, fetch from services
-		fetchFromServices(true);
-	}, [fetchFromServices]);
+		fetchFromServices(true, 'initial-load');
+	}, [fetchFromServices, rdLoading, isFetching]);
+
+	// Refetch when RD token changes (e.g., after refresh on reload)
+	useEffect(() => {
+		// Only trigger after initial mount when the token actually changes
+		const prev = prevRdKeyRef.current;
+		const tokenChanged = prev !== undefined && rdKey && rdKey !== prev;
+		if (tokenChanged) {
+			if (isFetching) {
+				// Defer refetch until current fetch completes if token differs from the active one
+				if (rdKey !== activeRdKeyRef.current) {
+					pendingRefetchRef.current = true;
+					console.log(
+						`RD token changed during fetch (active=${activeRdKeyRef.current ? 'set' : 'null'}). Will refetch after.`
+					);
+				} else {
+					console.log(
+						'RD token changed during fetch but same as active; skipping pending refetch'
+					);
+				}
+			} else {
+				// Force a full refresh to rehydrate RD library with the new token
+				fetchFromServices(true, 'rd-token-changed');
+			}
+		}
+		prevRdKeyRef.current = rdKey;
+	}, [rdKey, isFetching, fetchFromServices]);
+
+	// If an RD token change happened during a fetch, refetch right after
+	useEffect(() => {
+		if (!isFetching && pendingRefetchRef.current) {
+			pendingRefetchRef.current = false;
+			if (rdKey !== activeRdKeyRef.current) {
+				fetchFromServices(true, 'pending-refetch-after-token-change');
+			} else {
+				console.log('Pending RD refetch cleared: current token equals active token');
+			}
+		}
+	}, [isFetching, fetchFromServices]);
 
 	// Check network status and retry on reconnection
 	useEffect(() => {
 		const handleOnline = () => {
 			if (error && !isFetching) {
-				fetchFromServices(true);
+				fetchFromServices(true, 'network-online');
 			}
 		};
 

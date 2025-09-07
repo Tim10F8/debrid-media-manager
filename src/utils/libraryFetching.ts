@@ -14,6 +14,9 @@ export async function fetchLatestRDTorrents(
 	customLimit?: number,
 	forceRefresh?: boolean
 ) {
+	console.log(
+		`fetchLatestRDTorrents start (forceRefresh=${!!forceRefresh}, customLimit=${customLimit ?? 'none'})`
+	);
 	const oldTorrents = await torrentDB.all();
 	const oldIds = new Set(
 		oldTorrents.map((torrent) => torrent.id).filter((id) => id.startsWith('rd:'))
@@ -106,6 +109,7 @@ export async function fetchLatestRDTorrents(
 			});
 		})
 	);
+	console.log('fetchLatestRDTorrents end');
 }
 
 export async function fetchLatestADTorrents(

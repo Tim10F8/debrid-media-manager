@@ -154,8 +154,8 @@ export const handleSelectFilesInRd = async (rdKey: string, id: string, bare: boo
 		await selectFiles(rdKey, id.substring(3), selectedFiles, bare);
 	} catch (error) {
 		if (error instanceof Error && error.message !== 'no_files_for_selection') {
-			// Pass a second string argument to align with test expectations
-			toast.error(`Error selecting files (${id}) - ${error}`, 'select-files');
+			// Pass a second string argument to align with test expectations while keeping TS happy
+			toast.error(`Error selecting files (${id}) - ${error}`, 'select-files' as any);
 		}
 	}
 };

@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getAllDebridUser } from '../services/allDebrid';
 import { getCurrentUser as getRealDebridUser, getToken } from '../services/realDebrid';
 import { TorBoxUser, getUserData } from '../services/torbox';
@@ -31,32 +31,60 @@ export interface AllDebridUser {
 	fidelityPoints: number;
 }
 
+// Global singleton state for RealDebrid to prevent duplicate calls
+let globalRealDebridState = {
+	user: null as RealDebridUser | null,
+	error: null as Error | null,
+	loading: true,
+	hasAuth: false,
+	isInitialized: false,
+	subscribers: new Set<() => void>(),
+};
+
 // Simplified hook that handles RealDebrid auth
 const useRealDebrid = () => {
-	const [user, setUser] = useState<RealDebridUser | null>(null);
-	const [error, setError] = useState<Error | null>(null);
-	const [loading, setLoading] = useState(true);
+	const [user, setUser] = useState<RealDebridUser | null>(globalRealDebridState.user);
+	const [error, setError] = useState<Error | null>(globalRealDebridState.error);
+	const [loading, setLoading] = useState(globalRealDebridState.loading);
 	const [token, setToken] = useLocalStorage<string>('rd:accessToken');
 	const [clientId] = useLocalStorage<string>('rd:clientId');
 	const [clientSecret] = useLocalStorage<string>('rd:clientSecret');
 	const [refreshToken] = useLocalStorage<string>('rd:refreshToken');
-	const hasInitializedRef = useRef(false);
+
+	useEffect(() => {
+		const updateState = () => {
+			setUser(globalRealDebridState.user);
+			setError(globalRealDebridState.error);
+			setLoading(globalRealDebridState.loading);
+		};
+
+		// Subscribe to global state changes
+		globalRealDebridState.subscribers.add(updateState);
+		return () => {
+			globalRealDebridState.subscribers.delete(updateState);
+		};
+	}, []);
 
 	useEffect(() => {
 		let isMounted = true;
 
 		const auth = async () => {
-			// Prevent duplicate initialization
-			if (hasInitializedRef.current) {
+			console.log('useRealDebrid: auth start');
+
+			// Prevent duplicate initialization globally
+			if (globalRealDebridState.isInitialized) {
+				console.log('useRealDebrid: already initialized globally, skipping');
 				return;
 			}
 
 			if (!refreshToken || !clientId || !clientSecret) {
-				setLoading(false);
+				console.log('useRealDebrid: missing refresh credentials');
+				globalRealDebridState.loading = false;
+				globalRealDebridState.subscribers.forEach((fn) => fn());
 				return;
 			}
 
-			hasInitializedRef.current = true;
+			globalRealDebridState.isInitialized = true;
 
 			try {
 				// Try current token first
@@ -64,13 +92,16 @@ const useRealDebrid = () => {
 					try {
 						const user = await getRealDebridUser(token);
 						if (isMounted) {
-							setUser(user as RealDebridUser);
-							setError(null);
-							setLoading(false);
+							globalRealDebridState.user = user as RealDebridUser;
+							globalRealDebridState.error = null;
+							globalRealDebridState.loading = false;
+							globalRealDebridState.hasAuth = true;
+							globalRealDebridState.subscribers.forEach((fn) => fn());
 						}
+						console.log('useRealDebrid: existing token valid');
 						return;
 					} catch {
-						// Token invalid, continue to refresh
+						console.log('useRealDebrid: token invalid, will refresh');
 					}
 				}
 
@@ -82,21 +113,30 @@ const useRealDebrid = () => {
 				);
 
 				if (isMounted) {
+					console.log('useRealDebrid: refreshed token obtained');
 					setToken(access_token, expires_in);
 					const user = await getRealDebridUser(access_token);
-					setUser(user as RealDebridUser);
-					setError(null);
+					globalRealDebridState.user = user as RealDebridUser;
+					globalRealDebridState.error = null;
+					globalRealDebridState.hasAuth = true;
+					globalRealDebridState.subscribers.forEach((fn) => fn());
 				}
 			} catch (e) {
 				if (isMounted) {
+					console.log('useRealDebrid: auth error', e);
 					clearRdKeys();
-					setError(e as Error);
+					globalRealDebridState.error = e as Error;
+					globalRealDebridState.user = null;
+					globalRealDebridState.hasAuth = false;
 					// Reset initialization flag on error to allow retry
-					hasInitializedRef.current = false;
+					globalRealDebridState.isInitialized = false;
+					globalRealDebridState.subscribers.forEach((fn) => fn());
 				}
 			} finally {
 				if (isMounted) {
-					setLoading(false);
+					globalRealDebridState.loading = false;
+					globalRealDebridState.subscribers.forEach((fn) => fn());
+					console.log('useRealDebrid: auth end, loading=false');
 				}
 			}
 		};
