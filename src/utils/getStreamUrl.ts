@@ -49,7 +49,7 @@ export const getStreamUrl = async (
 
 			await deleteTorrent(rdKey, id, true);
 		} catch (e) {
-			console.log('error after adding hash', e);
+			console.error('error after adding hash', e);
 			await deleteTorrent(rdKey, id, true);
 			throw e;
 		}
@@ -92,7 +92,7 @@ export const getBiggestFileStreamUrl = async (
 
 			await deleteTorrent(rdKey, id, true);
 		} catch (e) {
-			console.log('error after adding hash', e);
+			console.error('error after adding hash', e);
 			await deleteTorrent(rdKey, id, true);
 			throw e;
 		}

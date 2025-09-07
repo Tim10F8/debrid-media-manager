@@ -24,7 +24,7 @@ const processPage = async (
 			responseData = response.data;
 			break;
 		} catch (error: any) {
-			console.log('TorrentGalaxy request error:', error.message, searchUrl);
+			console.error('TorrentGalaxy request error:', error.message, searchUrl);
 			retries++;
 			if (retries >= MAX_RETRIES) {
 				console.error(`Max retries reached (${MAX_RETRIES}), aborting search`);

@@ -26,7 +26,7 @@ const processPage = async (
 			}
 			break;
 		} catch (error: any) {
-			console.log('ApiBay request error:', error.message, searchUrl);
+			console.error('ApiBay request error:', error.message, searchUrl);
 			retries++;
 			if (retries >= MAX_RETRIES) {
 				console.error(`Max retries reached (${MAX_RETRIES}), aborting search`);

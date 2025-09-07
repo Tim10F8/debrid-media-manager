@@ -112,7 +112,7 @@ const processPage = async (
 			} else if (error.message.includes('timeout of')) {
 				retries++;
 			} else {
-				console.log('btdigg request error:', error.message, searchUrl);
+				console.error('btdigg request error:', error.message, searchUrl);
 				retries++;
 				if (retries >= MAX_RETRIES) {
 					console.error(`Max retries reached (${MAX_RETRIES}), aborting search`);
