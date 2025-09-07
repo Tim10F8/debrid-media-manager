@@ -162,7 +162,6 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 		async (forceRefresh: boolean = false, reason: string = 'manual/unknown') => {
 			// Synchronous re-entrancy guard
 			if (isFetchingRef.current) {
-				console.log(`Library fetch skipped: already fetching (reason=${reason})`);
 				return;
 			}
 			if (!rdKey && !adKey) {
@@ -173,7 +172,6 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 
 			// Prevent multiple simultaneous fetches
 			if (isFetching) {
-				console.log(`Library fetch skipped due to isFetching=true (reason=${reason})`);
 				return;
 			}
 
@@ -285,11 +283,8 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 		const currentState = await getCurrentLibraryState();
 
 		if (!hasLibraryChanged(lastLibraryState.current, currentState)) {
-			console.log('No library changes detected, skipping refresh');
 			return;
 		}
-
-		console.log('Library changes detected, performing full refresh');
 		await fetchFromServices(false, 'smart-refresh');
 	}, [isFetching, getCurrentLibraryState, hasLibraryChanged, fetchFromServices]);
 
@@ -369,13 +364,6 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 				// Defer refetch until current fetch completes if token differs from the active one
 				if (rdKey !== activeRdKeyRef.current) {
 					pendingRefetchRef.current = true;
-					console.log(
-						`RD token changed during fetch (active=${activeRdKeyRef.current ? 'set' : 'null'}). Will refetch after.`
-					);
-				} else {
-					console.log(
-						'RD token changed during fetch but same as active; skipping pending refetch'
-					);
 				}
 			} else {
 				// Force a full refresh to rehydrate RD library with the new token
@@ -391,8 +379,6 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 			pendingRefetchRef.current = false;
 			if (rdKey !== activeRdKeyRef.current) {
 				fetchFromServices(true, 'pending-refetch-after-token-change');
-			} else {
-				console.log('Pending RD refetch cleared: current token equals active token');
 			}
 		}
 	}, [isFetching, fetchFromServices]);

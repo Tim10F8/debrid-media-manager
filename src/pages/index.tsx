@@ -42,9 +42,9 @@ function IndexPage() {
 
 	useCastToken();
 
-	// Log when home page switches between loading and ready states
+	// Loading state tracking
 	useEffect(() => {
-		console.log(`index page: isLoading=${isLoading}`);
+		// Loading state managed by auth system
 	}, [isLoading]);
 
 	useEffect(() => {

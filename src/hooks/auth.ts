@@ -69,16 +69,12 @@ const useRealDebrid = () => {
 		let isMounted = true;
 
 		const auth = async () => {
-			console.log('useRealDebrid: auth start');
-
 			// Prevent duplicate initialization globally
 			if (globalRealDebridState.isInitialized) {
-				console.log('useRealDebrid: already initialized globally, skipping');
 				return;
 			}
 
 			if (!refreshToken || !clientId || !clientSecret) {
-				console.log('useRealDebrid: missing refresh credentials');
 				globalRealDebridState.loading = false;
 				globalRealDebridState.subscribers.forEach((fn) => fn());
 				return;
@@ -98,10 +94,9 @@ const useRealDebrid = () => {
 							globalRealDebridState.hasAuth = true;
 							globalRealDebridState.subscribers.forEach((fn) => fn());
 						}
-						console.log('useRealDebrid: existing token valid');
 						return;
 					} catch {
-						console.log('useRealDebrid: token invalid, will refresh');
+						// Token invalid, will refresh
 					}
 				}
 
@@ -113,7 +108,6 @@ const useRealDebrid = () => {
 				);
 
 				if (isMounted) {
-					console.log('useRealDebrid: refreshed token obtained');
 					setToken(access_token, expires_in);
 					const user = await getRealDebridUser(access_token);
 					globalRealDebridState.user = user as RealDebridUser;
@@ -123,7 +117,7 @@ const useRealDebrid = () => {
 				}
 			} catch (e) {
 				if (isMounted) {
-					console.log('useRealDebrid: auth error', e);
+					console.error('RealDebrid auth error:', e);
 					clearRdKeys();
 					globalRealDebridState.error = e as Error;
 					globalRealDebridState.user = null;
@@ -136,7 +130,6 @@ const useRealDebrid = () => {
 				if (isMounted) {
 					globalRealDebridState.loading = false;
 					globalRealDebridState.subscribers.forEach((fn) => fn());
-					console.log('useRealDebrid: auth end, loading=false');
 				}
 			}
 		};
