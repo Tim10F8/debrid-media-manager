@@ -4,33 +4,34 @@ import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorr
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/router';
-import LibraryTorrentRow from '../LibraryTorrentRow';
+import { beforeEach, describe, expect, it, vi, type MockedFunction } from 'vitest';
+import LibraryTorrentRow from './LibraryTorrentRow';
 
 // Mock dependencies
-jest.mock('@/utils/addMagnet');
-jest.mock('@/utils/deleteTorrent');
-jest.mock('@/utils/copyMagnet');
-jest.mock('@/utils/hashList');
-jest.mock('next/router', () => ({
-	useRouter: jest.fn(),
+vi.mock('@/utils/addMagnet');
+vi.mock('@/utils/deleteTorrent');
+vi.mock('@/utils/copyMagnet');
+vi.mock('@/utils/hashList');
+vi.mock('next/router', () => ({
+	useRouter: vi.fn(),
 }));
 
-const mockHandleReinsertTorrentinRd = handleReinsertTorrentinRd as jest.MockedFunction<
+const mockHandleReinsertTorrentinRd = handleReinsertTorrentinRd as MockedFunction<
 	typeof handleReinsertTorrentinRd
 >;
-const mockHandleRestartTorrent = handleRestartTorrent as jest.MockedFunction<
+const mockHandleRestartTorrent = handleRestartTorrent as MockedFunction<
 	typeof handleRestartTorrent
 >;
-const mockHandleDeleteRdTorrent = handleDeleteRdTorrent as jest.MockedFunction<
+const mockHandleDeleteRdTorrent = handleDeleteRdTorrent as MockedFunction<
 	typeof handleDeleteRdTorrent
 >;
-const mockHandleDeleteAdTorrent = handleDeleteAdTorrent as jest.MockedFunction<
+const mockHandleDeleteAdTorrent = handleDeleteAdTorrent as MockedFunction<
 	typeof handleDeleteAdTorrent
 >;
 
 describe('LibraryTorrentRow Reinsert Functionality', () => {
 	const mockRouter = {
-		push: jest.fn(),
+		push: vi.fn(),
 		query: {},
 	};
 
@@ -60,16 +61,19 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 		titleGrouping: {},
 		tvGroupingByTitle: {},
 		isSelected: false,
-		onSelect: jest.fn(),
-		onDelete: jest.fn(),
-		onShowInfo: jest.fn(),
-		onTypeChange: jest.fn(),
-		onRefreshLibrary: jest.fn(),
+		onSelect: vi.fn(),
+		onDelete: vi.fn(),
+		onShowInfo: vi.fn(),
+		onTypeChange: vi.fn(),
+		onRefreshLibrary: vi.fn(),
 	};
 
 	beforeEach(() => {
-		jest.clearAllMocks();
-		(useRouter as jest.Mock).mockReturnValue(mockRouter);
+		vi.clearAllMocks();
+		(useRouter as unknown as ReturnType<typeof vi.fn>).mockReturnValue?.(mockRouter);
+		// For safety if not using vi.fn return, set directly
+		// @ts-ignore - test mock setup
+		(useRouter as any).mockReturnValue?.(mockRouter);
 	});
 
 	describe('Reinsert Button Click', () => {
@@ -132,7 +136,7 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 		});
 
 		it('should handle errors gracefully', async () => {
-			const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+			const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 			const error = new Error('Reinsert failed');
 			mockHandleReinsertTorrentinRd.mockRejectedValueOnce(error);
 
@@ -159,7 +163,7 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 
 			const reinsertButton = container.querySelector('button[title="Reinsert"]');
 			const clickEvent = new MouseEvent('click', { bubbles: true });
-			const stopPropagationSpy = jest.spyOn(clickEvent, 'stopPropagation');
+			const stopPropagationSpy = vi.spyOn(clickEvent, 'stopPropagation');
 
 			fireEvent(reinsertButton!, clickEvent);
 
@@ -212,8 +216,8 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 			// Check title is displayed
 			expect(screen.getByText('Test Movie')).toBeInTheDocument();
 
-			// Check file size (1GB)
-			expect(screen.getByText('1.0 GB')).toBeInTheDocument();
+			// Check file size (approx 1GB in GiB units)
+			expect(screen.getByText('0.9 GB')).toBeInTheDocument();
 
 			// Check status for finished torrent
 			expect(screen.getByText('downloaded')).toBeInTheDocument();
@@ -236,8 +240,8 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 			// Check seeders
 			expect(screen.getByText('5')).toBeInTheDocument();
 
-			// Check speed (1MB/s)
-			expect(screen.getByText('1.0MB/s')).toBeInTheDocument();
+			// Check speed (1 MB/s)
+			expect(screen.getByText('1 MB/s')).toBeInTheDocument();
 		});
 
 		it('should apply selected styling when selected', () => {

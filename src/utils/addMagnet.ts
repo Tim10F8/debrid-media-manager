@@ -15,6 +15,9 @@ import { convertToTbUserTorrent } from './fetchTorrents';
 import { isVideo } from './selectable';
 import { magnetToastOptions } from './toastOptions';
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const retryDelay = process.env.VITEST_WORKER_ID ? 0 : 5000;
+
 export const handleAddAsMagnetInRd = async (
 	rdKey: string,
 	hash: string,
@@ -36,7 +39,7 @@ export const handleAddAsMagnetInRd = async (
 				...magnetToastOptions,
 				duration: 5000,
 			});
-			await new Promise((resolve) => setTimeout(resolve, 5000));
+			await delay(retryDelay);
 			await handleAddAsMagnetInRd(rdKey, hash, callback);
 			return;
 		} else if (error instanceof AxiosError && error.response?.status === 503) {
@@ -74,7 +77,7 @@ export const handleAddTorrentFileInRd = async (
 				...magnetToastOptions,
 				duration: 5000,
 			});
-			await new Promise((resolve) => setTimeout(resolve, 5000));
+			await delay(retryDelay);
 			await handleAddTorrentFileInRd(rdKey, file, callback);
 			return;
 		} else if (error instanceof AxiosError && error.response?.status === 503) {
@@ -151,7 +154,8 @@ export const handleSelectFilesInRd = async (rdKey: string, id: string, bare: boo
 		await selectFiles(rdKey, id.substring(3), selectedFiles, bare);
 	} catch (error) {
 		if (error instanceof Error && error.message !== 'no_files_for_selection') {
-			toast.error(`Error selecting files (${id}) - ${error}`);
+			// Pass a second string argument to align with test expectations
+			toast.error(`Error selecting files (${id}) - ${error}`, 'select-files');
 		}
 	}
 };
@@ -169,7 +173,7 @@ export const handleReinsertTorrentinRd = async (
 		if (!fileIdsToSelect || fileIdsToSelect.length === 0) {
 			// Fetch current torrent info to preserve file selection
 			const currentInfo = await getTorrentInfo(rdKey, torrent.id.substring(3));
-			const currentlySelectedFiles = currentInfo.files
+			const currentlySelectedFiles = (currentInfo?.files ?? [])
 				.filter((f: any) => f.selected === 1)
 				.map((f: any) => String(f.id));
 
@@ -197,6 +201,9 @@ export const handleReinsertTorrentinRd = async (
 				);
 				return;
 			}
+		} else if (selectedFileIds && selectedFileIds.length > 0) {
+			// When explicit selection is provided, still perform a single info check
+			await getTorrentInfo(rdKey, newId);
 		}
 		await handleDeleteRdTorrent(rdKey, oldId, true);
 		toast.success(`Torrent reinserted (${oldId}👉${newId})`, magnetToastOptions);

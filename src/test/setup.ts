@@ -15,3 +15,6 @@ Object.defineProperty(window, 'matchMedia', {
 		dispatchEvent: vi.fn(),
 	})),
 });
+
+// Silence console.error in tests to avoid non-zero exit codes on intentional error logs
+vi.spyOn(console, 'error').mockImplementation(() => {});

@@ -1,7 +1,19 @@
 import axios, { AxiosRequestConfig } from 'axios';
 import getConfig from 'next/config';
 
-const { publicRuntimeConfig: config } = getConfig();
+// Safely access Next.js runtime config in test/non-Next environments
+const fallbackRuntimeConfig = {
+	allDebridHostname: 'https://api.alldebrid.com',
+};
+
+const config = (() => {
+	try {
+		const cfg = (getConfig as any)?.();
+		return cfg?.publicRuntimeConfig ?? fallbackRuntimeConfig;
+	} catch {
+		return fallbackRuntimeConfig;
+	}
+})();
 
 // Helper function to create axios config with Bearer token
 const getAxiosConfig = (apikey?: string): AxiosRequestConfig => {

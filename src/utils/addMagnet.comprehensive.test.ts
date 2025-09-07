@@ -32,11 +32,12 @@ vi.mock('@/services/realDebrid');
 vi.mock('@/services/torbox');
 vi.mock('./deleteTorrent');
 vi.mock('./fetchTorrents');
-vi.mock('react-hot-toast', () => ({
-	default: vi.fn((message: string) => {}),
-	success: vi.fn(),
-	error: vi.fn(),
-}));
+vi.mock('react-hot-toast', () => {
+	const fn: any = vi.fn((message: string) => {});
+	fn.success = vi.fn();
+	fn.error = vi.fn();
+	return { default: fn };
+});
 
 describe('addMagnet utilities', () => {
 	beforeEach(() => {

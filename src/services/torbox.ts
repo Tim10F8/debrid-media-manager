@@ -12,7 +12,19 @@ import {
 
 export type { TorBoxTorrentInfo, TorBoxUser };
 
-const { publicRuntimeConfig: config } = getConfig();
+// Safely access Next.js runtime config in test/non-Next environments
+const fallbackRuntimeConfig = {
+	torboxHostname: 'https://api.torbox.app',
+};
+
+const config = (() => {
+	try {
+		const cfg = (getConfig as any)?.();
+		return cfg?.publicRuntimeConfig ?? fallbackRuntimeConfig;
+	} catch {
+		return fallbackRuntimeConfig;
+	}
+})();
 
 // Constants
 const MIN_REQUEST_INTERVAL = (60 * 1000) / 500;

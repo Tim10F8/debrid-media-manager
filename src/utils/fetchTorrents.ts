@@ -116,22 +116,27 @@ export const fetchRealDebrid = async (
 };
 
 export function convertToUserTorrent(torrentInfo: UserTorrentResponse): UserTorrent {
-	let mediaType = getTypeByNameAndFileCount(torrentInfo.filename);
-	const serviceStatus = torrentInfo.status;
-	const status = getRdStatus(torrentInfo);
+	// Provide defensive defaults for partially shaped inputs
+	const filename = torrentInfo.filename || 'noname';
+	const addedRaw =
+		typeof torrentInfo.added === 'string' ? torrentInfo.added : new Date().toISOString();
+	const serviceStatus = torrentInfo.status || 'unknown';
+	const linksRaw = Array.isArray(torrentInfo.links) ? torrentInfo.links : [];
+
+	let mediaType = getTypeByNameAndFileCount(filename);
+	const status = getRdStatus({ ...torrentInfo, status: serviceStatus } as UserTorrentResponse);
 
 	let info = {} as ParsedFilename;
 	try {
-		info =
-			mediaType === 'movie'
-				? filenameParse(torrentInfo.filename)
-				: filenameParse(torrentInfo.filename, true);
+		info = mediaType === 'movie' ? filenameParse(filename) : filenameParse(filename, true);
 	} catch (error) {
 		// flip the condition if error is thrown
 		mediaType = mediaType === 'movie' ? 'tv' : 'movie';
-		mediaType === 'movie'
-			? filenameParse(torrentInfo.filename)
-			: filenameParse(torrentInfo.filename, true);
+		try {
+			info = mediaType === 'movie' ? filenameParse(filename) : filenameParse(filename, true);
+		} catch {
+			// Leave info empty if parsing still fails
+		}
 	}
 
 	return {
@@ -140,18 +145,35 @@ export function convertToUserTorrent(torrentInfo: UserTorrentResponse): UserTorr
 		status,
 		serviceStatus,
 		mediaType,
-		added: new Date(torrentInfo.added.replace('Z', '+01:00')),
+		added: new Date(addedRaw.replace?.('Z', '+01:00') || addedRaw),
 		id: `rd:${torrentInfo.id}`,
-		links: torrentInfo.links.map((l) => l.replaceAll('/', '/')),
-		seeders: torrentInfo.seeders || 0,
-		speed: torrentInfo.speed || 0,
-		title: getMediaId(info, mediaType, false) || torrentInfo.filename,
+		// Decode any percent-encoded characters for display/use
+		links: linksRaw.map((l) => {
+			try {
+				return decodeURIComponent(l);
+			} catch {
+				return l;
+			}
+		}),
+		seeders: (torrentInfo as any).seeders || 0,
+		speed: (torrentInfo as any).speed || 0,
+		title: getMediaId(info, mediaType, false) || filename,
 		selectedFiles: [],
 	};
 }
 
 async function processTorrents(torrentData: UserTorrentResponse[]): Promise<UserTorrent[]> {
-	return Promise.all(torrentData.map(convertToUserTorrent));
+	const results = await Promise.all(
+		torrentData.map(async (t) => {
+			try {
+				return convertToUserTorrent(t);
+			} catch (e) {
+				console.error('Failed to convert torrent:', e);
+				return null;
+			}
+		})
+	);
+	return results.filter((x): x is UserTorrent => x !== null);
 }
 
 export const fetchAllDebrid = async (
@@ -340,6 +362,11 @@ export const convertToTbUserTorrent = (info: TorBoxTorrentInfo): UserTorrent => 
 		} catch {
 			// If both parsing attempts fail, leave parsedInfo empty
 		}
+	}
+
+	// If parsed title is not meaningful (no word characters), treat as parse failure
+	if (!parsedInfo?.title || !/\w/.test(parsedInfo.title)) {
+		parsedInfo = {} as ParsedFilename;
 	}
 
 	// Convert TorBoxFile[] to SelectedFile[]

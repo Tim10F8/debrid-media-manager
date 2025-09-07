@@ -13,10 +13,11 @@ import {
 vi.mock('@/services/allDebrid');
 vi.mock('@/services/realDebrid');
 vi.mock('@/services/torbox');
-vi.mock('react-hot-toast', () => ({
-	default: vi.fn((message: string) => {}),
-	error: vi.fn(),
-}));
+vi.mock('react-hot-toast', () => {
+	const fn: any = vi.fn((message: string) => {});
+	fn.error = vi.fn();
+	return { default: fn };
+});
 
 describe('deleteTorrent utilities', () => {
 	beforeEach(() => {

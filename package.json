@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write 'src/**/*.{js,jsx,ts,tsx,json,md}'",
-    "test": "vitest",
+    "test": "vitest run",
     "prepare": "husky"
   },
   "dependencies": {
@@ -49,6 +49,7 @@
     "@types/react-dom": "^18.2.7",
     "@types/user-agents": "^1.0.4",
     "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^5.0.2",
     "autoprefixer": "^10.4.21",
     "eslint": "^8.49.0",
     "eslint-config-next": "^13.5.2",

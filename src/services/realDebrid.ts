@@ -12,7 +12,21 @@ import {
 	UserTorrentsResult,
 } from './types';
 
-const { publicRuntimeConfig: config } = getConfig();
+// Safely access Next.js runtime config in test/non-Next environments
+const fallbackRuntimeConfig = {
+	proxy: '',
+	realDebridHostname: 'https://app.real-debrid.com',
+	realDebridClientId: 'X245A4XAIBGVM',
+};
+
+const config = (() => {
+	try {
+		const cfg = (getConfig as any)?.();
+		return cfg?.publicRuntimeConfig ?? fallbackRuntimeConfig;
+	} catch {
+		return fallbackRuntimeConfig;
+	}
+})();
 
 // Constants for timeout and retry
 const REQUEST_TIMEOUT = 10000; // Increased from 5s to 10s
