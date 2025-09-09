@@ -667,7 +667,9 @@ describe('addMagnet utilities', () => {
 			const callback = vi.fn();
 			await handleAddAsMagnetInTb(tbKey, hash, callback);
 
-			expect(createTorrent).toHaveBeenCalledWith(tbKey, { magnet: hash });
+			expect(createTorrent).toHaveBeenCalledWith(tbKey, {
+				magnet: `magnet:?xt=urn:btih:${hash}`,
+			});
 			expect(getTorrentList).toHaveBeenCalledWith(tbKey, { id: 123 });
 			expect(callback).toHaveBeenCalledWith(mockUserTorrent);
 			expect(toast.success).toHaveBeenCalledWith(
@@ -700,7 +702,9 @@ describe('addMagnet utilities', () => {
 
 			await handleAddAsMagnetInTb(tbKey, hash);
 
-			expect(createTorrent).toHaveBeenCalledWith(tbKey, { magnet: hash });
+			expect(createTorrent).toHaveBeenCalledWith(tbKey, {
+				magnet: `magnet:?xt=urn:btih:${hash}`,
+			});
 			expect(toast.success).toHaveBeenCalledWith(
 				'Successfully added torrent!',
 				expect.any(Object)

@@ -199,7 +199,7 @@ export const getPin = async (): Promise<PinData> => {
 };
 
 export const checkPin = async (pin: string, check: string): Promise<PinCheckData> => {
-	const endpoint = `${config.allDebridHostname}/v4.1/pin/check`;
+	const endpoint = `${config.allDebridHostname}/v4/pin/check`;
 	try {
 		const params = new URLSearchParams();
 		params.append('pin', pin);
@@ -238,7 +238,7 @@ export const checkPin = async (pin: string, check: string): Promise<PinCheckData
 
 // Authenticated endpoints
 export const getAllDebridUser = async (apikey: string) => {
-	const endpoint = `${config.allDebridHostname}/v4.1/user`;
+	const endpoint = `${config.allDebridHostname}/v4/user`;
 	try {
 		const response = await axios.get<ApiResponse<UserData>>(endpoint, getAxiosConfig(apikey));
 
@@ -255,7 +255,7 @@ export const getAllDebridUser = async (apikey: string) => {
 
 export const uploadMagnet = async (apikey: string, hashes: string[]): Promise<MagnetUploadData> => {
 	try {
-		const endpoint = `${config.allDebridHostname}/v4.1/magnet/upload`;
+		const endpoint = `${config.allDebridHostname}/v4/magnet/upload`;
 		const response = await axios.post<ApiResponse<MagnetUploadData>>(
 			endpoint,
 			{ magnets: hashes },
@@ -383,7 +383,7 @@ export const getMagnetFiles = async (
 	apikey: string,
 	magnetIds: number[]
 ): Promise<MagnetFilesData> => {
-	const endpoint = `${config.allDebridHostname}/v4.1/magnet/files`;
+	const endpoint = `${config.allDebridHostname}/v4/magnet/files`;
 
 	try {
 		const response = await axios.post<ApiResponse<MagnetFilesData>>(
@@ -404,7 +404,7 @@ export const getMagnetFiles = async (
 };
 
 export const deleteMagnet = async (apikey: string, id: string): Promise<MagnetDeleteData> => {
-	const endpoint = `${config.allDebridHostname}/v4.1/magnet/delete`;
+	const endpoint = `${config.allDebridHostname}/v4/magnet/delete`;
 	try {
 		const response = await axios.post<ApiResponse<MagnetDeleteData>>(
 			endpoint,
@@ -424,7 +424,7 @@ export const deleteMagnet = async (apikey: string, id: string): Promise<MagnetDe
 };
 
 export const restartMagnet = async (apikey: string, id: string): Promise<MagnetRestartData> => {
-	const endpoint = `${config.allDebridHostname}/v4.1/magnet/restart`;
+	const endpoint = `${config.allDebridHostname}/v4/magnet/restart`;
 	try {
 		const response = await axios.post<ApiResponse<MagnetRestartData>>(
 			endpoint,
@@ -443,6 +443,7 @@ export const restartMagnet = async (apikey: string, id: string): Promise<MagnetR
 	}
 };
 
+// Note: /v4.1/magnet/instant is not documented in the official API; this may be a custom or undocumented endpoint
 export const adInstantCheck = async (
 	apikey: string,
 	hashes: string[]

@@ -1,5 +1,6 @@
 import { MagnetFile, adInstantCheck } from '@/services/allDebrid';
 import { EnrichedHashlistTorrent, FileData, SearchResult } from '@/services/mediasearch';
+import { checkCachedStatus } from '@/services/torbox';
 import { Dispatch, SetStateAction } from 'react';
 import { toast } from 'react-hot-toast';
 import { checkAvailability, checkAvailabilityByHashes } from './availability';
@@ -265,6 +266,72 @@ const processAdInstantCheck = async <T extends SearchResult | EnrichedHashlistTo
 	return instantCount;
 };
 
+// Generic TB instant check function
+const processTbInstantCheck = async <T extends SearchResult | EnrichedHashlistTorrent>(
+	tbKey: string,
+	hashes: string[],
+	setTorrentList: Dispatch<SetStateAction<T[]>>,
+	sortFn?: (results: T[]) => T[]
+): Promise<number> => {
+	let instantCount = 0;
+	const funcs = [];
+
+	for (const hashGroup of groupBy(100, hashes)) {
+		funcs.push(async () => {
+			const resp = await checkCachedStatus(
+				{
+					hash: hashGroup,
+					format: 'object',
+					list_files: true,
+				},
+				tbKey
+			);
+
+			if (resp.success && resp.data) {
+				setTorrentList((prevSearchResults) => {
+					const newSearchResults = [...prevSearchResults];
+					for (const torrent of newSearchResults) {
+						if (torrent.noVideos) continue;
+
+						// Check if this hash is in the cached response
+						const cachedData = resp.data as any;
+						const availableTorrent = cachedData[torrent.hash];
+						if (!availableTorrent) continue;
+
+						// Map TorBox file structure to our format
+						if (availableTorrent.files && Array.isArray(availableTorrent.files)) {
+							torrent.files = availableTorrent.files.map(
+								(file: any, index: number) => ({
+									fileId: index, // TorBox cached API doesn't provide file IDs, use index
+									filename: file.name,
+									filesize: file.size,
+								})
+							);
+
+							const videoFiles = torrent.files.filter((f) =>
+								isVideo({ path: f.filename })
+							);
+							const stats = calculateFileStats(videoFiles);
+							Object.assign(torrent, stats);
+
+							torrent.noVideos = videoFiles.length === 0;
+							if (!torrent.noVideos) {
+								torrent.tbAvailable = true;
+								instantCount += 1;
+							} else {
+								torrent.tbAvailable = false;
+							}
+						}
+					}
+					return sortFn ? sortFn(newSearchResults) : newSearchResults;
+				});
+			}
+		});
+	}
+	await runConcurrentFunctions(funcs, 4, 0);
+	return instantCount;
+};
+
 // Wrapper functions
 export const wrapLoading = async function (debrid: string, checkAvailability: Promise<number>) {
 	return await toast.promise(
@@ -300,3 +367,16 @@ export const instantCheckInAd2 = (
 	hashes: string[],
 	setTorrentList: Dispatch<SetStateAction<EnrichedHashlistTorrent[]>>
 ) => processAdInstantCheck(adKey, hashes, setTorrentList);
+
+export const instantCheckInTb = (
+	tbKey: string,
+	hashes: string[],
+	setTorrentList: Dispatch<SetStateAction<SearchResult[]>>,
+	sortFn: (searchResults: SearchResult[]) => SearchResult[]
+) => processTbInstantCheck(tbKey, hashes, setTorrentList, sortFn);
+
+export const instantCheckInTb2 = (
+	tbKey: string,
+	hashes: string[],
+	setTorrentList: Dispatch<SetStateAction<EnrichedHashlistTorrent[]>>
+) => processTbInstantCheck(tbKey, hashes, setTorrentList);

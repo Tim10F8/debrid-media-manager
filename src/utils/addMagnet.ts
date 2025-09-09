@@ -5,7 +5,7 @@ import {
 	getTorrentInfo,
 	selectFiles,
 } from '@/services/realDebrid';
-import { createTorrent, getTorrentList } from '@/services/torbox';
+import { controlTorrent, createTorrent, getTorrentList } from '@/services/torbox';
 import { TorBoxTorrentInfo, TorrentInfoResponse } from '@/services/types';
 import { UserTorrent } from '@/torrent/userTorrent';
 import { AxiosError } from 'axios';
@@ -265,14 +265,33 @@ export const handleRestartTorrent = async (adKey: string, id: string) => {
 	}
 };
 
+export const handleRestartTbTorrent = async (tbKey: string, id: string) => {
+	try {
+		await controlTorrent(tbKey, {
+			torrent_id: parseInt(id.substring(3)),
+			operation: 'reannounce',
+		});
+		toast.success(`Torrent reannounced (${id})`, magnetToastOptions);
+	} catch (error) {
+		console.error(
+			'Error reannouncing TB torrent:',
+			error instanceof Error ? error.message : 'Unknown error'
+		);
+		toast.error(`Error reannouncing torrent (${id})`, magnetToastOptions);
+		throw error;
+	}
+};
+
 export const handleAddAsMagnetInTb = async (
 	tbKey: string,
 	hash: string,
 	callback?: (torrent: UserTorrent) => Promise<void>
 ) => {
 	try {
+		// TorBox requires a full magnet URI, not a bare info hash
+		const magnet = hash.startsWith('magnet:') ? hash : `magnet:?xt=urn:btih:${hash}`;
 		const response = await createTorrent(tbKey, {
-			magnet: hash,
+			magnet,
 		});
 		if (response.data?.torrent_id || response.data?.queued_id) {
 			const torrentInfo = await getTorrentList(tbKey, { id: response.data.torrent_id });
@@ -291,4 +310,72 @@ export const handleAddAsMagnetInTb = async (
 		toast.error('Error adding torrent', magnetToastOptions);
 		throw error;
 	}
+};
+
+export const handleAddMultipleHashesInTb = async (
+	tbKey: string,
+	hashes: string[],
+	callback?: () => Promise<void>
+) => {
+	let errorCount = 0;
+	for (const hash of hashes) {
+		try {
+			await handleAddAsMagnetInTb(tbKey, hash);
+		} catch (error) {
+			errorCount++;
+			console.error(
+				'Error adding hash in TB:',
+				error instanceof Error ? error.message : 'Unknown error'
+			);
+			toast.error('There was an error adding hash');
+		}
+	}
+	if (callback) await callback();
+	toast(
+		`Successfully added ${hashes.length - errorCount} ${
+			hashes.length - errorCount === 1 ? 'hash' : 'hashes'
+		} to TorBox!`,
+		magnetToastOptions
+	);
+};
+
+export const handleAddMultipleTorrentFilesInTb = async (
+	tbKey: string,
+	files: File[],
+	callback?: () => Promise<void>
+) => {
+	let success = 0;
+	let errors = 0;
+	for (const file of files) {
+		try {
+			const resp = await createTorrent(tbKey, { file });
+			const id = resp?.data?.torrent_id ?? resp?.data?.queued_id;
+			if (!id) throw new Error('no_id_returned');
+			// Fetch info and convert to UserTorrent for cache/DB layers that may listen elsewhere
+			try {
+				const infoResp = await getTorrentList(tbKey, { id });
+				const info = infoResp?.data as TorBoxTorrentInfo;
+				if (info) {
+					// No direct DB/cache here; library refresh will pick it up
+					convertToTbUserTorrent(info);
+				}
+			} catch {
+				// Swallow info fetch errors; the torrent is created anyway
+			}
+			success++;
+		} catch (error) {
+			errors++;
+			console.error(
+				'Error adding torrent file in TB:',
+				error instanceof Error ? error.message : 'Unknown error'
+			);
+			toast.error('There was an error adding torrent file');
+		}
+	}
+	if (callback) await callback();
+	toast(
+		`Successfully added ${success} torrent file${success === 1 ? '' : 's'} to TorBox!` +
+			(errors ? ` (${errors} failed)` : ''),
+		magnetToastOptions
+	);
 };

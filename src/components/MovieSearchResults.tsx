@@ -218,11 +218,23 @@ const MovieSearchResults = ({
 	return (
 		<div className="mx-1 my-1 grid grid-cols-1 gap-2 overflow-x-auto sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
 			{filteredResults.map((r: SearchResult, i: number) => {
-				const downloaded = isDownloaded('rd', r.hash) || isDownloaded('ad', r.hash);
-				const downloading = isDownloading('rd', r.hash) || isDownloading('ad', r.hash);
+				const downloaded =
+					isDownloaded('rd', r.hash) ||
+					isDownloaded('ad', r.hash) ||
+					isDownloaded('tb', r.hash);
+				const downloading =
+					isDownloading('rd', r.hash) ||
+					isDownloading('ad', r.hash) ||
+					isDownloading('tb', r.hash);
 				const inYourLibrary = downloaded || downloading;
 
-				if (onlyShowCached && !r.rdAvailable && !r.adAvailable && !inYourLibrary)
+				if (
+					onlyShowCached &&
+					!r.rdAvailable &&
+					!r.adAvailable &&
+					!r.tbAvailable &&
+					!inYourLibrary
+				)
 					return null;
 				if (
 					movieMaxSize !== '0' &&
@@ -241,7 +253,7 @@ const MovieSearchResults = ({
 				return (
 					<div
 						key={i}
-						className={`border-2 border-gray-700 ${borderColor(downloaded, downloading)} ${getMovieCountClass(r.videoCount, r.rdAvailable || r.adAvailable)} overflow-hidden rounded-lg bg-opacity-30 shadow transition-shadow duration-200 ease-in hover:shadow-lg`}
+						className={`border-2 border-gray-700 ${borderColor(downloaded, downloading)} ${getMovieCountClass(r.videoCount, r.rdAvailable || r.adAvailable || r.tbAvailable)} overflow-hidden rounded-lg bg-opacity-30 shadow transition-shadow duration-200 ease-in hover:shadow-lg`}
 					>
 						<div className="space-y-2 p-1">
 							<h2 className="line-clamp-2 overflow-hidden text-ellipsis break-words text-sm font-bold leading-tight">
@@ -263,6 +275,8 @@ const MovieSearchResults = ({
 											{fileSize(r.biggestFileSize)} GB
 											{r.trackerStats &&
 												!r.rdAvailable &&
+												!r.adAvailable &&
+												!r.tbAvailable &&
 												(r.trackerStats.seeders > 0 ? (
 													<span className="text-green-400">
 														{' '}
@@ -280,6 +294,8 @@ const MovieSearchResults = ({
 											Total: {fileSize(r.fileSize)} GB
 											{r.trackerStats &&
 												!r.rdAvailable &&
+												!r.adAvailable &&
+												!r.tbAvailable &&
 												(r.trackerStats.seeders > 0 ? (
 													<span className="text-green-400">
 														{' '}
@@ -299,6 +315,8 @@ const MovieSearchResults = ({
 									Total: {fileSize(r.fileSize)} GB
 									{r.trackerStats &&
 										!r.rdAvailable &&
+										!r.adAvailable &&
+										!r.tbAvailable &&
 										(r.trackerStats.seeders > 0 ? (
 											<span className="text-green-400"> • Has seeders</span>
 										) : (
@@ -426,7 +444,7 @@ const MovieSearchResults = ({
 								)}
 
 								{/* Check availability btn */}
-								{rdKey && !r.rdAvailable && (
+								{rdKey && !r.rdAvailable && !r.adAvailable && !r.tbAvailable && (
 									<button
 										className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${checkingHashes.has(r.hash) ? 'cursor-not-allowed opacity-50' : ''}`}
 										onClick={() => handleCheckWithLoading(r)}
@@ -447,7 +465,7 @@ const MovieSearchResults = ({
 								)}
 
 								{/* Watch btn */}
-								{(r.rdAvailable || r.adAvailable) && (
+								{(r.rdAvailable || r.adAvailable || r.tbAvailable) && (
 									<>
 										{r.rdAvailable && player && (
 											<button

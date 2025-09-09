@@ -12,7 +12,7 @@ import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
 import { handleCastMovie } from '@/utils/castApiClient';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
-import { instantCheckInRd } from '@/utils/instantChecks';
+import { instantCheckInRd, instantCheckInTb } from '@/utils/instantChecks';
 import { quickSearch } from '@/utils/quickSearch';
 import { sortByBiggest } from '@/utils/results';
 import { isVideo } from '@/utils/selectable';
@@ -136,12 +136,15 @@ const MovieSearch: FunctionComponent = () => {
 	const { isCheckingAvailability, handleCheckAvailability, handleAvailabilityTest } =
 		useAvailabilityCheck(
 			rdKey,
+			torboxKey,
 			imdbid as string,
 			searchResults,
 			setSearchResults,
 			hashAndProgress,
 			addRd,
+			addTb,
 			deleteRd,
+			deleteTb,
 			sortByBiggest
 		);
 
@@ -294,43 +297,78 @@ const MovieSearch: FunctionComponent = () => {
 				});
 
 				const nonCachedNew = newUniqueResults.filter(
-					(r) => !r.rdAvailable && !r.adAvailable
+					(r) => !r.rdAvailable && !r.adAvailable && !r.tbAvailable
 				);
 
 				completedSources++;
 
-				if (nonCachedNew.length > 0 && rdKey) {
+				if (nonCachedNew.length > 0) {
 					const hashArr = nonCachedNew.map((r) => r.hash);
-					pendingAvailabilityChecks++;
 
-					(async () => {
-						const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
-						const count = await instantCheckInRd(
-							tokenWithTimestamp,
-							tokenHash,
-							imdbId,
-							hashArr,
-							setSearchResults,
-							sortByBiggest
-						);
-						totalAvailableCount += count;
-						pendingAvailabilityChecks--;
+					// Check RD availability
+					if (rdKey) {
+						pendingAvailabilityChecks++;
 
-						if (
-							allSourcesCompleted &&
-							pendingAvailabilityChecks === 0 &&
-							totalAvailableCount > 0
-						) {
-							// Trigger the toast notification through state
-							setSearchCompleteInfo({
-								finalResults: 0,
-								totalAvailableCount,
-								allSourcesCompleted,
-								pendingAvailabilityChecks,
-								isAvailabilityOnly: true,
-							});
-						}
-					})();
+						(async () => {
+							const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
+							const count = await instantCheckInRd(
+								tokenWithTimestamp,
+								tokenHash,
+								imdbId,
+								hashArr,
+								setSearchResults,
+								sortByBiggest
+							);
+							totalAvailableCount += count;
+							pendingAvailabilityChecks--;
+
+							if (
+								allSourcesCompleted &&
+								pendingAvailabilityChecks === 0 &&
+								totalAvailableCount > 0
+							) {
+								// Trigger the toast notification through state
+								setSearchCompleteInfo({
+									finalResults: 0,
+									totalAvailableCount,
+									allSourcesCompleted,
+									pendingAvailabilityChecks,
+									isAvailabilityOnly: true,
+								});
+							}
+						})();
+					}
+
+					// Check TorBox availability
+					if (torboxKey) {
+						pendingAvailabilityChecks++;
+
+						(async () => {
+							const count = await instantCheckInTb(
+								torboxKey,
+								hashArr,
+								setSearchResults,
+								sortByBiggest
+							);
+							totalAvailableCount += count;
+							pendingAvailabilityChecks--;
+
+							if (
+								allSourcesCompleted &&
+								pendingAvailabilityChecks === 0 &&
+								totalAvailableCount > 0
+							) {
+								// Trigger the toast notification through state
+								setSearchCompleteInfo({
+									finalResults: 0,
+									totalAvailableCount,
+									allSourcesCompleted,
+									pendingAvailabilityChecks,
+									isAvailabilityOnly: true,
+								});
+							}
+						})();
+					}
 				}
 
 				if (completedSources === totalSources) {
@@ -405,6 +443,7 @@ const MovieSearch: FunctionComponent = () => {
 				...r,
 				rdAvailable: false,
 				adAvailable: false,
+				tbAvailable: false,
 				noVideos: false,
 				files: r.files || [],
 			}));

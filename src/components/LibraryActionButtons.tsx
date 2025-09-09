@@ -8,7 +8,7 @@ interface LibraryActionButtonsProps {
 	onGenerateHashlist: () => void;
 	onDeleteShownTorrents: () => void;
 	onAddMagnet: (service: string) => void;
-	onLocalRestore: (service: 'rd' | 'ad') => Promise<void>;
+	onLocalRestore: (service: 'rd' | 'ad' | 'tb') => Promise<void>;
 	onLocalBackup: () => Promise<void>;
 	onDedupeBySize: () => void;
 	onDedupeByRecency: () => void;
@@ -16,6 +16,7 @@ interface LibraryActionButtonsProps {
 	selectedTorrentsSize: number;
 	rdKey: string | null;
 	adKey: string | null;
+	tbKey?: string | null;
 	showDedupe: boolean;
 	showHashCombine: boolean;
 }
@@ -35,6 +36,7 @@ export default function LibraryActionButtons({
 	selectedTorrentsSize,
 	rdKey,
 	adKey,
+	tbKey,
 	showDedupe,
 	showHashCombine,
 }: LibraryActionButtonsProps) {
@@ -87,6 +89,19 @@ export default function LibraryActionButtons({
 					<LibraryButton variant="indigo" onClick={() => onLocalRestore('ad')}>
 						<Wrench className="mr-1 inline-block h-4 w-4 text-indigo-500" />
 						AD Restore
+					</LibraryButton>
+				</>
+			)}
+
+			{tbKey && (
+				<>
+					<LibraryButton variant="teal" onClick={() => onAddMagnet('tb')}>
+						<Link2 className="mr-1 inline-block h-4 w-4 text-teal-500" />
+						TB&nbsp;Add
+					</LibraryButton>
+					<LibraryButton variant="indigo" onClick={() => onLocalRestore('tb')}>
+						<Wrench className="mr-1 inline-block h-4 w-4 text-indigo-500" />
+						TB Restore
 					</LibraryButton>
 				</>
 			)}

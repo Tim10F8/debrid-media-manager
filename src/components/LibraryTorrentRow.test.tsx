@@ -1,6 +1,14 @@
 import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
-import { handleReinsertTorrentinRd, handleRestartTorrent } from '@/utils/addMagnet';
-import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorrent';
+import {
+	handleReinsertTorrentinRd,
+	handleRestartTbTorrent,
+	handleRestartTorrent,
+} from '@/utils/addMagnet';
+import {
+	handleDeleteAdTorrent,
+	handleDeleteRdTorrent,
+	handleDeleteTbTorrent,
+} from '@/utils/deleteTorrent';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/router';
@@ -27,6 +35,12 @@ const mockHandleDeleteRdTorrent = handleDeleteRdTorrent as MockedFunction<
 >;
 const mockHandleDeleteAdTorrent = handleDeleteAdTorrent as MockedFunction<
 	typeof handleDeleteAdTorrent
+>;
+const mockHandleDeleteTbTorrent = handleDeleteTbTorrent as MockedFunction<
+	typeof handleDeleteTbTorrent
+>;
+const mockHandleRestartTbTorrent = handleRestartTbTorrent as MockedFunction<
+	typeof handleRestartTbTorrent
 >;
 
 describe('LibraryTorrentRow Reinsert Functionality', () => {
@@ -56,6 +70,7 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 		torrent: mockTorrent,
 		rdKey: 'test-rd-key',
 		adKey: null,
+		tbKey: null,
 		shouldDownloadMagnets: false,
 		hashGrouping: {},
 		titleGrouping: {},
@@ -135,6 +150,35 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 			expect(adProps.onRefreshLibrary).toHaveBeenCalled();
 		});
 
+		it('should call appropriate restart function for TB torrents', async () => {
+			const tbTorrent = { ...mockTorrent, id: 'tb:789' };
+			const tbProps = {
+				...defaultProps,
+				torrent: tbTorrent,
+				rdKey: null,
+				adKey: null,
+				tbKey: 'test-tb-key',
+			};
+
+			mockHandleRestartTbTorrent.mockResolvedValueOnce(undefined);
+
+			const { container } = render(<LibraryTorrentRow {...tbProps} />);
+
+			const reinsertButton = container.querySelector('button[title="Reinsert"]');
+			fireEvent.click(reinsertButton!);
+
+			await waitFor(() => {
+				// Should call handleRestartTbTorrent for TB
+				expect(mockHandleRestartTbTorrent).toHaveBeenCalledWith('test-tb-key', 'tb:789');
+				// Should NOT call RD reinsert or AD restart
+				expect(mockHandleReinsertTorrentinRd).not.toHaveBeenCalled();
+				expect(mockHandleRestartTorrent).not.toHaveBeenCalled();
+			});
+
+			// Should still refresh library
+			expect(tbProps.onRefreshLibrary).toHaveBeenCalled();
+		});
+
 		it('should handle errors gracefully', async () => {
 			const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 			const error = new Error('Reinsert failed');
@@ -207,6 +251,29 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 				expect(adProps.onDelete).toHaveBeenCalledWith('ad:456');
 			});
 		});
+
+		it('should call appropriate delete function for TB torrents', async () => {
+			const tbTorrent = { ...mockTorrent, id: 'tb:789' };
+			const tbProps = {
+				...defaultProps,
+				torrent: tbTorrent,
+				rdKey: null,
+				adKey: null,
+				tbKey: 'test-tb-key',
+			};
+
+			mockHandleDeleteTbTorrent.mockResolvedValueOnce(undefined);
+
+			const { container } = render(<LibraryTorrentRow {...tbProps} />);
+
+			const deleteButton = container.querySelector('button[title="Delete"]');
+			fireEvent.click(deleteButton!);
+
+			await waitFor(() => {
+				expect(mockHandleDeleteTbTorrent).toHaveBeenCalledWith('test-tb-key', 'tb:789');
+				expect(tbProps.onDelete).toHaveBeenCalledWith('tb:789');
+			});
+		});
 	});
 
 	describe('Row Display', () => {
@@ -220,7 +287,7 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 			expect(screen.getByText('0.9 GB')).toBeInTheDocument();
 
 			// Check status for finished torrent
-			expect(screen.getByText('downloaded')).toBeInTheDocument();
+			expect(screen.getByText('Downloaded')).toBeInTheDocument();
 		});
 
 		it('should show progress for downloading torrents', () => {

@@ -1,5 +1,6 @@
 import { MagnetStatus, getMagnetStatus } from '@/services/allDebrid';
 import { getUserTorrentsList } from '@/services/realDebrid';
+import { getTorrentList } from '@/services/torbox';
 import { TorBoxTorrentInfo, UserTorrentResponse } from '@/services/types';
 import { UserTorrentStatus } from '@/torrent/userTorrent';
 import { ParsedFilename } from '@ctrl/video-filename-parser';
@@ -10,12 +11,14 @@ import {
 	convertToUserTorrent,
 	fetchAllDebrid,
 	fetchRealDebrid,
+	fetchTorBox,
 	getRdStatus,
 } from './fetchTorrents';
 
 // Mock dependencies
 vi.mock('@/services/allDebrid');
 vi.mock('@/services/realDebrid');
+vi.mock('@/services/torbox');
 vi.mock('react-hot-toast', () => ({
 	default: {
 		error: vi.fn(),
@@ -730,6 +733,98 @@ describe('fetchTorrents utilities', () => {
 			expect(callback).toHaveBeenCalled();
 			const torrents = callback.mock.calls[0][0];
 			expect(torrents.length).toBeGreaterThan(0);
+		});
+	});
+
+	describe('fetchTorBox', () => {
+		it('should fetch torrents successfully', async () => {
+			const tbKey = 'test-tb-key';
+			const callback = vi.fn();
+			const mockTorrentInfo: TorBoxTorrentInfo = {
+				id: 123,
+				name: 'Test Movie.mkv',
+				size: 1000000,
+				progress: 100,
+				download_state: 'finished',
+				seeds: 10,
+				download_speed: 0,
+				created_at: '2024-01-01T00:00:00Z',
+				hash: 'testhash',
+				files: [
+					{ name: 'Test Movie.mkv', size: 1000000, s3_path: 'http://example.com/file' },
+				],
+			} as any;
+
+			vi.mocked(getTorrentList).mockResolvedValue({
+				success: true,
+				data: [mockTorrentInfo],
+			} as any);
+
+			await fetchTorBox(tbKey, callback);
+
+			expect(getTorrentList).toHaveBeenCalledWith(tbKey);
+			expect(callback).toHaveBeenCalled();
+			const torrents = callback.mock.calls[0][0];
+			expect(torrents).toHaveLength(1);
+			expect(torrents[0].id).toBe('tb:123');
+			expect(torrents[0].filename).toBe('Test Movie.mkv');
+		});
+
+		it('should handle empty torrent list', async () => {
+			const tbKey = 'test-tb-key';
+			const callback = vi.fn();
+
+			vi.mocked(getTorrentList).mockResolvedValue({
+				success: true,
+				data: [],
+			} as any);
+
+			await fetchTorBox(tbKey, callback);
+
+			expect(callback).toHaveBeenCalledWith([]);
+		});
+
+		it('should handle API errors', async () => {
+			const tbKey = 'test-tb-key';
+			const callback = vi.fn();
+
+			vi.mocked(getTorrentList).mockRejectedValue(new Error('API Error'));
+
+			await fetchTorBox(tbKey, callback);
+
+			expect(toast.error).toHaveBeenCalledWith(
+				'Error fetching TorBox torrents list',
+				expect.any(Object)
+			);
+			expect(callback).toHaveBeenCalledWith([]);
+		});
+
+		it('should apply custom limit', async () => {
+			const tbKey = 'test-tb-key';
+			const callback = vi.fn();
+			const mockTorrents: TorBoxTorrentInfo[] = Array.from({ length: 10 }, (_, i) => ({
+				id: i + 1,
+				name: `Test Movie ${i + 1}.mkv`,
+				size: 1000000,
+				progress: 100,
+				download_state: 'finished',
+				seeds: 10,
+				download_speed: 0,
+				created_at: '2024-01-01T00:00:00Z',
+				hash: `testhash${i}`,
+				files: [{ name: `Test Movie ${i + 1}.mkv`, size: 1000000 }],
+			})) as any[];
+
+			vi.mocked(getTorrentList).mockResolvedValue({
+				success: true,
+				data: mockTorrents,
+			} as any);
+
+			await fetchTorBox(tbKey, callback, 5);
+
+			expect(callback).toHaveBeenCalled();
+			const torrents = callback.mock.calls[0][0];
+			expect(torrents).toHaveLength(5);
 		});
 	});
 });

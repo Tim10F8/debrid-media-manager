@@ -1,5 +1,5 @@
 import { SearchResult } from '@/services/mediasearch';
-import { instantCheckInRd } from '@/utils/instantChecks';
+import { instantCheckInRd, instantCheckInTb } from '@/utils/instantChecks';
 import { processWithConcurrency } from '@/utils/parallelProcessor';
 import { generateTokenAndHash } from '@/utils/token';
 import { getCachedTrackerStats, shouldIncludeTrackerStats } from '@/utils/trackerStats';
@@ -8,12 +8,15 @@ import toast from 'react-hot-toast';
 
 export function useAvailabilityCheck(
 	rdKey: string | null,
+	torboxKey: string | null,
 	imdbId: string,
 	searchResults: SearchResult[],
 	setSearchResults: React.Dispatch<React.SetStateAction<SearchResult[]>>,
 	hashAndProgress: Record<string, number>,
 	addRd: (hash: string, isCheckingAvailability: boolean) => Promise<any>,
+	addTb: (hash: string, isCheckingAvailability: boolean) => Promise<any>,
 	deleteRd: (hash: string) => Promise<void>,
+	deleteTb: (hash: string) => Promise<void>,
 	sortFunction: (searchResults: SearchResult[]) => SearchResult[]
 ) {
 	const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
@@ -21,66 +24,107 @@ export function useAvailabilityCheck(
 
 	const handleCheckAvailability = useCallback(
 		async (result: SearchResult) => {
-			if (result.rdAvailable) {
-				toast.success('This torrent is already available in Real Debrid');
+			if (result.rdAvailable || result.tbAvailable) {
+				const service = result.rdAvailable ? 'Real Debrid' : 'TorBox';
+				toast.success(`This torrent is already available in ${service}`);
 				return;
 			}
 
 			const toastId = toast.loading('Checking availability...');
 
 			try {
-				// Run both checks in parallel
-				const [rdCheckResult, trackerStatsResult] = await Promise.allSettled([
-					// RD availability check
-					(async () => {
-						let addRdResponse: any;
-						// Check if torrent is in progress
-						if (`rd:${result.hash}` in hashAndProgress) {
-							await deleteRd(result.hash);
-							addRdResponse = await addRd(result.hash, true);
-						} else {
-							addRdResponse = await addRd(result.hash, true);
-							await deleteRd(result.hash);
-						}
+				// Run checks in parallel for both RD and TorBox
+				const [rdCheckResult, tbCheckResult, trackerStatsResult] = await Promise.allSettled(
+					[
+						// RD availability check
+						rdKey
+							? (async () => {
+									let addRdResponse: any;
+									// Check if torrent is in progress
+									if (`rd:${result.hash}` in hashAndProgress) {
+										await deleteRd(result.hash);
+										addRdResponse = await addRd(result.hash, true);
+									} else {
+										addRdResponse = await addRd(result.hash, true);
+										await deleteRd(result.hash);
+									}
 
-						// Check if addRd found it cached (returns response with ID)
-						const isCachedInRD =
-							addRdResponse &&
-							addRdResponse.id &&
-							addRdResponse.status === 'downloaded' &&
-							addRdResponse.progress === 100;
+									// Check if addRd found it cached (returns response with ID)
+									const isCachedInRD =
+										addRdResponse &&
+										addRdResponse.id &&
+										addRdResponse.status === 'downloaded' &&
+										addRdResponse.progress === 100;
 
-						return { addRdResponse, isCachedInRD };
-					})(),
+									return { addRdResponse, isCachedInRD };
+								})()
+							: Promise.resolve({ addRdResponse: null, isCachedInRD: false }),
 
-					// Tracker stats check (only if enabled and not already RD available)
-					(async () => {
-						if (!shouldIncludeTrackerStats() || result.rdAvailable) {
-							return null;
-						}
+						// TorBox availability check
+						torboxKey
+							? (async () => {
+									let addTbResponse: any;
+									// Check if torrent is in progress
+									if (`tb:${result.hash}` in hashAndProgress) {
+										await deleteTb(result.hash);
+										addTbResponse = await addTb(result.hash, true);
+									} else {
+										addTbResponse = await addTb(result.hash, true);
+										await deleteTb(result.hash);
+									}
 
-						// For single torrent checks, force refresh if it was previously dead
-						const currentStats = result.trackerStats;
-						const forceRefresh = currentStats && currentStats.seeders === 0;
+									// Check if addTb found it cached
+									const isCachedInTB =
+										addTbResponse &&
+										addTbResponse.id &&
+										addTbResponse.download_finished;
 
-						// Use cached stats if fresh, otherwise scrape new ones
-						return await getCachedTrackerStats(result.hash, 24, forceRefresh);
-					})(),
-				]);
+									return { addTbResponse, isCachedInTB };
+								})()
+							: Promise.resolve({ addTbResponse: null, isCachedInTB: false }),
+
+						// Tracker stats check (only if enabled and not already available)
+						(async () => {
+							if (
+								!shouldIncludeTrackerStats() ||
+								result.rdAvailable ||
+								result.tbAvailable
+							) {
+								return null;
+							}
+
+							// For single torrent checks, force refresh if it was previously dead
+							const currentStats = result.trackerStats;
+							const forceRefresh = currentStats && currentStats.seeders === 0;
+
+							// Use cached stats if fresh, otherwise scrape new ones
+							return await getCachedTrackerStats(result.hash, 24, forceRefresh);
+						})(),
+					]
+				);
 
 				// Process RD check result
 				let isCachedInRD = false;
 				if (rdCheckResult.status === 'fulfilled') {
 					isCachedInRD = rdCheckResult.value.isCachedInRD;
-				} else {
+				} else if (rdKey) {
 					console.error('RD availability check failed:', rdCheckResult.reason);
 				}
 
-				// Process tracker stats result (only if not cached in RD)
+				// Process TorBox check result
+				let isCachedInTB = false;
+				if (tbCheckResult.status === 'fulfilled') {
+					isCachedInTB = tbCheckResult.value.isCachedInTB;
+				} else if (torboxKey) {
+					console.error('TorBox availability check failed:', tbCheckResult.reason);
+				}
+
+				// Process tracker stats result (only if not cached in either service)
 				if (
 					trackerStatsResult.status === 'fulfilled' &&
 					trackerStatsResult.value &&
-					!isCachedInRD
+					!isCachedInRD &&
+					!isCachedInTB
 				) {
 					const trackerStats = trackerStatsResult.value;
 
@@ -102,7 +146,11 @@ export function useAvailabilityCheck(
 						return r;
 					});
 					setSearchResults(updatedResults);
-				} else if (trackerStatsResult.status === 'rejected' && !isCachedInRD) {
+				} else if (
+					trackerStatsResult.status === 'rejected' &&
+					!isCachedInRD &&
+					!isCachedInTB
+				) {
 					console.error('Failed to get tracker stats:', trackerStatsResult.reason);
 				}
 
@@ -110,16 +158,25 @@ export function useAvailabilityCheck(
 
 				// Refetch data instead of reloading
 				if (isMounted.current) {
-					const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
 					const hashArr = [result.hash];
-					await instantCheckInRd(
-						tokenWithTimestamp,
-						tokenHash,
-						imdbId,
-						hashArr,
-						setSearchResults,
-						sortFunction
-					);
+
+					// Check RD if available
+					if (rdKey) {
+						const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
+						await instantCheckInRd(
+							tokenWithTimestamp,
+							tokenHash,
+							imdbId,
+							hashArr,
+							setSearchResults,
+							sortFunction
+						);
+					}
+
+					// Check TorBox if available
+					if (torboxKey) {
+						await instantCheckInTb(torboxKey, hashArr, setSearchResults, sortFunction);
+					}
 				}
 
 				// Reload the page after a short delay to show the result
@@ -140,14 +197,28 @@ export function useAvailabilityCheck(
 				}, 1500);
 			}
 		},
-		[imdbId, searchResults, setSearchResults, hashAndProgress, addRd, deleteRd, sortFunction]
+		[
+			imdbId,
+			rdKey,
+			torboxKey,
+			searchResults,
+			setSearchResults,
+			hashAndProgress,
+			addRd,
+			addTb,
+			deleteRd,
+			deleteTb,
+			sortFunction,
+		]
 	);
 
 	const handleAvailabilityTest = useCallback(
 		async (filteredResults: SearchResult[]) => {
 			if (isCheckingAvailability) return;
 
-			const nonAvailableResults = filteredResults.filter((r) => !r.rdAvailable);
+			const nonAvailableResults = filteredResults.filter(
+				(r) => !r.rdAvailable && !r.tbAvailable
+			);
 			let progressToast: string | null = null;
 			let realtimeAvailableCount = 0;
 
@@ -208,54 +279,103 @@ export function useAvailabilityCheck(
 			};
 
 			try {
-				// Run RD checks and tracker stats completely in parallel
-				const [rdCheckResults, trackerStatsResults] = await Promise.all([
+				// Run RD, TorBox checks and tracker stats completely in parallel
+				const [rdCheckResults, tbCheckResults, trackerStatsResults] = await Promise.all([
 					// RD availability checks with concurrency limit
-					processWithConcurrency(
-						torrentsToCheck,
-						async (result: SearchResult) => {
-							try {
-								let addRdResponse: any;
-								if (`rd:${result.hash}` in hashAndProgress) {
-									await deleteRd(result.hash);
-									addRdResponse = await addRd(result.hash, true);
-								} else {
-									addRdResponse = await addRd(result.hash, true);
-									await deleteRd(result.hash);
+					rdKey
+						? processWithConcurrency(
+								torrentsToCheck,
+								async (result: SearchResult) => {
+									try {
+										let addRdResponse: any;
+										if (`rd:${result.hash}` in hashAndProgress) {
+											await deleteRd(result.hash);
+											addRdResponse = await addRd(result.hash, true);
+										} else {
+											addRdResponse = await addRd(result.hash, true);
+											await deleteRd(result.hash);
+										}
+
+										// Check if addRd returned a response with an ID AND is truly available
+										const isCachedInRD =
+											addRdResponse &&
+											addRdResponse.id &&
+											addRdResponse.status === 'downloaded' &&
+											addRdResponse.progress === 100;
+
+										if (isCachedInRD) {
+											realtimeAvailableCount++;
+										}
+
+										return { result, isCachedInRD };
+									} catch (error) {
+										console.error(
+											`Failed RD check for ${result.title}:`,
+											error
+										);
+										throw error;
+									}
+								},
+								3,
+								(completed: number, total: number) => {
+									rdProgress = { completed, total };
+									updateProgressMessage();
 								}
+							)
+						: Promise.resolve([]),
 
-								// Check if addRd returned a response with an ID AND is truly available
-								const isCachedInRD =
-									addRdResponse &&
-									addRdResponse.id &&
-									addRdResponse.status === 'downloaded' &&
-									addRdResponse.progress === 100;
+					// TorBox availability checks with concurrency limit
+					torboxKey
+						? processWithConcurrency(
+								torrentsToCheck,
+								async (result: SearchResult) => {
+									try {
+										let addTbResponse: any;
+										if (`tb:${result.hash}` in hashAndProgress) {
+											await deleteTb(result.hash);
+											addTbResponse = await addTb(result.hash, true);
+										} else {
+											addTbResponse = await addTb(result.hash, true);
+											await deleteTb(result.hash);
+										}
 
-								if (isCachedInRD) {
-									realtimeAvailableCount++;
+										// Check if addTb returned a response and is cached
+										const isCachedInTB =
+											addTbResponse &&
+											addTbResponse.id &&
+											addTbResponse.download_finished;
+
+										if (isCachedInTB) {
+											realtimeAvailableCount++;
+										}
+
+										return { result, isCachedInTB };
+									} catch (error) {
+										console.error(
+											`Failed TorBox check for ${result.title}:`,
+											error
+										);
+										throw error;
+									}
+								},
+								3,
+								(completed: number, total: number) => {
+									rdProgress = { completed, total };
+									updateProgressMessage();
 								}
+							)
+						: Promise.resolve([]),
 
-								return { result, isCachedInRD };
-							} catch (error) {
-								console.error(`Failed RD check for ${result.title}:`, error);
-								throw error;
-							}
-						},
-						3,
-						(completed: number, total: number) => {
-							rdProgress = { completed, total };
-							updateProgressMessage();
-						}
-					),
-
-					// Tracker stats checks (only for non-RD available torrents)
+					// Tracker stats checks (only for non-available torrents)
 					(async () => {
 						if (!shouldIncludeTrackerStats()) {
 							return [];
 						}
 
-						// Filter out torrents that are already RD available
-						const torrentsNeedingStats = torrentsToCheck.filter((t) => !t.rdAvailable);
+						// Filter out torrents that are already available in any service
+						const torrentsNeedingStats = torrentsToCheck.filter(
+							(t) => !t.rdAvailable && !t.tbAvailable
+						);
 
 						if (torrentsNeedingStats.length === 0) {
 							return [];
@@ -307,47 +427,65 @@ export function useAvailabilityCheck(
 					})(),
 				]);
 
-				// Filter out tracker stats for torrents that turned out to be RD cached
-				const rdCachedHashes = new Set(
-					rdCheckResults
+				// Filter out tracker stats for torrents that turned out to be cached
+				const cachedHashes = new Set([
+					...rdCheckResults
 						.filter((r) => r.success && r.result?.isCachedInRD)
-						.map((r) => r.item.hash)
-				);
+						.map((r) => r.item.hash),
+					...tbCheckResults
+						.filter((r) => r.success && r.result?.isCachedInTB)
+						.map((r) => r.item.hash),
+				]);
 
 				// Apply tracker stats only to non-cached torrents
 				trackerStatsResults.forEach((statsResult: any) => {
 					if (
 						statsResult.success &&
 						statsResult.result?.trackerStats &&
-						!rdCachedHashes.has(statsResult.item.hash)
+						!cachedHashes.has(statsResult.item.hash)
 					) {
 						// Stats will already be set on the result object
-					} else if (statsResult.success && rdCachedHashes.has(statsResult.item.hash)) {
-						// Clear tracker stats for RD cached torrents
+					} else if (statsResult.success && cachedHashes.has(statsResult.item.hash)) {
+						// Clear tracker stats for cached torrents
 						delete statsResult.item.trackerStats;
 					}
 				});
 
-				const succeeded = rdCheckResults.filter((r) => r.success);
-				const failed = rdCheckResults.filter((r) => !r.success);
+				const allResults = [...rdCheckResults, ...tbCheckResults];
+				const succeeded = allResults.filter((r) => r.success);
+				const failed = allResults.filter((r) => !r.success);
 
 				if (progressToast && isMounted.current) {
 					toast.dismiss(progressToast);
 				}
 
-				// Get the final accurate count with a single instant check
+				// Get the final accurate count with instant checks for both services
 				let availableCount = 0;
 				if (succeeded.length > 0 && isMounted.current) {
-					const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
 					const successfulHashes = succeeded.map((r) => r.item.hash);
-					availableCount = await instantCheckInRd(
-						tokenWithTimestamp,
-						tokenHash,
-						imdbId,
-						successfulHashes,
-						setSearchResults,
-						sortFunction
-					);
+
+					// Check RD if available
+					if (rdKey) {
+						const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
+						availableCount += await instantCheckInRd(
+							tokenWithTimestamp,
+							tokenHash,
+							imdbId,
+							successfulHashes,
+							setSearchResults,
+							sortFunction
+						);
+					}
+
+					// Check TorBox if available
+					if (torboxKey) {
+						availableCount += await instantCheckInTb(
+							torboxKey,
+							successfulHashes,
+							setSearchResults,
+							sortFunction
+						);
+					}
 				}
 
 				// Update search results with tracker stats for torrents that have them
@@ -408,10 +546,14 @@ export function useAvailabilityCheck(
 		},
 		[
 			imdbId,
+			rdKey,
+			torboxKey,
 			setSearchResults,
 			hashAndProgress,
 			addRd,
+			addTb,
 			deleteRd,
+			deleteTb,
 			sortFunction,
 			isCheckingAvailability,
 		]

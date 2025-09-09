@@ -53,6 +53,7 @@ export interface EnrichedHashlistTorrent extends HashlistTorrent {
 	noVideos: boolean;
 	rdAvailable: boolean;
 	adAvailable: boolean;
+	tbAvailable: boolean; // TorBox
 	files: FileData[];
 }
 

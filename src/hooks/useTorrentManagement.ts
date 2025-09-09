@@ -2,7 +2,7 @@ import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { SearchResult } from '@/services/mediasearch';
 import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
-import { UserTorrent } from '@/torrent/userTorrent';
+import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
 import {
 	handleAddAsMagnetInAd,
 	handleAddAsMagnetInRd,
@@ -134,6 +134,10 @@ export function useTorrentManagement(
 		async (hash: string) => {
 			if (!torboxKey) return;
 
+			// Read searchResults at call time via closure
+			const torrentResult = searchResults.find((r) => r.hash === hash);
+			const wasMarkedAvailable = torrentResult?.tbAvailable || false;
+
 			await handleAddAsMagnetInTb(torboxKey, hash, async (userTorrent: UserTorrent) => {
 				await torrentDB.add(userTorrent);
 				addToCache(userTorrent); // Update global cache
@@ -141,13 +145,16 @@ export function useTorrentManagement(
 				// Immediately update hashAndProgress state for this torrent
 				setHashAndProgress((prev) => ({
 					...prev,
-					[`${userTorrent.id.substring(0, 3)}${userTorrent.hash}`]: userTorrent.progress,
+					[`${userTorrent.id.substring(0, 3)}${userTorrent.hash}`]:
+						wasMarkedAvailable || userTorrent.status === UserTorrentStatus.finished
+							? 100
+							: userTorrent.progress,
 				}));
 
 				await fetchHashAndProgress();
 			});
 		},
-		[torboxKey, fetchHashAndProgress, addToCache]
+		[torboxKey, fetchHashAndProgress, addToCache, searchResults]
 	);
 
 	const deleteRd = useCallback(

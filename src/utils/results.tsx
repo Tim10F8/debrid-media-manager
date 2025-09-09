@@ -16,6 +16,8 @@ export const btnColor = (avail: boolean, noVideos: boolean) =>
 export const torrentPrefix = (id: string) =>
 	id.startsWith('rd:') ? (
 		<span className="bg-[#b5d496] text-xs text-black">RD</span>
+	) : id.startsWith('tb:') ? (
+		<span className="bg-[#4f46e5] text-xs text-white">TB</span>
 	) : (
 		<span className="bg-[#fbc730] text-[8px] text-black">AD</span>
 	);

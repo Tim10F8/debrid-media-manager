@@ -1,5 +1,4 @@
 import { SearchResult } from '@/services/mediasearch';
-import { createTorrent } from '@/services/torbox';
 import { downloadMagnetFile } from '@/utils/downloadMagnet';
 import { getEpisodeCountClass, getEpisodeCountLabel } from '@/utils/episodeUtils';
 import { borderColor, btnColor, btnIcon, btnLabel, fileSize } from '@/utils/results';
@@ -13,7 +12,6 @@ import {
 	X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
 import ReportButton from './ReportButton';
 
 type TvSearchResultsProps = {
@@ -32,8 +30,10 @@ type TvSearchResultsProps = {
 	handleCheckAvailability: (result: SearchResult) => Promise<void>;
 	addRd: (hash: string) => Promise<void>;
 	addAd: (hash: string) => Promise<void>;
+	addTb: (hash: string) => Promise<void>;
 	deleteRd: (hash: string) => Promise<void>;
 	deleteAd: (hash: string) => Promise<void>;
+	deleteTb: (hash: string) => Promise<void>;
 	imdbId?: string;
 };
 
@@ -53,8 +53,10 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 	handleCheckAvailability,
 	addRd,
 	addAd,
+	addTb,
 	deleteRd,
 	deleteAd,
+	deleteTb,
 	imdbId,
 }) => {
 	const [loadingHashes, setLoadingHashes] = useState<Set<string>>(new Set());
@@ -196,12 +198,23 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 		<div className="mx-1 my-1 grid grid-cols-1 gap-2 overflow-x-auto sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
 			{filteredResults && filteredResults.length > 0
 				? filteredResults.map((r: SearchResult, i: number) => {
-						const downloaded = isDownloaded('rd', r.hash) || isDownloaded('ad', r.hash);
+						const downloaded =
+							isDownloaded('rd', r.hash) ||
+							isDownloaded('ad', r.hash) ||
+							isDownloaded('tb', r.hash);
 						const downloading =
-							isDownloading('rd', r.hash) || isDownloading('ad', r.hash);
+							isDownloading('rd', r.hash) ||
+							isDownloading('ad', r.hash) ||
+							isDownloading('tb', r.hash);
 						const inYourLibrary = downloaded || downloading;
 
-						if (onlyShowCached && !r.rdAvailable && !r.adAvailable && !inYourLibrary)
+						if (
+							onlyShowCached &&
+							!r.rdAvailable &&
+							!r.adAvailable &&
+							!r.tbAvailable &&
+							!inYourLibrary
+						)
 							return null;
 						if (
 							episodeMaxSize !== '0' &&
@@ -225,7 +238,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 						return (
 							<div
 								key={i}
-								className={`border-2 border-gray-700 ${borderColor(downloaded, downloading)} ${getEpisodeCountClass(r.videoCount, expectedEpisodeCount, r.rdAvailable || r.adAvailable)} overflow-hidden rounded-lg bg-opacity-30 shadow transition-shadow duration-200 ease-in hover:shadow-lg`}
+								className={`border-2 border-gray-700 ${borderColor(downloaded, downloading)} ${getEpisodeCountClass(r.videoCount, expectedEpisodeCount, r.rdAvailable || r.adAvailable || r.tbAvailable)} overflow-hidden rounded-lg bg-opacity-30 shadow transition-shadow duration-200 ease-in hover:shadow-lg`}
 							>
 								<div className="space-y-2 p-1">
 									<h2 className="line-clamp-2 overflow-hidden text-ellipsis break-words text-sm font-bold leading-tight">
@@ -243,6 +256,8 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 												{fileSize(r.medianFileSize)} GB
 												{r.trackerStats &&
 													!r.rdAvailable &&
+													!r.adAvailable &&
+													!r.tbAvailable &&
 													(r.trackerStats.seeders > 0 ? (
 														<span className="text-green-400">
 															{' '}
@@ -261,6 +276,8 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 											Total: {fileSize(r.fileSize)} GB
 											{r.trackerStats &&
 												!r.rdAvailable &&
+												!r.adAvailable &&
+												!r.tbAvailable &&
 												(r.trackerStats.hasActivity ? (
 													<span className="text-green-400">
 														{' '}
@@ -356,7 +373,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 										{torboxKey && inLibrary('tb', r.hash) && (
 											<button
 												className={`haptic-sm inline rounded border-2 border-red-500 bg-red-900/30 px-1 text-xs text-red-100 transition-colors hover:bg-red-800/50 ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
-												onClick={() => handleDeleteRd(r.hash)}
+												onClick={() => deleteTb(r.hash)}
 												disabled={isLoading}
 											>
 												{isLoading ? (
@@ -368,48 +385,13 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 												)}
 												{isLoading
 													? 'Removing...'
-													: `TorBox (${hashAndProgress[`tb:${r.hash}`] + '%'})`}
+													: `TB (${hashAndProgress[`tb:${r.hash}`] + '%'})`}
 											</button>
 										)}
 										{torboxKey && notInLibrary('tb', r.hash) && (
 											<button
-												className={`border-2 border-${btnColor(r.rdAvailable, r.noVideos)}-500 bg-${btnColor(r.rdAvailable, r.noVideos)}-900/30 text-${btnColor(r.rdAvailable, r.noVideos)}-100 hover:bg-${btnColor(r.rdAvailable, r.noVideos)}-800/50 haptic-sm inline rounded px-1 text-xs transition-colors ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
-												onClick={async () => {
-													setLoadingHashes((prev) =>
-														new Set(prev).add(r.hash)
-													);
-													try {
-														await toast.promise(
-															(async () => {
-																const createResponse =
-																	await createTorrent(torboxKey, {
-																		magnet: `magnet:?xt=urn:btih:${r.hash}`,
-																		name: r.title,
-																	});
-																if (
-																	!createResponse.success ||
-																	!createResponse.data.torrent_id
-																) {
-																	throw new Error(
-																		'Failed to create torrent'
-																	);
-																}
-															})(),
-															{
-																loading:
-																	'Creating TorBox download...',
-																success: 'Download started!',
-																error: 'Failed to create TorBox download',
-															}
-														);
-													} finally {
-														setLoadingHashes((prev) => {
-															const newSet = new Set(prev);
-															newSet.delete(r.hash);
-															return newSet;
-														});
-													}
-												}}
+												className={`border-2 border-${btnColor(r.tbAvailable, r.noVideos)}-500 bg-${btnColor(r.tbAvailable, r.noVideos)}-900/30 text-${btnColor(r.tbAvailable, r.noVideos)}-100 hover:bg-${btnColor(r.tbAvailable, r.noVideos)}-800/50 haptic-sm inline rounded px-1 text-xs transition-colors ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
+												onClick={() => addTb(r.hash)}
 												disabled={isLoading}
 											>
 												{isLoading ? (
@@ -417,11 +399,11 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 														⌛
 													</span>
 												) : (
-													btnIcon(r.rdAvailable)
+													btnIcon(r.tbAvailable)
 												)}
 												{isLoading
 													? 'Adding...'
-													: btnLabel(r.rdAvailable, 'TorBox')}
+													: btnLabel(r.tbAvailable, 'TB')}
 											</button>
 										)}
 
@@ -449,25 +431,28 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 										)}
 
 										{/* Check availability btn */}
-										{rdKey && !r.rdAvailable && (
-											<button
-												className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${checkingHashes.has(r.hash) ? 'cursor-not-allowed opacity-50' : ''}`}
-												onClick={() => handleCheckWithLoading(r)}
-												disabled={checkingHashes.has(r.hash)}
-											>
-												{checkingHashes.has(r.hash) ? (
-													<>
-														<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
-														Checking...
-													</>
-												) : (
-													<>
-														<SearchIcon className="mr-1 inline-block h-3 w-3 text-yellow-400" />
-														Check
-													</>
-												)}
-											</button>
-										)}
+										{(rdKey || torboxKey) &&
+											!r.rdAvailable &&
+											!r.adAvailable &&
+											!r.tbAvailable && (
+												<button
+													className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${checkingHashes.has(r.hash) ? 'cursor-not-allowed opacity-50' : ''}`}
+													onClick={() => handleCheckWithLoading(r)}
+													disabled={checkingHashes.has(r.hash)}
+												>
+													{checkingHashes.has(r.hash) ? (
+														<>
+															<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
+															Checking...
+														</>
+													) : (
+														<>
+															<SearchIcon className="mr-1 inline-block h-3 w-3 text-yellow-400" />
+															Check
+														</>
+													)}
+												</button>
+											)}
 
 										{/* Watch button */}
 										{rdKey && player && r.rdAvailable && (

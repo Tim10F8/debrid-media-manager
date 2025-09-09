@@ -5,22 +5,29 @@ import LibrarySize from '@/components/LibrarySize';
 import LibraryTableHeader from '@/components/LibraryTableHeader';
 import LibraryTorrentRow from '@/components/LibraryTorrentRow';
 import { useLibraryCache } from '@/contexts/LibraryCacheContext';
-import { useAllDebridApiKey, useRealDebridAccessToken } from '@/hooks/auth';
+import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
 import { getTorrentInfo, proxyUnrestrictLink } from '@/services/realDebrid';
 import UserTorrentDB from '@/torrent/db';
 import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
 import {
 	handleAddAsMagnetInAd,
 	handleAddAsMagnetInRd,
+	handleAddAsMagnetInTb,
 	handleAddMultipleHashesInAd,
 	handleAddMultipleHashesInRd,
+	handleAddMultipleHashesInTb,
 	handleAddMultipleTorrentFilesInRd,
+	handleAddMultipleTorrentFilesInTb,
 	handleReinsertTorrentinRd,
 	handleRestartTorrent,
 } from '@/utils/addMagnet';
 import { AsyncFunction, runConcurrentFunctions } from '@/utils/batch';
 import { deleteFilteredTorrents } from '@/utils/deleteList';
-import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorrent';
+import {
+	handleDeleteAdTorrent,
+	handleDeleteRdTorrent,
+	handleDeleteTbTorrent,
+} from '@/utils/deleteTorrent';
 import { extractHashes } from '@/utils/extractHashes';
 import { getRdStatus } from '@/utils/fetchTorrents';
 import { generateHashList } from '@/utils/hashList';
@@ -108,6 +115,7 @@ function TorrentsPage() {
 	// keys
 	const [rdKey] = useRealDebridAccessToken();
 	const adKey = useAllDebridApiKey();
+	const tbKey = useTorBoxAccessToken();
 
 	const [defaultTitleGrouping] = useState<Record<string, number>>(() => ({}));
 	const [movieTitleGrouping] = useState<Record<string, number>>(() => ({}));
@@ -240,6 +248,13 @@ function TorrentsPage() {
 			promises.push(
 				new Promise<void>((resolve) => {
 					handleAddMultipleHashesInAd(adKey, hashes, async () => resolve());
+				})
+			);
+		}
+		if (tbKey) {
+			promises.push(
+				new Promise<void>((resolve) => {
+					handleAddMultipleHashesInTb(tbKey, hashes, async () => resolve());
 				})
 			);
 		}
@@ -712,6 +727,9 @@ function TorrentsPage() {
 				if (adKey && t.id.startsWith('ad:')) {
 					await handleDeleteAdTorrent(adKey, t.id);
 				}
+				if (tbKey && t.id.startsWith('tb:')) {
+					await handleDeleteTbTorrent(tbKey, t.id);
+				}
 			} catch (error) {
 				// Rollback optimistic update on failure
 				console.error('Failed to delete torrent:', error);
@@ -1098,6 +1116,7 @@ function TorrentsPage() {
 			const addMagnet = (hash: string) => {
 				if (rdKey && debridService === 'rd') return handleAddAsMagnetInRd(rdKey, hash);
 				if (adKey && debridService === 'ad') return handleAddAsMagnetInAd(adKey, hash);
+				if (tbKey && debridService === 'tb') return handleAddAsMagnetInTb(tbKey, hash);
 			};
 
 			function wrapAddMagnetFn(hash: string) {
@@ -1263,6 +1282,19 @@ function TorrentsPage() {
 				handleAddMultipleHashesInAd(adKey, allHashes, async () => await refreshLibrary());
 			}
 		}
+		if (tbKey && debridService === 'tb') {
+			// TorBox accepts both torrent files and magnets
+			if (torrentFiles.length > 0) {
+				handleAddMultipleTorrentFilesInTb(
+					tbKey,
+					torrentFiles,
+					async () => await refreshLibrary()
+				);
+			}
+			if (hashes.length > 0) {
+				handleAddMultipleHashesInTb(tbKey, hashes, async () => await refreshLibrary());
+			}
+		}
 	}
 
 	const hasNoQueryParamsBut = (...params: string[]) =>
@@ -1389,6 +1421,7 @@ function TorrentsPage() {
 				selectedTorrentsSize={selectedTorrents.size}
 				rdKey={rdKey}
 				adKey={adKey}
+				tbKey={tbKey}
 				showDedupe={
 					router.query.status === 'sametitle' ||
 					(!!titleFilter && filteredList.length > 1)
@@ -1420,6 +1453,7 @@ function TorrentsPage() {
 									torrent={torrent}
 									rdKey={rdKey}
 									adKey={adKey}
+									tbKey={tbKey}
 									shouldDownloadMagnets={shouldDownloadMagnets}
 									hashGrouping={hashGrouping}
 									titleGrouping={getTitleGroupings(torrent.mediaType)}
@@ -1490,6 +1524,13 @@ function TorrentsPage() {
 											);
 										} else if (t.id.startsWith('ad:') && adKey) {
 											await handleShowInfoForAD(t, adKey);
+										} else if (t.id.startsWith('tb:') && tbKey) {
+											// For now, show basic info for TorBox torrents
+											console.log('TorBox torrent info:', t);
+											// TODO: Implement detailed TorBox info modal
+											alert(
+												`TorBox torrent: ${t.title}\nStatus: ${t.serviceStatus}\nProgress: ${t.progress}%\nSize: ${(t.bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
+											);
 										} else {
 											console.error(
 												'Cannot show info: missing debrid service key'

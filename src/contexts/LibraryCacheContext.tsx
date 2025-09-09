@@ -1,9 +1,14 @@
-import { useAllDebridApiKey, useRealDebridAccessToken } from '@/hooks/auth';
+import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
 import { getMagnetStatus } from '@/services/allDebrid';
 import { getUserTorrentsList } from '@/services/realDebrid';
+import { getTorrentList } from '@/services/torbox';
 import UserTorrentDB from '@/torrent/db';
 import { UserTorrent } from '@/torrent/userTorrent';
-import { fetchLatestADTorrents, fetchLatestRDTorrents } from '@/utils/libraryFetching';
+import {
+	fetchLatestADTorrents,
+	fetchLatestRDTorrents,
+	fetchLatestTBTorrents,
+} from '@/utils/libraryFetching';
 import {
 	createContext,
 	ReactNode,
@@ -32,6 +37,8 @@ interface LibraryState {
 	rdFirstTorrentId: string | null;
 	adTotalCount: number;
 	adFirstMagnetId: number | null;
+	tbTotalCount: number;
+	tbFirstTorrentId: number | null;
 	timestamp: number;
 }
 
@@ -51,6 +58,7 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 	const [error, setError] = useState<string | null>(null);
 	const [rdSyncing, setRdSyncing] = useState(false);
 	const [adSyncing, setAdSyncing] = useState(false);
+	const [tbSyncing, setTbSyncing] = useState(false);
 	const [selectedTorrents, setSelectedTorrents] = useState<Set<string>>(new Set());
 	const retryCountRef = useRef(0);
 	const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -60,6 +68,7 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 
 	const [rdKey, rdLoading] = useRealDebridAccessToken();
 	const adKey = useAllDebridApiKey();
+	const tbKey = useTorBoxAccessToken();
 
 	// Track previous RD key and pending refetch to detect and act on changes
 	const prevRdKeyRef = useRef<string | null | undefined>(undefined);
@@ -89,6 +98,8 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 			rdFirstTorrentId: null,
 			adTotalCount: 0,
 			adFirstMagnetId: null,
+			tbTotalCount: 0,
+			tbFirstTorrentId: null,
 			timestamp: Date.now(),
 		};
 
@@ -112,12 +123,24 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 				}
 			}
 
+			// Check TorBox state
+			if (tbKey) {
+				const tbResponse = await getTorrentList(tbKey, { limit: 1 });
+				if (tbResponse?.success && tbResponse.data) {
+					const torrents = Array.isArray(tbResponse.data)
+						? tbResponse.data
+						: [tbResponse.data];
+					state.tbTotalCount = torrents.length; // This is just from the first page, not accurate total
+					state.tbFirstTorrentId = torrents.length > 0 ? torrents[0].id : null;
+				}
+			}
+
 			return state;
 		} catch (error) {
 			console.error('Failed to get library state:', error);
 			return null;
 		}
-	}, [rdKey, adKey]);
+	}, [rdKey, adKey, tbKey]);
 
 	// Check if library state has changed
 	const hasLibraryChanged = useCallback(
@@ -152,6 +175,20 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 				return true;
 			}
 
+			// Check TorBox changes
+			if (oldState.tbTotalCount !== newState.tbTotalCount) {
+				console.log(
+					`Library change detected: TB count changed from ${oldState.tbTotalCount} to ${newState.tbTotalCount}`
+				);
+				return true;
+			}
+			if (oldState.tbFirstTorrentId !== newState.tbFirstTorrentId) {
+				console.log(
+					`Library change detected: TB first torrent changed from ${oldState.tbFirstTorrentId} to ${newState.tbFirstTorrentId}`
+				);
+				return true;
+			}
+
 			return false;
 		},
 		[]
@@ -164,7 +201,7 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 			if (isFetchingRef.current) {
 				return;
 			}
-			if (!rdKey && !adKey) {
+			if (!rdKey && !adKey && !tbKey) {
 				setIsLoading(false);
 				setError('No debrid service configured');
 				return;
@@ -227,6 +264,21 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 					);
 				}
 
+				// Fetch from TorBox
+				if (tbKey) {
+					setTbSyncing(true);
+					await fetchLatestTBTorrents(
+						tbKey,
+						torrentDB,
+						setLibraryItems,
+						setIsLoading,
+						setTbSyncing,
+						setSelectedTorrents,
+						undefined, // customLimit
+						forceRefresh
+					);
+				}
+
 				// Update state after successful fetch
 				const newState = await getCurrentLibraryState();
 				if (newState) {
@@ -272,7 +324,7 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 				// Keep activeRdKeyRef as the last-used RD key for decision making
 			}
 		},
-		[rdKey, adKey, isFetching, getCurrentLibraryState]
+		[rdKey, adKey, tbKey, isFetching, getCurrentLibraryState]
 	);
 
 	// Smart refresh with change detection (for auto-refresh)

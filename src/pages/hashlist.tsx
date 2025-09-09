@@ -98,6 +98,11 @@ function HashlistPage() {
 					info,
 					mediaType,
 					title: getMediaId(info, mediaType, false) || torrent.filename,
+					rdAvailable: false,
+					adAvailable: false,
+					tbAvailable: false,
+					noVideos: false,
+					files: [],
 					...torrent,
 				};
 			}) as EnrichedHashlistTorrent[];

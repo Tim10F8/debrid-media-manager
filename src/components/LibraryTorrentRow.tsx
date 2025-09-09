@@ -1,11 +1,22 @@
 import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
-import { handleReinsertTorrentinRd, handleRestartTorrent } from '@/utils/addMagnet';
+import {
+	handleReinsertTorrentinRd,
+	handleRestartTbTorrent,
+	handleRestartTorrent,
+} from '@/utils/addMagnet';
+import { getAllDebridStatusText } from '@/utils/allDebridStatus';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
-import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorrent';
+import {
+	handleDeleteAdTorrent,
+	handleDeleteRdTorrent,
+	handleDeleteTbTorrent,
+} from '@/utils/deleteTorrent';
 import { handleShare } from '@/utils/hashList';
 import { normalize } from '@/utils/mediaId';
+import { getRealDebridStatusText } from '@/utils/realDebridStatus';
 import { torrentPrefix } from '@/utils/results';
 import { shortenNumber } from '@/utils/speed';
+import { getTorBoxStatusText } from '@/utils/torBoxStatus';
 import {
 	Check,
 	Film,
@@ -27,6 +38,7 @@ interface TorrentRowProps {
 	torrent: UserTorrent;
 	rdKey: string | null;
 	adKey: string | null;
+	tbKey: string | null;
 	shouldDownloadMagnets: boolean;
 	hashGrouping: Record<string, number>;
 	titleGrouping: Record<string, number>;
@@ -46,6 +58,7 @@ export default function TorrentRow({
 	torrent,
 	rdKey,
 	adKey,
+	tbKey,
 	shouldDownloadMagnets,
 	hashGrouping,
 	titleGrouping,
@@ -61,6 +74,18 @@ export default function TorrentRow({
 	onRefreshLibrary,
 }: TorrentRowProps) {
 	const router = useRouter();
+
+	// Helper function to get user-friendly status text for any service
+	const getStatusText = (torrent: UserTorrent): string => {
+		if (torrent.id.startsWith('rd:')) {
+			return getRealDebridStatusText(torrent.serviceStatus);
+		} else if (torrent.id.startsWith('ad:')) {
+			return getAllDebridStatusText(torrent.serviceStatus);
+		} else if (torrent.id.startsWith('tb:')) {
+			return getTorBoxStatusText(torrent.serviceStatus);
+		}
+		return torrent.serviceStatus; // Fallback to raw status
+	};
 
 	// Calculate filter texts
 	const hashGroupCount = hashGrouping[torrent.hash];
@@ -159,17 +184,20 @@ export default function TorrentRow({
 						<br />
 					</>
 				)}
-				{rdKey && adKey && torrentPrefix(torrent.id)}{' '}
+				{[rdKey, adKey, tbKey].filter(Boolean).length > 1 && torrentPrefix(torrent.id)}{' '}
 				{torrent.filename === torrent.hash ? 'Magnet' : torrent.filename}
-				{torrent.filename === torrent.hash || torrent.filename === 'Magnet'
-					? ` (${torrent.status})`
+				{torrent.filename === torrent.hash ||
+				torrent.filename === 'Magnet' ||
+				torrent.status === UserTorrentStatus.error
+					? ` (${getStatusText(torrent)})`
 					: ''}
 			</td>
 			<td onClick={() => onShowInfo(torrent)} className="px-0.5 py-1 text-center text-xs">
 				{(torrent.bytes / ONE_GIGABYTE).toFixed(1)} GB
 			</td>
 			<td onClick={() => onShowInfo(torrent)} className="px-0.5 py-1 text-center text-xs">
-				{torrent.status !== UserTorrentStatus.finished ? (
+				{torrent.status !== UserTorrentStatus.finished &&
+				torrent.status !== UserTorrentStatus.error ? (
 					<>
 						<span className="inline-block align-middle">
 							{torrent.progress.toFixed(2)}%&nbsp;
@@ -184,7 +212,7 @@ export default function TorrentRow({
 						</span>
 					</>
 				) : (
-					`${torrent.serviceStatus}`
+					getStatusText(torrent)
 				)}
 			</td>
 			<td onClick={() => onShowInfo(torrent)} className="px-0.5 py-1 text-center text-xs">
@@ -214,6 +242,9 @@ export default function TorrentRow({
 						}
 						if (adKey && torrent.id.startsWith('ad:')) {
 							await handleDeleteAdTorrent(adKey, torrent.id);
+						}
+						if (tbKey && torrent.id.startsWith('tb:')) {
+							await handleDeleteTbTorrent(tbKey, torrent.id);
 						}
 						onDelete(torrent.id);
 					}}
@@ -248,6 +279,13 @@ export default function TorrentRow({
 							if (adKey && torrent.id.startsWith('ad:')) {
 								await handleRestartTorrent(adKey, torrent.id);
 								// AllDebrid might also need refresh
+								if (onRefreshLibrary) {
+									await onRefreshLibrary();
+								}
+							}
+							if (tbKey && torrent.id.startsWith('tb:')) {
+								await handleRestartTbTorrent(tbKey, torrent.id);
+								// TorBox might also need refresh
 								if (onRefreshLibrary) {
 									await onRefreshLibrary();
 								}

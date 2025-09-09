@@ -3,7 +3,7 @@ import SearchTokens from '@/components/SearchTokens';
 import TvSearchResults from '@/components/TvSearchResults';
 import Poster from '@/components/poster';
 import { showInfoForRD } from '@/components/showInfo';
-import { useAllDebridApiKey, useRealDebridAccessToken } from '@/hooks/auth';
+import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
 import { useAvailabilityCheck } from '@/hooks/useAvailabilityCheck';
 import { useExternalSources } from '@/hooks/useExternalSources';
 import { useMassReport } from '@/hooks/useMassReport';
@@ -18,7 +18,7 @@ import {
 	getExpectedEpisodeCount,
 	getQueryForEpisodeCount,
 } from '@/utils/episodeUtils';
-import { instantCheckInRd } from '@/utils/instantChecks';
+import { instantCheckInRd, instantCheckInTb } from '@/utils/instantChecks';
 import { quickSearch } from '@/utils/quickSearch';
 import { sortByMedian } from '@/utils/results';
 import { isVideo } from '@/utils/selectable';
@@ -72,6 +72,7 @@ const TvSearch: FunctionComponent = () => {
 	const [descLimit, setDescLimit] = useState(100);
 	const [rdKey] = useRealDebridAccessToken();
 	const adKey = useAllDebridApiKey();
+	const torboxKey = useTorBoxAccessToken();
 	const [onlyShowCached, setOnlyShowCached] = useState<boolean>(false);
 	const [currentPage, setCurrentPage] = useState(0);
 	const [hasMoreResults, setHasMoreResults] = useState(true);
@@ -97,31 +98,42 @@ const TvSearch: FunctionComponent = () => {
 	const { imdbid, seasonNum } = router.query;
 
 	// Use shared hooks
-	const { hashAndProgress, fetchHashAndProgress, addRd, addAd, deleteRd, deleteAd } =
-		useTorrentManagement(
-			rdKey,
-			adKey,
-			null, // no torbox in TV show page
-			imdbid as string,
-			searchResults,
-			setSearchResults
-		);
+	const {
+		hashAndProgress,
+		fetchHashAndProgress,
+		addRd,
+		addAd,
+		addTb,
+		deleteRd,
+		deleteAd,
+		deleteTb,
+	} = useTorrentManagement(
+		rdKey,
+		adKey,
+		torboxKey,
+		imdbid as string,
+		searchResults,
+		setSearchResults
+	);
 
 	const { fetchEpisodeFromExternalSource, getEnabledSources } = useExternalSources(rdKey);
 
 	const { isCheckingAvailability, handleCheckAvailability, handleAvailabilityTest } =
 		useAvailabilityCheck(
 			rdKey,
+			torboxKey,
 			imdbid as string,
 			searchResults,
 			setSearchResults,
 			hashAndProgress,
 			addRd,
+			addTb,
 			deleteRd,
+			deleteTb,
 			sortByMedian
 		);
 
-	const { handleMassReport } = useMassReport(rdKey, adKey, null, imdbid as string);
+	const { handleMassReport } = useMassReport(rdKey, adKey, torboxKey, imdbid as string);
 
 	const expectedEpisodeCount = useMemo(
 		() =>
@@ -242,51 +254,91 @@ const TvSearch: FunctionComponent = () => {
 
 				// Check availability for new non-cached results
 				const nonCachedNew = newUniqueResults.filter(
-					(r) => !r.rdAvailable && !r.adAvailable
+					(r) => !r.rdAvailable && !r.adAvailable && !r.tbAvailable
 				);
 
 				// Always increment the completed sources counter synchronously
 				completedSources++;
 
-				if (nonCachedNew.length > 0 && rdKey) {
+				if (nonCachedNew.length > 0) {
 					const hashArr = nonCachedNew.map((r) => r.hash);
 
-					// Track pending availability check
-					pendingAvailabilityChecks++;
+					// Check RD availability
+					if (rdKey) {
+						// Track pending availability check
+						pendingAvailabilityChecks++;
 
-					// Start async availability check but don't wait for it
-					(async () => {
-						const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
-						const count = await instantCheckInRd(
-							tokenWithTimestamp,
-							tokenHash,
-							imdbId,
-							hashArr,
-							setSearchResults,
-							sortByMedian
-						);
-						// Update the count
-						totalAvailableCount += count;
+						// Start async RD availability check
+						(async () => {
+							const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
+							const count = await instantCheckInRd(
+								tokenWithTimestamp,
+								tokenHash,
+								imdbId,
+								hashArr,
+								setSearchResults,
+								sortByMedian
+							);
+							// Update the count
+							totalAvailableCount += count;
 
-						// Decrement pending checks
-						pendingAvailabilityChecks--;
+							// Decrement pending checks
+							pendingAvailabilityChecks--;
 
-						// If all sources completed and this was the last availability check
-						if (
-							allSourcesCompleted &&
-							pendingAvailabilityChecks === 0 &&
-							totalAvailableCount > 0
-						) {
-							// Trigger the toast notification through state
-							setSearchCompleteInfo({
-								finalResults: 0,
-								totalAvailableCount,
-								allSourcesCompleted,
-								pendingAvailabilityChecks,
-								isAvailabilityOnly: true,
-							});
-						}
-					})();
+							// If all sources completed and this was the last availability check
+							if (
+								allSourcesCompleted &&
+								pendingAvailabilityChecks === 0 &&
+								totalAvailableCount > 0
+							) {
+								// Trigger the toast notification through state
+								setSearchCompleteInfo({
+									finalResults: 0,
+									totalAvailableCount,
+									allSourcesCompleted,
+									pendingAvailabilityChecks,
+									isAvailabilityOnly: true,
+								});
+							}
+						})();
+					}
+
+					// Check TorBox availability
+					if (torboxKey) {
+						// Track pending availability check
+						pendingAvailabilityChecks++;
+
+						// Start async TorBox availability check
+						(async () => {
+							const count = await instantCheckInTb(
+								torboxKey,
+								hashArr,
+								setSearchResults,
+								sortByMedian
+							);
+							// Update the count
+							totalAvailableCount += count;
+
+							// Decrement pending checks
+							pendingAvailabilityChecks--;
+
+							// If all sources completed and this was the last availability check
+							if (
+								allSourcesCompleted &&
+								pendingAvailabilityChecks === 0 &&
+								totalAvailableCount > 0
+							) {
+								// Trigger the toast notification through state
+								setSearchCompleteInfo({
+									finalResults: 0,
+									totalAvailableCount,
+									allSourcesCompleted,
+									pendingAvailabilityChecks,
+									isAvailabilityOnly: true,
+								});
+							}
+						})();
+					}
 				}
 
 				// Check if all sources completed
@@ -404,6 +456,7 @@ const TvSearch: FunctionComponent = () => {
 				...r,
 				rdAvailable: false,
 				adAvailable: false,
+				tbAvailable: false,
 				noVideos: false,
 				files: r.files || [],
 			}));
@@ -1051,6 +1104,7 @@ const TvSearch: FunctionComponent = () => {
 				episodeMaxSize={episodeMaxSize}
 				rdKey={rdKey}
 				adKey={adKey}
+				torboxKey={torboxKey}
 				player={player}
 				hashAndProgress={hashAndProgress}
 				handleShowInfo={handleShowInfo}
@@ -1059,8 +1113,10 @@ const TvSearch: FunctionComponent = () => {
 				handleCheckAvailability={handleCheckAvailability}
 				addRd={addRd}
 				addAd={addAd}
+				addTb={addTb}
 				deleteRd={deleteRd}
 				deleteAd={deleteAd}
+				deleteTb={deleteTb}
 				imdbId={imdbid as string}
 			/>
 

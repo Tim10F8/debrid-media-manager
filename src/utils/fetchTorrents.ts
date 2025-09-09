@@ -1,5 +1,6 @@
 import { MagnetStatus, getMagnetStatus } from '@/services/allDebrid';
 import { getUserTorrentsList } from '@/services/realDebrid';
+import { getTorrentList } from '@/services/torbox';
 import { TorBoxTorrentInfo, UserTorrentResponse } from '@/services/types';
 import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
 import { ParsedFilename, filenameParse } from '@ctrl/video-filename-parser';
@@ -317,6 +318,12 @@ export const getRdStatus = (torrentInfo: UserTorrentResponse): UserTorrentStatus
 		case 'downloaded':
 			status = UserTorrentStatus.finished;
 			break;
+		case 'magnet_error':
+		case 'error':
+		case 'virus':
+		case 'dead':
+			status = UserTorrentStatus.error;
+			break;
 		default:
 			status = UserTorrentStatus.error;
 			break;
@@ -330,22 +337,27 @@ export const convertToTbUserTorrent = (info: TorBoxTorrentInfo): UserTorrent => 
 	let status: UserTorrentStatus;
 
 	// Map TorBox status to UserTorrentStatus
-	switch (info.download_state.toLowerCase()) {
-		case 'queued':
-		case 'checking':
-			status = UserTorrentStatus.waiting;
-			break;
-		case 'downloading':
-		case 'uploading':
-			status = UserTorrentStatus.downloading;
-			break;
-		case 'finished':
-		case 'seeding':
-			status = UserTorrentStatus.finished;
-			break;
-		default:
-			status = UserTorrentStatus.error;
-			break;
+	// Check download_finished flag first, as TorBox can show "uploading" when seeding after completion
+	if (info.download_finished) {
+		status = UserTorrentStatus.finished;
+	} else {
+		switch (info.download_state.toLowerCase()) {
+			case 'queued':
+			case 'checking':
+				status = UserTorrentStatus.waiting;
+				break;
+			case 'downloading':
+			case 'uploading':
+				status = UserTorrentStatus.downloading;
+				break;
+			case 'finished':
+			case 'seeding':
+				status = UserTorrentStatus.finished;
+				break;
+			default:
+				status = UserTorrentStatus.error;
+				break;
+		}
 	}
 
 	// Parse filename for media info
@@ -378,6 +390,14 @@ export const convertToTbUserTorrent = (info: TorBoxTorrentInfo): UserTorrent => 
 			link: file.s3_path || '',
 		})) ?? [];
 
+	// Ensure progress reflects completed state when finished/cached
+	const computedProgress =
+		status === UserTorrentStatus.finished ||
+		info.download_finished ||
+		(info as any).download_present
+			? 100
+			: info.progress;
+
 	return {
 		id: `tb:${info.id}`,
 		links: selectedFiles.map((f) => f.link).filter(Boolean),
@@ -392,7 +412,7 @@ export const convertToTbUserTorrent = (info: TorBoxTorrentInfo): UserTorrent => 
 		bytes: info.size,
 		status,
 		serviceStatus,
-		progress: info.progress,
+		progress: computedProgress,
 		added: new Date(info.created_at),
 		hash: info.hash,
 		mediaType,
@@ -426,3 +446,42 @@ const getAdStatus = (magnetInfo: MagnetStatus): [UserTorrentStatus, number] => {
 	}
 	return [status, progress];
 };
+
+export const fetchTorBox = async (
+	tbKey: string,
+	callback: (torrents: UserTorrent[]) => Promise<void>,
+	customLimit?: number
+) => {
+	try {
+		// Get all torrents from TorBox
+		const response = await getTorrentList(tbKey);
+
+		if (!response.success || !response.data) {
+			await callback([]);
+			return;
+		}
+
+		// Handle both single torrent and array responses
+		const torrentInfos = Array.isArray(response.data) ? response.data : [response.data];
+
+		if (!torrentInfos.length) {
+			await callback([]);
+			return;
+		}
+
+		// Apply custom limit if specified
+		const limitedTorrents = customLimit ? torrentInfos.slice(0, customLimit) : torrentInfos;
+
+		// Process the torrents
+		const torrents = await processTorBoxTorrents(limitedTorrents);
+		await callback(torrents);
+	} catch (error) {
+		await callback([]);
+		toast.error('Error fetching TorBox torrents list', genericToastOptions);
+		console.error(error);
+	}
+};
+
+async function processTorBoxTorrents(torrentInfos: TorBoxTorrentInfo[]): Promise<UserTorrent[]> {
+	return Promise.all(torrentInfos.map(convertToTbUserTorrent));
+}
