@@ -446,9 +446,9 @@ export async function getUserTorrentsList(
 	bare: boolean = false
 ): Promise<UserTorrentsResult> {
 	try {
-		// Add a cache-aware parameter to ensure fresh results for critical requests
+		// Add a cache-aware parameter to ensure fresh results for all requests
 		// This helps avoid conflicts with the service worker cache
-		const cacheParam = page === 1 ? `&_fresh=${Date.now()}` : '';
+		const cacheParam = `&_fresh=${Date.now()}`;
 
 		const response = await realDebridAxios.get<UserTorrentResponse[]>(
 			`${bare ? 'https://app.real-debrid.com' : getProxyUrl(config.proxy) + config.realDebridHostname}/rest/1.0/torrents?page=${page}&limit=${limit}${cacheParam}`,

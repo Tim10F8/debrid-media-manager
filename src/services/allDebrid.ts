@@ -308,7 +308,9 @@ export const getMagnetStatus = async (
 	counter?: number
 ): Promise<MagnetStatusResponse> => {
 	const endpoint = `${config.allDebridHostname}/v4.1/magnet/status`;
-	const params: any = {};
+	const params: any = {
+		_fresh: Date.now(), // Add cache-busting parameter for fresh uncached results
+	};
 
 	if (magnetId) {
 		params.id = magnetId;

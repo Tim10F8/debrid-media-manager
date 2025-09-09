@@ -165,9 +165,15 @@ export const getTorrentList = async (
 ): Promise<TorBoxResponse<TorBoxTorrentInfo[] | TorBoxTorrentInfo>> => {
 	try {
 		const client = createAxiosClient(accessToken);
+		// Add fresh query parameter to get uncached results
+		const queryParams = {
+			...params,
+			bypass_cache: true, // Always fetch fresh uncached results
+			_fresh: Date.now(), // Additional cache-busting parameter
+		};
 		const response = await client.get<TorBoxResponse<TorBoxTorrentInfo[] | TorBoxTorrentInfo>>(
 			`/${API_VERSION}/api/torrents/mylist`,
-			{ params }
+			{ params: queryParams }
 		);
 		return response.data;
 	} catch (error: any) {
