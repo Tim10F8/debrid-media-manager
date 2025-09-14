@@ -30,7 +30,7 @@ const config = (() => {
 
 // Constants for timeout and retry
 const REQUEST_TIMEOUT = 10000; // Increased from 5s to 10s
-const TORRENT_REQUEST_TIMEOUT = 30000; // Increased from 15s to 30s
+const TORRENT_REQUEST_TIMEOUT = 15000; // 15s timeout to fail fast and retry
 // Adjust rate limits to be compatible with the service worker cache timing
 // Service worker cache is 5 seconds, so we need to ensure requests are spaced
 // to avoid conflicting with cache invalidation
@@ -445,6 +445,7 @@ export async function getUserTorrentsList(
 	page: number = 1,
 	bare: boolean = false
 ): Promise<UserTorrentsResult> {
+	const apiStart = Date.now();
 	try {
 		// Add a cache-aware parameter to ensure fresh results for all requests
 		// This helps avoid conflicts with the service worker cache
@@ -458,6 +459,9 @@ export async function getUserTorrentsList(
 				},
 				timeout: TORRENT_REQUEST_TIMEOUT,
 			}
+		);
+		console.log(
+			`[${new Date().toISOString()}]     RD API call (page=${page}, limit=${limit}): ${Date.now() - apiStart}ms`
 		);
 
 		const {

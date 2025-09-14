@@ -222,7 +222,9 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 			isFetchingRef.current = true;
 			setIsFetching(true);
 			const startTs = Date.now();
-			console.log(`Library fetch start (reason=${reason}, forceRefresh=${forceRefresh})`);
+			console.log(
+				`[${new Date().toISOString()}] Library fetch start (reason=${reason}, forceRefresh=${forceRefresh})`
+			);
 			activeRdKeyRef.current = rdKey ?? null;
 			setError(null);
 
@@ -279,12 +281,32 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 					);
 				}
 
-				// Update state after successful fetch
-				const newState = await getCurrentLibraryState();
-				if (newState) {
-					lastLibraryState.current = newState;
-					localStorage.setItem(LIBRARY_STATE_KEY, JSON.stringify(newState));
-				}
+				// Update state after successful fetch using data we already have
+				// No need for another API call - we just fetched everything!
+				const allTorrents = await torrentDB.all();
+				const rdTorrents = allTorrents.filter((t) => t.id.startsWith('rd:'));
+				const adTorrents = allTorrents.filter((t) => t.id.startsWith('ad:'));
+				const tbTorrents = allTorrents.filter((t) => t.id.startsWith('tb:'));
+
+				const newState: LibraryState = {
+					rdTotalCount: rdTorrents.length,
+					rdFirstTorrentId:
+						rdTorrents.length > 0 ? rdTorrents[0].id.replace('rd:', '') : null,
+					adTotalCount: adTorrents.length,
+					adFirstMagnetId:
+						adTorrents.length > 0
+							? parseInt(adTorrents[0].id.replace('ad:', ''))
+							: null,
+					tbTotalCount: tbTorrents.length,
+					tbFirstTorrentId:
+						tbTorrents.length > 0
+							? parseInt(tbTorrents[0].id.replace('tb:', ''))
+							: null,
+					timestamp: Date.now(),
+				};
+
+				lastLibraryState.current = newState;
+				localStorage.setItem(LIBRARY_STATE_KEY, JSON.stringify(newState));
 
 				const now = new Date();
 				setLastFetchTime(now);
@@ -317,7 +339,9 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 				}
 			} finally {
 				const ms = Date.now() - startTs;
-				console.log(`Library fetch end (reason=${reason}) in ${ms}ms`);
+				console.log(
+					`[${new Date().toISOString()}] Library fetch end (reason=${reason}) in ${ms}ms`
+				);
 				isFetchingRef.current = false;
 				setIsFetching(false);
 				setIsLoading(false);
@@ -338,7 +362,7 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 			return;
 		}
 		await fetchFromServices(false, 'smart-refresh');
-	}, [isFetching, getCurrentLibraryState, hasLibraryChanged, fetchFromServices]);
+	}, [isFetching, hasLibraryChanged, fetchFromServices, getCurrentLibraryState]);
 
 	// Manual refresh (always does full refresh)
 	const refreshLibrary = useCallback(async () => {
@@ -433,7 +457,7 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 				fetchFromServices(true, 'pending-refetch-after-token-change');
 			}
 		}
-	}, [isFetching, fetchFromServices]);
+	}, [isFetching, fetchFromServices, rdKey]);
 
 	// Check network status and retry on reconnection
 	useEffect(() => {

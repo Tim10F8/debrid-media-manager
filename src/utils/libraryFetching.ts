@@ -14,10 +14,18 @@ export async function fetchLatestRDTorrents(
 	customLimit?: number,
 	forceRefresh?: boolean
 ) {
+	const startTime = Date.now();
 	console.log(
-		`fetchLatestRDTorrents start (forceRefresh=${!!forceRefresh}, customLimit=${customLimit ?? 'none'})`
+		`[${new Date().toISOString()}] fetchLatestRDTorrents start (forceRefresh=${!!forceRefresh}, customLimit=${customLimit ?? 'none'})`
 	);
+
+	const dbReadStart = Date.now();
 	const oldTorrents = await torrentDB.all();
+	console.log(
+		`[${new Date().toISOString()}]   DB read: ${Date.now() - dbReadStart}ms (${oldTorrents.length} items)`
+	);
+
+	const filterStart = Date.now();
 	const oldIds = new Set(
 		oldTorrents.map((torrent) => torrent.id).filter((id) => id.startsWith('rd:'))
 	);
@@ -31,6 +39,7 @@ export async function fetchLatestRDTorrents(
 			.map((t) => t.id)
 			.filter((id) => id.startsWith('rd:'))
 	);
+	console.log(`[${new Date().toISOString()}]   Filter setup: ${Date.now() - filterStart}ms`);
 	const newIds = new Set();
 
 	if (!rdKey) {
@@ -41,38 +50,66 @@ export async function fetchLatestRDTorrents(
 			// Clear cache if force refresh requested
 			if (forceRefresh) {
 				clearTorrentCache();
-				console.log('RealDebrid: Cleared cache for force refresh');
+				console.log(
+					`[${new Date().toISOString()}] RealDebrid: Cleared cache for force refresh`
+				);
 			}
 
 			// Use caching strategy for fetching
 			const useCache = !customLimit && !forceRefresh; // Don't use cache for small syncs or force refresh
+			const fetchStart = Date.now();
 			const { torrents, cacheHit } = await fetchRealDebridWithCache(
 				rdKey,
 				useCache,
 				customLimit
 			);
+			console.log(
+				`[${new Date().toISOString()}]   Fetch from RD: ${Date.now() - fetchStart}ms (${torrents.length} items, cacheHit=${cacheHit})`
+			);
 
 			if (cacheHit) {
-				console.log('RealDebrid: Used cached data for faster loading');
+				console.log(
+					`[${new Date().toISOString()}] RealDebrid: Used cached data for faster loading`
+				);
 			}
 
 			// add all new torrents to the database
+			const processStart = Date.now();
 			torrents.forEach((torrent) => newIds.add(torrent.id));
 			const newTorrents = torrents.filter((torrent) => !oldIds.has(torrent.id));
+			console.log(
+				`[${new Date().toISOString()}]   New torrents filtering: ${Date.now() - processStart}ms (${newTorrents.length} new)`
+			);
+
+			const uiUpdateStart = Date.now();
 			setUserTorrentsList((prev) => {
 				const newTorrentIds = new Set(newTorrents.map((t) => t.id));
 				const filteredPrev = prev.filter((t) => !newTorrentIds.has(t.id));
 				return [...newTorrents, ...filteredPrev];
 			});
+			console.log(
+				`[${new Date().toISOString()}]   UI update 1: ${Date.now() - uiUpdateStart}ms`
+			);
+
+			const dbWriteStart = Date.now();
 			await torrentDB.addAll(newTorrents);
+			console.log(
+				`[${new Date().toISOString()}]   DB write new: ${Date.now() - dbWriteStart}ms`
+			);
 
 			// refresh the torrents that are in progress
+			const inProgressStart = Date.now();
 			const inProgressTorrents = torrents.filter(
 				(torrent) =>
 					torrent.status === UserTorrentStatus.waiting ||
 					torrent.status === UserTorrentStatus.downloading ||
 					inProgressIds.has(torrent.id)
 			);
+			console.log(
+				`[${new Date().toISOString()}]   In-progress filter: ${Date.now() - inProgressStart}ms (${inProgressTorrents.length} items)`
+			);
+
+			const uiUpdateStart2 = Date.now();
 			setUserTorrentsList((prev) => {
 				const newList = [...prev];
 				for (const t of inProgressTorrents) {
@@ -83,12 +120,23 @@ export async function fetchLatestRDTorrents(
 				}
 				return newList;
 			});
+			console.log(
+				`[${new Date().toISOString()}]   UI update 2: ${Date.now() - uiUpdateStart2}ms`
+			);
+
+			const dbWriteStart2 = Date.now();
 			await torrentDB.addAll(inProgressTorrents);
+			console.log(
+				`[${new Date().toISOString()}]   DB write in-progress: ${Date.now() - dbWriteStart2}ms`
+			);
 
 			setLoading(false);
 		} catch (error) {
-			console.error('Error fetching RD torrents:', error);
+			console.error(`[${new Date().toISOString()}] Error fetching RD torrents:`, error);
 			setLoading(false);
+			// Don't delete torrents if fetch failed
+			setRdSyncing(false);
+			return;
 		}
 		setRdSyncing(false);
 
@@ -98,18 +146,34 @@ export async function fetchLatestRDTorrents(
 		// Toast notification removed for better UX
 	}
 
+	// Only delete if we successfully fetched data
+	if (newIds.size === 0 && oldIds.size > 0) {
+		console.log(
+			`[${new Date().toISOString()}] Skipping deletion - no new torrents fetched (likely an error)`
+		);
+		return;
+	}
+
+	const deleteStart = Date.now();
 	const toDelete = Array.from(oldIds).filter((id) => !newIds.has(id));
-	await Promise.all(
-		toDelete.map(async (id) => {
-			setUserTorrentsList((prev) => prev.filter((torrent) => torrent.id !== id));
-			await torrentDB.deleteById(id);
-			setSelectedTorrents((prev) => {
-				prev.delete(id);
-				return new Set(prev);
-			});
-		})
+	if (toDelete.length > 0) {
+		await Promise.all(
+			toDelete.map(async (id) => {
+				setUserTorrentsList((prev) => prev.filter((torrent) => torrent.id !== id));
+				await torrentDB.deleteById(id);
+				setSelectedTorrents((prev) => {
+					prev.delete(id);
+					return new Set(prev);
+				});
+			})
+		);
+		console.log(
+			`[${new Date().toISOString()}]   Delete old torrents: ${Date.now() - deleteStart}ms (${toDelete.length} deleted)`
+		);
+	}
+	console.log(
+		`[${new Date().toISOString()}] fetchLatestRDTorrents end - Total: ${Date.now() - startTime}ms`
 	);
-	console.log('fetchLatestRDTorrents end');
 }
 
 export async function fetchLatestADTorrents(
