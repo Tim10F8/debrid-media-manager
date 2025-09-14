@@ -1137,6 +1137,93 @@ function TorrentsPage() {
 		}
 	}
 
+	// Hidden function to backup non-current week table data
+	async function backupOldWeekData() {
+		try {
+			const torrentDB = new UserTorrentDB();
+
+			// Get all tables data for inspection
+			const allTablesData = await torrentDB.getAllTablesData();
+			console.log('All tables data:');
+			allTablesData.forEach(({ table, torrents }) => {
+				console.log(`  ${table}: ${torrents.length} torrents`);
+			});
+
+			// Try to get backup data (non-current week)
+			const backupData = await torrentDB.getBackupTableData();
+			console.log('Backup data retrieved:', backupData.length, 'torrents');
+
+			// If no backup data, offer to backup all data instead
+			if (backupData.length === 0) {
+				const allData = await torrentDB.all();
+				console.log('Current week data:', allData.length, 'torrents');
+
+				// Check if there's data in any table
+				const hasAnyData = allTablesData.some(({ torrents }) => torrents.length > 0);
+
+				if (!hasAnyData) {
+					toast('No data found in any table', libraryToastOptions);
+					return;
+				}
+
+				// Offer to backup current week instead
+				const confirmBackup = await Modal.fire({
+					title: 'Backup Current Week',
+					text: `No data in backup table. Current week has ${allData.length} torrents. Backup current week instead?`,
+					icon: 'question',
+					showCancelButton: true,
+					confirmButtonColor: '#0891b2',
+					cancelButtonColor: '#374151',
+					confirmButtonText: 'Yes, backup current week',
+					background: '#111827',
+					color: '#f3f4f6',
+				});
+
+				if (!confirmBackup.isConfirmed) return;
+
+				// Backup current week data
+				const hashList = allData.map((t) => ({
+					filename: t.filename,
+					hash: t.hash,
+					added: t.added,
+					id: t.id,
+				}));
+
+				const blob = new Blob([JSON.stringify(hashList, null, 2)], {
+					type: 'application/json',
+				});
+
+				saveAs(blob, `backup-current-week-${Date.now()}.dmm.json`);
+				toast(
+					`Generated backup for current week (${allData.length} torrents)`,
+					libraryToastOptions
+				);
+				return;
+			}
+
+			// Backup the old week data
+			const hashList = backupData.map((t) => ({
+				filename: t.filename,
+				hash: t.hash,
+				added: t.added,
+				id: t.id,
+			}));
+
+			const blob = new Blob([JSON.stringify(hashList, null, 2)], {
+				type: 'application/json',
+			});
+
+			saveAs(blob, `backup-oldweek-${Date.now()}.dmm.json`);
+			toast(
+				`Generated backup for old week table (${backupData.length} torrents)`,
+				libraryToastOptions
+			);
+		} catch (error) {
+			toast.error('Error creating backup from old week data', libraryToastOptions);
+			console.error(error);
+		}
+	}
+
 	async function wrapLocalRestoreFn(debridService: string) {
 		return await localRestore(async (files: RestoredFile[]) => {
 			const allHashes = new Set(userTorrentsList.map((t) => t.hash));
@@ -1465,7 +1552,11 @@ function TorrentsPage() {
 			<Toaster position="bottom-right" />
 			<div className="mb-1 flex items-center justify-between">
 				<div className="flex items-center gap-2">
-					<h1 className="text-xl font-bold text-white">
+					<h1
+						className="text-xl font-bold text-white"
+						onDoubleClick={backupOldWeekData}
+						style={{ cursor: 'default' }}
+					>
 						<BookOpen className="mr-1 inline-block h-5 w-5 text-cyan-400" />
 						Library{' '}
 						<LibrarySize

@@ -137,7 +137,99 @@ class UserTorrentDB {
 
 	public async clear() {
 		const db = await this.getDB();
+		// Only clear current week's table
 		await db.clear(this.torrentsTbl);
+		// Clear cached hashes table
+		if (db.objectStoreNames.contains(this.rdHashesTbl)) {
+			await db.clear(this.rdHashesTbl);
+		}
+	}
+
+	public async deleteDatabase() {
+		// Close the current connection if it exists
+		if (this.db) {
+			this.db.close();
+			this.db = null;
+		}
+		// Delete the entire database
+		await new Promise<void>((resolve, reject) => {
+			const deleteReq = indexedDB.deleteDatabase(this.dbName);
+			deleteReq.onsuccess = () => resolve();
+			deleteReq.onerror = () => reject(deleteReq.error);
+			deleteReq.onblocked = () => {
+				console.warn('Database deletion blocked - other connections may be open');
+				// Still resolve after a timeout to prevent hanging
+				setTimeout(() => resolve(), 1000);
+			};
+		});
+	}
+
+	public async isEmpty(): Promise<boolean> {
+		try {
+			const db = await this.getDB();
+			let totalCount = 0;
+
+			// Check all torrent tables
+			for (let i = 0; i < backupToWeekNum; i++) {
+				const tableName = `torrents-${i}`;
+				if (db.objectStoreNames.contains(tableName)) {
+					totalCount += await db.count(tableName);
+				}
+			}
+
+			// Check cached hashes table
+			if (db.objectStoreNames.contains(this.rdHashesTbl)) {
+				totalCount += await db.count(this.rdHashesTbl);
+			}
+
+			return totalCount === 0;
+		} catch (error) {
+			console.error('Error checking if database is empty:', error);
+			return true; // Assume empty if error
+		}
+	}
+
+	public async getBackupTableData(): Promise<UserTorrent[]> {
+		const db = await this.getDB();
+		const backupTorrents: UserTorrent[] = [];
+
+		// Get data from non-current week tables
+		const currentWeek = currentISOWeekNumber() % backupToWeekNum;
+		console.log('Current ISO week number:', currentISOWeekNumber());
+		console.log('Current week table index:', currentWeek);
+		console.log('Current week table name:', `torrents-${currentWeek}`);
+
+		for (let i = 0; i < backupToWeekNum; i++) {
+			if (i !== currentWeek) {
+				const tableName = `torrents-${i}`;
+				console.log(`Checking backup table: ${tableName}`);
+				if (db.objectStoreNames.contains(tableName)) {
+					const torrents = await db.getAll(tableName);
+					console.log(`Found ${torrents.length} torrents in ${tableName}`);
+					backupTorrents.push(...torrents);
+				} else {
+					console.log(`Table ${tableName} does not exist`);
+				}
+			}
+		}
+
+		return backupTorrents;
+	}
+
+	public async getAllTablesData(): Promise<{ table: string; torrents: UserTorrent[] }[]> {
+		const db = await this.getDB();
+		const allData: { table: string; torrents: UserTorrent[] }[] = [];
+
+		// Get data from all torrent tables
+		for (let i = 0; i < backupToWeekNum; i++) {
+			const tableName = `torrents-${i}`;
+			if (db.objectStoreNames.contains(tableName)) {
+				const torrents = await db.getAll(tableName);
+				allData.push({ table: tableName, torrents });
+			}
+		}
+
+		return allData;
 	}
 
 	public async inLibrary(hash: string): Promise<boolean> {

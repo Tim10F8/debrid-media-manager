@@ -101,9 +101,9 @@ function IndexPage() {
 
 	useEffect(() => {
 		if (rdUser) {
-			checkPremiumStatus(rdUser).then(({ shouldLogout }) => {
+			checkPremiumStatus(rdUser).then(async ({ shouldLogout }) => {
 				if (shouldLogout) {
-					handleLogout('rd:', router);
+					await handleLogout('rd:', router);
 				}
 			});
 		}
@@ -212,25 +212,25 @@ function IndexPage() {
 								service="rd"
 								user={rdUser}
 								onTraktLogin={loginWithRealDebrid}
-								onLogout={(prefix) => handleLogout(prefix, router)}
+								onLogout={async (prefix) => await handleLogout(prefix, router)}
 							/>
 							<ServiceCard
 								service="ad"
 								user={adUser}
 								onTraktLogin={loginWithAllDebrid}
-								onLogout={(prefix) => handleLogout(prefix, router)}
+								onLogout={async (prefix) => await handleLogout(prefix, router)}
 							/>
 							<ServiceCard
 								service="tb"
 								user={tbUser}
 								onTraktLogin={loginWithTorbox}
-								onLogout={(prefix) => handleLogout(prefix, router)}
+								onLogout={async (prefix) => await handleLogout(prefix, router)}
 							/>
 							<ServiceCard
 								service="trakt"
 								user={traktUser}
 								onTraktLogin={loginWithTrakt}
-								onLogout={(prefix) => handleLogout(prefix, router)}
+								onLogout={async (prefix) => await handleLogout(prefix, router)}
 							/>
 						</div>
 						<InfoSection />
@@ -250,7 +250,7 @@ function IndexPage() {
 								Clear library cache
 							</button>
 							<button
-								onClick={() => handleLogout(undefined, router)}
+								onClick={async () => await handleLogout(undefined, router)}
 								className="haptic-sm rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-2 text-sm font-medium text-gray-100 transition-colors hover:bg-gray-700/50"
 							>
 								Logout All

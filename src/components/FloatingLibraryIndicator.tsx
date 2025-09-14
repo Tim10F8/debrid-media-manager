@@ -18,10 +18,11 @@ export default function FloatingLibraryIndicator() {
 	// Check authentication status directly from localStorage
 	const checkAuthStatus = () => {
 		if (typeof window === 'undefined') return false;
-		const hasRd = !!localStorage.getItem('rd:accessToken');
-		const hasAd = !!localStorage.getItem('ad:apiKey');
-		const hasTb = !!localStorage.getItem('tb:apiKey');
-		return hasRd || hasAd || hasTb;
+		const hasRd = localStorage.getItem('rd:accessToken');
+		const hasAd = localStorage.getItem('ad:apiKey');
+		const hasTb = localStorage.getItem('tb:apiKey');
+		// Only return true if at least one key exists and is not empty
+		return !!(hasRd && hasRd.trim()) || !!(hasAd && hasAd.trim()) || !!(hasTb && hasTb.trim());
 	};
 
 	// Handle client-side mounting to avoid hydration mismatch
@@ -63,9 +64,11 @@ export default function FloatingLibraryIndicator() {
 		};
 	}, []);
 
-	// Sync with auth hooks when they change
+	// Sync with auth hooks when they change - use hooks as source of truth
 	useEffect(() => {
-		setIsLoggedIn(checkAuthStatus());
+		const hasValidAuth =
+			!!(rdToken && rdToken.trim()) || !!(adKey && adKey.trim()) || !!(tbKey && tbKey.trim());
+		setIsLoggedIn(hasValidAuth);
 	}, [rdToken, adKey, tbKey]);
 
 	// Don't render until mounted to avoid hydration issues

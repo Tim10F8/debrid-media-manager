@@ -1,6 +1,16 @@
+import UserTorrentDB from '@/torrent/db';
 import { NextRouter } from 'next/router';
 
-export function handleLogout(prefix: string | undefined, router: NextRouter) {
+export async function handleLogout(prefix: string | undefined, router: NextRouter) {
+	// Clear IndexedDB library cache (current week only)
+	try {
+		const torrentDB = new UserTorrentDB();
+		await torrentDB.clear();
+		console.log('Logout: Cleared current week library cache');
+	} catch (error) {
+		console.error('Failed to clear torrent database:', error);
+	}
+
 	if (prefix) {
 		let i = localStorage.length - 1;
 		while (i >= 0) {

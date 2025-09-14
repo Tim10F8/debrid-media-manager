@@ -55,7 +55,7 @@ export const AuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
 				login: () => {
 					loginWithRealDebrid();
 				},
-				logout: () => handleLogout('rd:', router),
+				logout: async () => await handleLogout('rd:', router),
 			});
 		}
 
@@ -77,7 +77,7 @@ export const AuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
 				login: () => {
 					loginWithAllDebrid();
 				},
-				logout: () => handleLogout('ad:', router),
+				logout: async () => await handleLogout('ad:', router),
 			});
 		}
 
@@ -100,7 +100,7 @@ export const AuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
 				login: () => {
 					loginWithTorbox();
 				},
-				logout: () => handleLogout('tb:', router),
+				logout: async () => await handleLogout('tb:', router),
 			});
 		}
 
@@ -146,8 +146,8 @@ export const AuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
 		}
 	};
 
-	const logoutAll = () => {
-		handleLogout(undefined, router);
+	const logoutAll = async () => {
+		await handleLogout(undefined, router);
 	};
 
 	const value: AuthContextValue = {
