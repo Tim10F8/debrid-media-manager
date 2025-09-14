@@ -30,7 +30,7 @@ const config = (() => {
 
 // Constants for timeout and retry
 const REQUEST_TIMEOUT = 10000; // Increased from 5s to 10s
-const TORRENT_REQUEST_TIMEOUT = 15000; // 15s timeout to fail fast and retry
+const TORRENT_REQUEST_TIMEOUT = 60000; // 60s timeout for slow connections
 // Adjust rate limits to be compatible with the service worker cache timing
 // Service worker cache is 5 seconds, so we need to ensure requests are spaced
 // to avoid conflicting with cache invalidation
