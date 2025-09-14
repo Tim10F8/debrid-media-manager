@@ -1091,7 +1091,34 @@ function TorrentsPage() {
 
 		if (backupChoice.isDismissed) return;
 
-		const listToBackup = backupChoice.isConfirmed ? userTorrentsList : sortedData;
+		// Apply the current sort to all torrents or use already sorted filtered data
+		const listToBackup = backupChoice.isConfirmed
+			? [...userTorrentsList].sort((a, b) => {
+					const isAsc = sortBy.direction === 'asc';
+					let comparison = 0;
+
+					if (sortBy.column === 'title') {
+						const titleA = a[sortBy.column] as string;
+						const titleB = b[sortBy.column] as string;
+						const lowerA = titleA.toLowerCase();
+						const lowerB = titleB.toLowerCase();
+
+						if (lowerA === lowerB) {
+							comparison = titleA < titleB ? -1 : 1; // Uppercase first
+						} else {
+							comparison = lowerA < lowerB ? -1 : 1;
+						}
+					} else {
+						if (a[sortBy.column] > b[sortBy.column]) {
+							comparison = 1;
+						} else if (a[sortBy.column] < b[sortBy.column]) {
+							comparison = -1;
+						}
+					}
+
+					return isAsc ? comparison : comparison * -1;
+				})
+			: sortedData;
 		const backupType = backupChoice.isConfirmed ? 'full' : 'filtered';
 
 		toast('Generating a local backup file', libraryToastOptions);
