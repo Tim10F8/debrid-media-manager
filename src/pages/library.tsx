@@ -1138,7 +1138,7 @@ function TorrentsPage() {
 	}
 
 	async function wrapLocalRestoreFn(debridService: string) {
-		return await localRestore((files: RestoredFile[]) => {
+		return await localRestore(async (files: RestoredFile[]) => {
 			const allHashes = new Set(userTorrentsList.map((t) => t.hash));
 			const addMagnet = (hash: string) => {
 				if (rdKey && debridService === 'rd') return handleAddAsMagnetInRd(rdKey, hash);
@@ -1159,28 +1159,150 @@ function TorrentsPage() {
 							`${notAddingCount} torrents are already in your library`,
 							libraryToastOptions
 						);
-					const toAdd = files
-						.map((f) => f.hash)
-						.filter((h) => !allHashes.has(h))
-						.map(wrapAddMagnetFn);
-					const concurrencyCount = 1;
-					const [results, errors] = await runConcurrentFunctions(
-						toAdd,
-						concurrencyCount,
-						0,
-						(completed, total, errorCount) => {
-							const message =
-								errorCount > 0
-									? `Restoring ${completed}/${total} downloads (${errorCount} errors)...`
-									: `Restoring ${completed}/${total} downloads...`;
-							toast.loading(message, { id: 'restore-progress' });
+
+					// Filter out duplicates
+					const newHashes = files.map((f) => f.hash).filter((h) => !allHashes.has(h));
+
+					if (newHashes.length === 0) {
+						resolve({ success: 0, error: 0 });
+						return;
+					}
+
+					// Check availability for RD and TB (AD doesn't have bulk availability check)
+					let availableHashes: string[] = [];
+					let unavailableHashes: string[] = [];
+
+					if ((rdKey && debridService === 'rd') || (tbKey && debridService === 'tb')) {
+						toast.loading(`Checking availability for ${newHashes.length} torrents...`, {
+							id: 'availability-check',
+						});
+
+						try {
+							if (rdKey && debridService === 'rd') {
+								// Check RD availability in batches of 100
+								const { checkAvailabilityByHashes } = await import(
+									'@/utils/availability'
+								);
+								const availableSet = new Set<string>();
+
+								for (let i = 0; i < newHashes.length; i += 100) {
+									const batch = newHashes.slice(i, i + 100);
+									const resp = await checkAvailabilityByHashes('', '', batch);
+									if (resp?.available) {
+										resp.available.forEach((t: { hash: string }) =>
+											availableSet.add(t.hash)
+										);
+									}
+								}
+
+								availableHashes = newHashes.filter((h) => availableSet.has(h));
+								unavailableHashes = newHashes.filter((h) => !availableSet.has(h));
+							} else if (tbKey && debridService === 'tb') {
+								// Check TorBox availability
+								const { checkCachedStatus } = await import('@/services/torbox');
+								const availableSet = new Set<string>();
+
+								// TorBox checks in batches
+								for (let i = 0; i < newHashes.length; i += 100) {
+									const batch = newHashes.slice(i, i + 100);
+									const resp = await checkCachedStatus(
+										{
+											hash: batch,
+											format: 'object',
+										},
+										tbKey
+									);
+									if (resp?.data) {
+										Object.entries(resp.data).forEach(
+											([hash, data]: [string, any]) => {
+												if (data) availableSet.add(hash);
+											}
+										);
+									}
+								}
+
+								availableHashes = newHashes.filter((h) => availableSet.has(h));
+								unavailableHashes = newHashes.filter((h) => !availableSet.has(h));
+							}
+
+							toast.dismiss('availability-check');
+							if (availableHashes.length > 0) {
+								toast.success(
+									`Found ${availableHashes.length} cached torrents to restore first`,
+									libraryToastOptions
+								);
+							}
+							if (unavailableHashes.length > 0) {
+								toast(
+									`${unavailableHashes.length} torrents need to be downloaded`,
+									libraryToastOptions
+								);
+							}
+						} catch (error) {
+							console.error('Error checking availability:', error);
+							toast.dismiss('availability-check');
+							// If availability check fails, treat all as unavailable
+							unavailableHashes = newHashes;
+							availableHashes = [];
 						}
-					);
+					} else {
+						// For AD or if no availability check, treat all as unavailable
+						unavailableHashes = newHashes;
+					}
+
+					// Process available torrents first (higher concurrency), then unavailable ones
+					const toAddAvailable = availableHashes.map(wrapAddMagnetFn);
+					const toAddUnavailable = unavailableHashes.map(wrapAddMagnetFn);
+
+					let totalCompleted = 0;
+					const totalToAdd = toAddAvailable.length + toAddUnavailable.length;
+
+					// Process available torrents with higher concurrency (4)
+					let availableResults: any[] = [];
+					let availableErrors: any[] = [];
+					if (toAddAvailable.length > 0) {
+						[availableResults, availableErrors] = await runConcurrentFunctions(
+							toAddAvailable,
+							4, // Higher concurrency for cached torrents
+							0,
+							(completed, total, errorCount) => {
+								totalCompleted = completed;
+								const message =
+									errorCount > 0
+										? `Restoring cached torrents ${completed}/${total} (${errorCount} errors)...`
+										: `Restoring cached torrents ${completed}/${total}...`;
+								toast.loading(message, { id: 'restore-progress' });
+							}
+						);
+					}
+
+					// Process unavailable torrents with lower concurrency (1)
+					let unavailableResults: any[] = [];
+					let unavailableErrors: any[] = [];
+					if (toAddUnavailable.length > 0) {
+						[unavailableResults, unavailableErrors] = await runConcurrentFunctions(
+							toAddUnavailable,
+							1, // Lower concurrency for uncached torrents
+							0,
+							(completed, total, errorCount) => {
+								const actualCompleted = totalCompleted + completed;
+								const message =
+									errorCount > 0
+										? `Restoring ${actualCompleted}/${totalToAdd} downloads (${availableErrors.length + errorCount} errors)...`
+										: `Restoring ${actualCompleted}/${totalToAdd} downloads...`;
+								toast.loading(message, { id: 'restore-progress' });
+							}
+						);
+					}
+
 					toast.dismiss('restore-progress');
-					if (results.length) {
+					const allResults = [...availableResults, ...unavailableResults];
+					const allErrors = [...availableErrors, ...unavailableErrors];
+
+					if (allResults.length) {
 						await refreshLibrary();
 					}
-					resolve({ success: results.length, error: errors.length });
+					resolve({ success: allResults.length, error: allErrors.length });
 				}
 			);
 
