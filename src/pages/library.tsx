@@ -1499,21 +1499,21 @@ function TorrentsPage() {
 			}
 		}
 		if (adKey && debridService === 'ad') {
-			// AllDebrid still uses hashes only (convert torrent files to hashes)
-			let allHashes = [...hashes];
+			// AllDebrid: combine hashes from magnets and torrent files
+			const allHashes = [...hashes];
+
 			if (torrentFiles.length > 0) {
 				try {
 					const fileHashes = await Promise.all(
 						torrentFiles.map((file) => getHashOfTorrent(file))
 					);
-					allHashes.push(
-						...fileHashes.filter((hash): hash is string => hash !== undefined)
-					);
+					allHashes.push(...(fileHashes.filter((h) => h !== undefined) as string[]));
 				} catch (error) {
-					toast.error(`Failed to process torrent files for AllDebrid: ${error}`);
+					toast.error(`Failed to process torrent files: ${error}`);
 					return;
 				}
 			}
+
 			if (allHashes.length > 0) {
 				handleAddMultipleHashesInAd(adKey, allHashes, async () => await refreshLibrary());
 			}

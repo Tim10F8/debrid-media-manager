@@ -256,11 +256,26 @@ export const getAllDebridUser = async (apikey: string) => {
 export const uploadMagnet = async (apikey: string, hashes: string[]): Promise<MagnetUploadData> => {
 	try {
 		const endpoint = `${config.allDebridHostname}/v4/magnet/upload`;
-		const response = await axios.post<ApiResponse<MagnetUploadData>>(
-			endpoint,
-			{ magnets: hashes },
-			getAxiosConfig(apikey)
-		);
+
+		// Convert hashes to magnets (handles both formats)
+		const magnets = hashes
+			.map((h) => (h.startsWith('magnet:?') ? h : `magnet:?xt=urn:btih:${h}`))
+			.filter((m) => m.startsWith('magnet:?'));
+
+		if (!magnets.length) {
+			throw new Error('No valid magnets to upload');
+		}
+
+		// AllDebrid expects x-www-form-urlencoded with repeated magnets[] fields
+		const params = new URLSearchParams();
+		magnets.forEach((m) => params.append('magnets[]', m));
+
+		const response = await axios.post<ApiResponse<MagnetUploadData>>(endpoint, params, {
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Authorization: `Bearer ${apikey}`,
+			},
+		});
 
 		if (response.data.status === 'error') {
 			throw new Error(response.data.error?.message || 'Unknown error');

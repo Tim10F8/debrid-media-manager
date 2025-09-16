@@ -1,4 +1,5 @@
 import { TorrentInfoResponse } from '@/services/types';
+import { isValidHash } from './extractHashes';
 
 export async function submitAvailability(
 	dmmProblemKey: string,
@@ -44,6 +45,11 @@ export async function checkAvailability(
 	hashes: string[]
 ) {
 	try {
+		// Filter out invalid hashes proactively to avoid API 400s
+		const validHashes = (hashes || []).filter(isValidHash);
+		if (validHashes.length === 0) {
+			return { available: [] } as any;
+		}
 		const response = await fetch('/api/availability/check', {
 			method: 'POST',
 			headers: {
@@ -51,15 +57,21 @@ export async function checkAvailability(
 			},
 			body: JSON.stringify({
 				imdbId,
-				hashes,
+				hashes: validHashes,
 				dmmProblemKey,
 				solution,
 			}),
 		});
 
 		if (!response.ok) {
-			const error = await response.json();
-			throw new Error(error.error || 'Failed to check availability');
+			let error: any = {};
+			try {
+				error = await response.json();
+			} catch {}
+			const detail = error.hash ? ` (invalid: ${error.hash})` : '';
+			throw new Error(
+				error.error || error.errorMessage || `Failed to check availability${detail}`
+			);
 		}
 
 		return await response.json();
@@ -75,21 +87,34 @@ export async function checkAvailabilityByHashes(
 	hashes: string[]
 ) {
 	try {
+		// Filter out invalid hashes proactively to avoid API 400s
+		const validHashes = (hashes || []).filter(isValidHash);
+		if (validHashes.length === 0) {
+			return { available: [] } as any;
+		}
 		const response = await fetch('/api/availability/check2', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				hashes,
+				hashes: validHashes,
 				dmmProblemKey,
 				solution,
 			}),
 		});
 
 		if (!response.ok) {
-			const error = await response.json();
-			throw new Error(error.error || 'Failed to check availability by hashes');
+			let error: any = {};
+			try {
+				error = await response.json();
+			} catch {}
+			const detail = error.hash ? ` (invalid: ${error.hash})` : '';
+			throw new Error(
+				error.error ||
+					error.errorMessage ||
+					`Failed to check availability by hashes${detail}`
+			);
 		}
 
 		return await response.json();
