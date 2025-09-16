@@ -222,7 +222,10 @@ export const handleAddAsMagnetInAd = async (
 	callback?: () => Promise<void>
 ) => {
 	try {
-		const resp = await uploadMagnet(adKey, [hash]);
+		// Convert hash to magnet URI if it's just a hash
+		const magnetUri = hash.startsWith('magnet:?') ? hash : `magnet:?xt=urn:btih:${hash}`;
+
+		const resp = await uploadMagnet(adKey, [magnetUri]);
 		if (resp.magnets.length === 0 || resp.magnets[0].error) throw new Error('no_magnets');
 		if (callback) await callback();
 		toast('Successfully added hash!', magnetToastOptions);
