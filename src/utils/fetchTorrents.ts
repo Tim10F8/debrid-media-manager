@@ -205,7 +205,7 @@ export const fetchAllDebrid = async (
 	}
 };
 
-function convertToAllDebridUserTorrent(magnetInfo: MagnetStatus): UserTorrent {
+export function convertToAllDebridUserTorrent(magnetInfo: MagnetStatus): UserTorrent {
 	// Normalize filename if it's just a hash
 	if (magnetInfo.filename === magnetInfo.hash) {
 		magnetInfo.filename = 'Magnet';

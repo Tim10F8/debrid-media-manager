@@ -364,22 +364,32 @@ export const getMagnetStatus = async (
 
 		if (readyMagnets.length > 0 && !magnetId) {
 			// Batch fetch files for ready magnets
-			try {
-				const filesResponse = await getMagnetFiles(
-					apikey,
-					readyMagnets.map((m) => m.id)
-				);
+			// Filter out magnets with invalid IDs
+			const validMagnets = readyMagnets.filter((m) => m.id && m.id > 0);
 
-				// Map files back to magnets
-				filesResponse.magnets.forEach((fileData) => {
-					const magnet = magnets.find((m) => m.id === parseInt(fileData.id));
-					if (magnet && fileData.files) {
-						magnet.files = fileData.files;
-						magnet.links = convertFilesToLinks(fileData.files);
+			if (validMagnets.length > 0) {
+				try {
+					const filesResponse = await getMagnetFiles(
+						apikey,
+						validMagnets.map((m) => m.id)
+					);
+
+					// Map files back to magnets
+					if (filesResponse?.magnets) {
+						filesResponse.magnets.forEach((fileData) => {
+							const magnet = magnets.find((m) => m.id === parseInt(fileData.id));
+							if (magnet && fileData.files) {
+								magnet.files = fileData.files;
+								magnet.links = convertFilesToLinks(fileData.files);
+							}
+						});
 					}
-				});
-			} catch (error) {
-				console.warn('Failed to fetch magnet files:', error);
+				} catch (error: any) {
+					// Only log error if it's not about invalid magnet IDs
+					if (!error?.message?.includes('magnet ID does not exists')) {
+						console.warn('Failed to fetch magnet files:', error);
+					}
+				}
 			}
 		}
 
@@ -402,10 +412,17 @@ export const getMagnetFiles = async (
 ): Promise<MagnetFilesData> => {
 	const endpoint = `${config.allDebridHostname}/v4/magnet/files`;
 
+	// Filter out invalid IDs before making the request
+	const validIds = magnetIds.filter((id) => id && id > 0);
+
+	if (validIds.length === 0) {
+		return { magnets: [] } as MagnetFilesData;
+	}
+
 	try {
 		const response = await axios.post<ApiResponse<MagnetFilesData>>(
 			endpoint,
-			{ id: magnetIds },
+			{ id: validIds },
 			getAxiosConfig(apikey)
 		);
 
@@ -414,8 +431,11 @@ export const getMagnetFiles = async (
 		}
 
 		return response.data.data!;
-	} catch (error) {
-		console.error('Error fetching magnet files:', (error as any).message);
+	} catch (error: any) {
+		// Only log error if it's not about invalid magnet IDs
+		if (!error?.message?.includes('magnet ID does not exists')) {
+			console.error('Error fetching magnet files:', error.message);
+		}
 		throw error;
 	}
 };
