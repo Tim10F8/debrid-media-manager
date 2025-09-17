@@ -9,12 +9,11 @@ vi.mock('@/services/realDebrid', () => ({
 // Provide deterministic crypto.getRandomValues
 beforeEach(() => {
 	const arr = new Uint32Array([0x1abc]);
-	vi.spyOn(globalThis.crypto as any, 'getRandomValues').mockImplementation(
-		(buffer: Uint32Array) => {
-			buffer.set(arr);
-			return buffer;
-		}
-	);
+	vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation((buffer) => {
+		const typedBuffer = buffer as Uint32Array;
+		typedBuffer.set(arr);
+		return typedBuffer;
+	});
 });
 
 describe('token utils', () => {

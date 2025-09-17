@@ -10,6 +10,7 @@
     "lint": "next lint",
     "format": "prettier --write 'src/**/*.{js,jsx,ts,tsx,json,md}'",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "prepare": "husky"
   },
   "dependencies": {

@@ -2,6 +2,7 @@
 	"compilerOptions": {
 		"target": "ES2018",
 		"lib": ["dom", "dom.iterable", "esnext", "es5", "es6"],
+		"types": ["vitest/globals"],
 		"allowJs": true,
 		"skipLibCheck": true,
 		"strict": true,

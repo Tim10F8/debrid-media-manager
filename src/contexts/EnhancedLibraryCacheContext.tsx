@@ -406,7 +406,7 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	};
 
 	// Debounce timer ref for IndexedDB saves
-	const dbSaveTimerRef = useRef<NodeJS.Timeout>();
+	const dbSaveTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
 	// Update combined library
 	const updateCombinedLibrary = useCallback(() => {
