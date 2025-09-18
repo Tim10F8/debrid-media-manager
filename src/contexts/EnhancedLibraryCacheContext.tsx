@@ -434,6 +434,11 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		updateStats(combined);
 	}, [rdLibrary, adLibrary, tbLibrary]);
 
+	// Trigger combined library update when any service library changes
+	useEffect(() => {
+		updateCombinedLibrary();
+	}, [rdLibrary, adLibrary, tbLibrary, updateCombinedLibrary]);
+
 	// Update statistics
 	const updateStats = (torrents: UserTorrent[]) => {
 		const rd = torrents.filter((t) => t.id.startsWith('rd:')).length;
