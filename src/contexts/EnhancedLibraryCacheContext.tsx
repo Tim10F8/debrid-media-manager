@@ -7,7 +7,6 @@
 import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
 import { CacheManager, getGlobalCache } from '@/services/cache/CacheManager';
 import { FetchOptions, UnifiedLibraryFetcher } from '@/services/library/UnifiedLibraryFetcher';
-import { LibraryMonitor, MonitorConfig, ServiceConfig } from '@/services/monitor/LibraryMonitor';
 import { UnifiedRateLimiter, getGlobalRateLimiter } from '@/services/rateLimit/UnifiedRateLimiter';
 import UserTorrentDB from '@/torrent/db';
 import { UserTorrent } from '@/torrent/userTorrent';
@@ -28,7 +27,6 @@ interface LibraryStats {
 	adItems: number;
 	tbItems: number;
 	lastSync: Date | null;
-	lastChange: Date | null;
 	cacheHitRate: number;
 	averageFetchTime: number;
 }
@@ -65,11 +63,6 @@ interface EnhancedLibraryCacheContextType {
 	addTorrent: (torrent: UserTorrent) => void;
 	removeTorrent: (torrentId: string) => void;
 	updateTorrent: (torrentId: string, updates: Partial<UserTorrent>) => void;
-
-	// Monitoring control
-	setAutoRefresh: (enabled: boolean) => void;
-	setRefreshInterval: (minutes: number) => void;
-	getMonitoringStatus: () => any;
 }
 
 const EnhancedLibraryCacheContext = createContext<EnhancedLibraryCacheContextType | undefined>(
@@ -83,7 +76,6 @@ const torrentDB = new UserTorrentDB();
 let cacheManager: CacheManager;
 let rateLimiter: UnifiedRateLimiter;
 let libraryFetcher: UnifiedLibraryFetcher;
-let libraryMonitor: LibraryMonitor;
 
 // Initialize services
 function initializeServices() {
@@ -91,7 +83,6 @@ function initializeServices() {
 		cacheManager = getGlobalCache();
 		rateLimiter = getGlobalRateLimiter();
 		libraryFetcher = new UnifiedLibraryFetcher(cacheManager, rateLimiter);
-		libraryMonitor = new LibraryMonitor(libraryFetcher, cacheManager);
 	}
 }
 
@@ -124,217 +115,45 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		adItems: 0,
 		tbItems: 0,
 		lastSync: null,
-		lastChange: null,
 		cacheHitRate: 0,
 		averageFetchTime: 0,
 	});
 
-	// Monitoring configuration
-	const [autoRefresh, setAutoRefresh] = useState(true);
-	const [refreshInterval, setRefreshIntervalState] = useState(5); // minutes
-
 	// Performance tracking
 	const fetchTimesRef = useRef<number[]>([]);
 	const cacheHitsRef = useRef({ hits: 0, misses: 0 });
+	const dbSaveTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
-	// Initialize services on mount
+	// Initialize services on mount and restore cached data for display
 	useEffect(() => {
 		initializeServices();
-
-		// Configure monitor
-		const monitorConfig: Partial<MonitorConfig> = {
-			checkInterval: 30 * 1000, // 30 seconds
-			refreshInterval: refreshInterval * 60 * 1000,
-			enableAutoRefresh: autoRefresh,
-			enableChangeDetection: true,
-		};
-		libraryMonitor.updateConfig(monitorConfig);
-
-		// Set up event listeners
-		libraryMonitor.addEventListener((event) => {
-			switch (event.type) {
-				case 'change_detected':
-					console.log(`[Monitor] Change detected in ${event.service}`);
-					setStats((prev) => ({ ...prev, lastChange: new Date() }));
-					break;
-				case 'refresh_complete':
-					console.log(`[Monitor] Refresh complete for ${event.service}`, event.data);
-					handleMonitorRefresh(event.service);
-					break;
-				case 'error':
-					console.error(`[Monitor] Error in ${event.service}:`, event.error);
-					toast.error(`Error monitoring ${event.service}: ${event.error?.message}`);
-					break;
-			}
-		});
-
-		// Load any existing data from IndexedDB to display while services initialize
 		loadExistingData();
 
 		return () => {
-			// Cleanup on unmount
 			if (dbSaveTimerRef.current) {
 				clearTimeout(dbSaveTimerRef.current);
 			}
-			libraryMonitor.stop();
 		};
 	}, []);
 
-	// Track registered services to prevent duplicate registrations
-	const registeredServicesRef = useRef<Set<string>>(new Set());
-
-	// Register services when tokens change - monitor handles auto-initialization
+	// Reset per-service libraries when tokens are cleared
 	useEffect(() => {
-		if (rdKey && !rdLoading) {
-			// Check if already registered with same token
-			const serviceKey = `realdebrid:${rdKey}`;
-			if (registeredServicesRef.current.has(serviceKey)) {
-				return; // Already registered with this token
-			}
-
-			const config: ServiceConfig = {
-				service: 'realdebrid',
-				token: rdKey,
-				enabled: true,
-				priority: 1,
-			};
-
-			// Mark as registered before calling async register
-			registeredServicesRef.current.add(serviceKey);
-
-			// Monitor will auto-refresh if data is missing/stale
-			libraryMonitor.registerService(config);
-
-			// Subscribe to changes
-			const unsubscribe = libraryMonitor.onServiceChange('realdebrid', () => {
-				const data = libraryMonitor.getLibraryData('realdebrid');
-				if (data) {
-					console.log(`[LibraryCache] RD service change callback: ${data.length} items`);
-					setRdLibrary(data);
-					// updateCombinedLibrary will be called automatically via useCallback dependency
-				}
-			});
-
-			return () => {
-				// Cleanup on token change or unmount
-				registeredServicesRef.current.delete(serviceKey);
-				unsubscribe();
-			};
-		} else {
-			// Clear registration tracking for realdebrid
-			Array.from(registeredServicesRef.current)
-				.filter((key) => key.startsWith('realdebrid:'))
-				.forEach((key) => registeredServicesRef.current.delete(key));
-			libraryMonitor.unregisterService('realdebrid');
+		if (!rdKey || rdLoading) {
 			setRdLibrary([]);
 		}
 	}, [rdKey, rdLoading]);
 
 	useEffect(() => {
-		if (adKey) {
-			// Check if already registered with same token
-			const serviceKey = `alldebrid:${adKey}`;
-			if (registeredServicesRef.current.has(serviceKey)) {
-				return; // Already registered with this token
-			}
-
-			const config: ServiceConfig = {
-				service: 'alldebrid',
-				token: adKey,
-				enabled: true,
-				priority: 2,
-			};
-
-			// Mark as registered before calling async register
-			registeredServicesRef.current.add(serviceKey);
-
-			// Monitor will auto-refresh if data is missing/stale
-			libraryMonitor.registerService(config);
-
-			const unsubscribe = libraryMonitor.onServiceChange('alldebrid', () => {
-				const data = libraryMonitor.getLibraryData('alldebrid');
-				if (data) {
-					console.log(`[LibraryCache] AD service change callback: ${data.length} items`);
-					setAdLibrary(data);
-					// updateCombinedLibrary will be called automatically via useCallback dependency
-				}
-			});
-
-			return () => {
-				// Cleanup on token change or unmount
-				registeredServicesRef.current.delete(serviceKey);
-				unsubscribe();
-			};
-		} else {
-			// Clear registration tracking for alldebrid
-			Array.from(registeredServicesRef.current)
-				.filter((key) => key.startsWith('alldebrid:'))
-				.forEach((key) => registeredServicesRef.current.delete(key));
-			libraryMonitor.unregisterService('alldebrid');
+		if (!adKey) {
 			setAdLibrary([]);
 		}
 	}, [adKey]);
 
 	useEffect(() => {
-		if (tbKey) {
-			// Check if already registered with same token
-			const serviceKey = `torbox:${tbKey}`;
-			if (registeredServicesRef.current.has(serviceKey)) {
-				return; // Already registered with this token
-			}
-
-			const config: ServiceConfig = {
-				service: 'torbox',
-				token: tbKey,
-				enabled: true,
-				priority: 3,
-			};
-
-			// Mark as registered before calling async register
-			registeredServicesRef.current.add(serviceKey);
-
-			// Monitor will auto-refresh if data is missing/stale
-			libraryMonitor.registerService(config);
-
-			const unsubscribe = libraryMonitor.onServiceChange('torbox', () => {
-				const data = libraryMonitor.getLibraryData('torbox');
-				if (data) {
-					console.log(`[LibraryCache] TB service change callback: ${data.length} items`);
-					setTbLibrary(data);
-					// updateCombinedLibrary will be called automatically via useCallback dependency
-				}
-			});
-
-			return () => {
-				// Cleanup on token change or unmount
-				registeredServicesRef.current.delete(serviceKey);
-				unsubscribe();
-			};
-		} else {
-			// Clear registration tracking for torbox
-			Array.from(registeredServicesRef.current)
-				.filter((key) => key.startsWith('torbox:'))
-				.forEach((key) => registeredServicesRef.current.delete(key));
-			libraryMonitor.unregisterService('torbox');
+		if (!tbKey) {
 			setTbLibrary([]);
 		}
 	}, [tbKey]);
-
-	// Start/stop monitoring based on configuration
-	useEffect(() => {
-		if (autoRefresh && (rdKey || adKey || tbKey)) {
-			libraryMonitor.start();
-		} else {
-			libraryMonitor.stop();
-		}
-	}, [autoRefresh, rdKey, adKey, tbKey]);
-
-	// Update refresh interval
-	useEffect(() => {
-		libraryMonitor.updateConfig({
-			refreshInterval: refreshInterval * 60 * 1000,
-		});
-	}, [refreshInterval]);
 
 	// Load existing data from IndexedDB to display while monitor initializes
 	const loadExistingData = async () => {
@@ -361,52 +180,6 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 			setSyncStatus((prev) => ({ ...prev, isLoading: false }));
 		}
 	};
-
-	// Handle monitor refresh events
-	const handleMonitorRefresh = (service: string) => {
-		console.log(`[LibraryCache] Handling monitor refresh event for ${service}`);
-		const data = libraryMonitor.getLibraryData(service);
-		if (!data) {
-			console.warn(`[LibraryCache] No data available from monitor for ${service}`);
-			return;
-		}
-
-		console.log(`[LibraryCache] Monitor provided ${data.length} items for ${service}`);
-
-		// Update service-specific library
-		switch (service) {
-			case 'realdebrid':
-				console.log(
-					`[LibraryCache] Updating RD library from monitor: ${data.length} items`
-				);
-				setRdLibrary(data);
-				break;
-			case 'alldebrid':
-				console.log(
-					`[LibraryCache] Updating AD library from monitor: ${data.length} items`
-				);
-				setAdLibrary(data);
-				break;
-			case 'torbox':
-				console.log(
-					`[LibraryCache] Updating TB library from monitor: ${data.length} items`
-				);
-				setTbLibrary(data);
-				break;
-		}
-
-		// updateCombinedLibrary will be called automatically via useCallback dependency
-
-		// Update stats
-		setStats((prev) => ({
-			...prev,
-			lastSync: new Date(),
-			[`${service.substring(0, 2)}Items`]: data.length,
-		}));
-	};
-
-	// Debounce timer ref for IndexedDB saves
-	const dbSaveTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
 	// Update combined library
 	const updateCombinedLibrary = useCallback(() => {
@@ -462,7 +235,6 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 			adItems: ad,
 			tbItems: tb,
 			lastSync: new Date(),
-			lastChange: null,
 			cacheHitRate: Math.round(cacheHitRate * 100),
 			averageFetchTime: Math.round(avgFetchTime),
 		});
@@ -473,124 +245,98 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		service?: 'realdebrid' | 'alldebrid' | 'torbox',
 		force: boolean = false
 	) => {
-		if (service) {
-			console.log(`[LibraryCache] Starting refresh for ${service}, force: ${force}`);
-
-			setSyncStatus({
-				isLoading: false,
-				isSyncing: true,
-				service,
-				progress: 0,
-				total: 0,
-				error: null,
-			});
-
-			const startTime = Date.now();
-
-			try {
-				// If force refresh is requested, use the monitor's forceRefresh method
-				// which properly pauses background checking
-				if (force) {
-					console.log(
-						`[LibraryCache] Using force refresh through monitor for ${service}`
-					);
-					const torrents = await libraryMonitor.forceRefresh(service);
-
-					// Track performance
-					const fetchTime = Date.now() - startTime;
-					fetchTimesRef.current.push(fetchTime);
-					if (fetchTimesRef.current.length > 100) {
-						fetchTimesRef.current.shift();
-					}
-
-					cacheHitsRef.current.misses++;
-
-					console.log(
-						`[LibraryCache] Force refresh completed for ${service} - ${torrents.length} items in ${fetchTime}ms`
-					);
-
-					// Note: State is already updated via the monitor's onServiceChange callback
-					// No need to update again here to avoid duplicate updates
-					toast.success(`${service} library refreshed (${torrents.length} items)`);
-				} else {
-					// For non-forced refresh, use the regular fetch with cache
-					const options: FetchOptions = {
-						forceRefresh: false,
-						onProgress: (progress, total) => {
-							setSyncStatus((prev) => ({
-								...prev,
-								progress,
-								total,
-							}));
-						},
-					};
-
-					let token: string | undefined;
-					switch (service) {
-						case 'realdebrid':
-							token = rdKey || undefined;
-							break;
-						case 'alldebrid':
-							token = adKey || undefined;
-							break;
-						case 'torbox':
-							token = tbKey || undefined;
-							break;
-					}
-
-					if (!token) {
-						throw new Error(`No token for ${service}`);
-					}
-
-					const torrents = await libraryFetcher.fetchLibrary(service, token, options);
-
-					// Track performance
-					const fetchTime = Date.now() - startTime;
-					fetchTimesRef.current.push(fetchTime);
-					if (fetchTimesRef.current.length > 100) {
-						fetchTimesRef.current.shift();
-					}
-
-					cacheHitsRef.current.hits++;
-
-					// Update service-specific library
-					switch (service) {
-						case 'realdebrid':
-							setRdLibrary(torrents);
-							break;
-						case 'alldebrid':
-							setAdLibrary(torrents);
-							break;
-						case 'torbox':
-							setTbLibrary(torrents);
-							break;
-					}
-
-					updateCombinedLibrary();
-					toast.success(`${service} library refreshed (${torrents.length} items)`);
-				}
-			} catch (error: any) {
-				const errorTime = Date.now() - startTime;
-				console.error(
-					`[LibraryCache] Failed to refresh ${service} after ${errorTime}ms:`,
-					error
-				);
-				setSyncStatus((prev) => ({
-					...prev,
-					error: error.message,
-				}));
-				toast.error(`Failed to refresh ${service}: ${error.message}`);
-			} finally {
-				console.log(`[LibraryCache] Refresh completed for ${service}`);
-				setSyncStatus((prev) => ({
-					...prev,
-					isSyncing: false,
-					service: null,
-				}));
-			}
-		} else {
-			// Refresh all services
+		if (!service) {
 			await refreshAll(force);
+			return;
+		}
+
+		console.log(`[LibraryCache] Starting refresh for ${service}, force: ${force}`);
+
+		setSyncStatus({
+			isLoading: false,
+			isSyncing: true,
+			service,
+			progress: 0,
+			total: 0,
+			error: null,
+		});
+
+		const startTime = Date.now();
+
+		try {
+			const options: FetchOptions = {
+				forceRefresh: force,
+				onProgress: (progress, total) => {
+					setSyncStatus((prev) => ({
+						...prev,
+						progress,
+						total,
+					}));
+				},
+			};
+
+			let token: string | undefined;
+			switch (service) {
+				case 'realdebrid':
+					token = rdKey || undefined;
+					break;
+				case 'alldebrid':
+					token = adKey || undefined;
+					break;
+				case 'torbox':
+					token = tbKey || undefined;
+					break;
+			}
+
+			if (!token) {
+				throw new Error(`No token for ${service}`);
+			}
+
+			const torrents = await libraryFetcher.fetchLibrary(service, token, options);
+
+			const fetchTime = Date.now() - startTime;
+			fetchTimesRef.current.push(fetchTime);
+			if (fetchTimesRef.current.length > 100) {
+				fetchTimesRef.current.shift();
+			}
+
+			if (force) {
+				cacheHitsRef.current.misses++;
+			} else {
+				cacheHitsRef.current.hits++;
+			}
+
+			switch (service) {
+				case 'realdebrid':
+					setRdLibrary(torrents);
+					break;
+				case 'alldebrid':
+					setAdLibrary(torrents);
+					break;
+				case 'torbox':
+					setTbLibrary(torrents);
+					break;
+			}
+
+			toast.success(`${service} library refreshed (${torrents.length} items)`);
+		} catch (error: any) {
+			const errorTime = Date.now() - startTime;
+			console.error(
+				`[LibraryCache] Failed to refresh ${service} after ${errorTime}ms:`,
+				error
+			);
+			setSyncStatus((prev) => ({
+				...prev,
+				error: error.message,
+			}));
+			toast.error(`Failed to refresh ${service}: ${error.message}`);
+		} finally {
+			console.log(`[LibraryCache] Refresh completed for ${service}`);
+			setSyncStatus((prev) => ({
+				...prev,
+				isSyncing: false,
+				service: null,
+			}));
 		}
 	};
 
@@ -673,21 +419,6 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		}
 	};
 
-	// Monitoring control
-	const setAutoRefreshFn = (enabled: boolean) => {
-		setAutoRefresh(enabled);
-		libraryMonitor.updateConfig({ enableAutoRefresh: enabled });
-	};
-
-	const setRefreshIntervalFn = (minutes: number) => {
-		setRefreshIntervalState(minutes);
-		libraryMonitor.updateConfig({ refreshInterval: minutes * 60 * 1000 });
-	};
-
-	const getMonitoringStatus = () => {
-		return libraryMonitor.getStats();
-	};
-
 	const contextValue: EnhancedLibraryCacheContextType = {
 		libraryItems,
 		rdLibrary,
@@ -701,9 +432,6 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		addTorrent,
 		removeTorrent,
 		updateTorrent,
-		setAutoRefresh: setAutoRefreshFn,
-		setRefreshInterval: setRefreshIntervalFn,
-		getMonitoringStatus,
 	};
 
 	return (

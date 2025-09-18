@@ -57,10 +57,6 @@ export class CacheManager {
 					store.createIndex('timestamp', 'timestamp', { unique: false });
 					store.createIndex('expiresAt', 'expiresAt', { unique: false });
 				}
-
-				if (!db.objectStoreNames.contains('state')) {
-					db.createObjectStore('state', { keyPath: 'key' });
-				}
 			};
 		});
 	}
@@ -381,55 +377,6 @@ export class CacheManager {
 		for (const key of keysToDelete) {
 			this.memoryCache.delete(key);
 		}
-	}
-
-	/**
-	 * Save library state snapshot (like Zurg's state monitoring)
-	 */
-	async saveState(key: string, state: any): Promise<void> {
-		if (!this.db) return;
-
-		return new Promise((resolve, reject) => {
-			if (!this.db) {
-				reject(new Error('Database not initialized'));
-				return;
-			}
-
-			const transaction = this.db.transaction(['state'], 'readwrite');
-			const store = transaction.objectStore('state');
-			const request = store.put({
-				key,
-				state,
-				timestamp: Date.now(),
-			});
-
-			request.onsuccess = () => resolve();
-			request.onerror = () => reject(request.error);
-		});
-	}
-
-	/**
-	 * Get library state snapshot
-	 */
-	async getState(key: string): Promise<any | null> {
-		if (!this.db) return null;
-
-		return new Promise((resolve, reject) => {
-			if (!this.db) {
-				reject(new Error('Database not initialized'));
-				return;
-			}
-
-			const transaction = this.db.transaction(['state'], 'readonly');
-			const store = transaction.objectStore('state');
-			const request = store.get(key);
-
-			request.onsuccess = () => {
-				const result = request.result;
-				resolve(result ? result.state : null);
-			};
-			request.onerror = () => reject(request.error);
-		});
 	}
 
 	/**

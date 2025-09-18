@@ -24,19 +24,9 @@ export interface FetchOptions {
 	concurrency?: number;
 }
 
-export interface LibraryState {
-	service: string;
-	totalCount: number;
-	firstItemId: string | null;
-	lastItemId: string | null;
-	timestamp: number;
-	hash?: string; // Hash of first N items for deep comparison
-}
-
 export class UnifiedLibraryFetcher {
 	private cache: CacheManager;
 	private rateLimiter: UnifiedRateLimiter;
-	private lastStates: Map<string, LibraryState> = new Map();
 	private fetchingPromises: Map<string, Promise<UserTorrent[]>> = new Map();
 
 	constructor(cache?: CacheManager, rateLimiter?: UnifiedRateLimiter) {
@@ -205,16 +195,6 @@ export class UnifiedLibraryFetcher {
 		await this.cache.set(cacheKey, allTorrents, undefined, 5 * 60 * 1000);
 		console.log(`[Fetcher] Results cached in ${Date.now() - cacheStart}ms`);
 
-		// Update state for change detection
-		this.updateState('realdebrid', {
-			service: 'realdebrid',
-			totalCount: allTorrents.length,
-			firstItemId: allTorrents[0]?.id || null,
-			lastItemId: allTorrents[allTorrents.length - 1]?.id || null,
-			timestamp: Date.now(),
-			hash: this.hashTorrents(allTorrents.slice(0, 10)),
-		});
-
 		const totalTime = Date.now() - rdStart;
 		console.log(
 			`[Fetcher] RealDebrid fetch completed in ${totalTime}ms - ${allTorrents.length} items`
@@ -268,16 +248,6 @@ export class UnifiedLibraryFetcher {
 
 		// Cache the results
 		await this.cache.set(cacheKey, allTorrents, undefined, 5 * 60 * 1000);
-
-		// Update state for change detection
-		this.updateState('alldebrid', {
-			service: 'alldebrid',
-			totalCount: allTorrents.length,
-			firstItemId: allTorrents[0]?.id || null,
-			lastItemId: allTorrents[allTorrents.length - 1]?.id || null,
-			timestamp: Date.now(),
-			hash: this.hashTorrents(allTorrents.slice(0, 10)),
-		});
 
 		return allTorrents;
 	}
@@ -339,113 +309,7 @@ export class UnifiedLibraryFetcher {
 		// Cache the results
 		await this.cache.set(cacheKey, allTorrents, undefined, 5 * 60 * 1000);
 
-		// Update state for change detection
-		this.updateState('torbox', {
-			service: 'torbox',
-			totalCount: allTorrents.length,
-			firstItemId: allTorrents[0]?.id || null,
-			lastItemId: allTorrents[allTorrents.length - 1]?.id || null,
-			timestamp: Date.now(),
-			hash: this.hashTorrents(allTorrents.slice(0, 10)),
-		});
-
 		return allTorrents;
-	}
-
-	/**
-	 * Check if library has changed (like Zurg's state monitoring)
-	 */
-	async hasLibraryChanged(
-		service: 'realdebrid' | 'alldebrid' | 'torbox',
-		token: string
-	): Promise<boolean> {
-		const currentState = await this.getLibraryState(service, token);
-		const lastState = this.lastStates.get(service);
-
-		if (!lastState) {
-			return true;
-		}
-
-		// Compare states
-		if (currentState.totalCount !== lastState.totalCount) {
-			return true;
-		}
-
-		if (currentState.firstItemId !== lastState.firstItemId) {
-			return true;
-		}
-
-		// Deep comparison with hash if counts are the same
-		if (currentState.hash && lastState.hash && currentState.hash !== lastState.hash) {
-			return true;
-		}
-
-		return false;
-	}
-
-	/**
-	 * Get lightweight library state for change detection
-	 */
-	private async getLibraryState(
-		service: 'realdebrid' | 'alldebrid' | 'torbox',
-		token: string
-	): Promise<LibraryState> {
-		switch (service) {
-			case 'realdebrid': {
-				const result = await this.rateLimiter.execute('realdebrid', 'rd-state-check', () =>
-					getUserTorrentsList(token, 10, 1)
-				);
-				return {
-					service: 'realdebrid',
-					totalCount: result.totalCount || 0,
-					firstItemId: result.data[0]?.id || null,
-					lastItemId: result.data[result.data.length - 1]?.id || null,
-					timestamp: Date.now(),
-					hash: this.hashTorrents(result.data),
-				};
-			}
-
-			case 'alldebrid': {
-				const result = await this.rateLimiter.execute('alldebrid', 'ad-state-check', () =>
-					getMagnetStatus(token)
-				);
-				const magnets = result.data?.magnets || [];
-				return {
-					service: 'alldebrid',
-					totalCount: magnets.length,
-					firstItemId: magnets[0]?.id?.toString() || null,
-					lastItemId: magnets[magnets.length - 1]?.id?.toString() || null,
-					timestamp: Date.now(),
-					hash: this.hashMagnets(magnets.slice(0, 10)),
-				};
-			}
-
-			case 'torbox': {
-				const result = await this.rateLimiter.execute('torbox', 'tb-state-check', () =>
-					getTorrentList(token, { limit: 10 })
-				);
-				const torrents =
-					result.success && result.data
-						? Array.isArray(result.data)
-							? result.data
-							: [result.data]
-						: [];
-				return {
-					service: 'torbox',
-					totalCount: torrents.length,
-					firstItemId: torrents[0]?.id?.toString() || null,
-					lastItemId: torrents[torrents.length - 1]?.id?.toString() || null,
-					timestamp: Date.now(),
-					hash: this.hashTorboxTorrents(torrents),
-				};
-			}
-		}
-	}
-
-	private updateState(service: string, state: LibraryState): void {
-		this.lastStates.set(service, state);
-		// Also persist to cache
-		this.cache.saveState(`library-state:${service}`, state);
 	}
 
 	// Conversion helpers (these would import from existing utils)
@@ -459,32 +323,6 @@ export class UnifiedLibraryFetcher {
 
 	private async processTorboxTorrents(data: any[]): Promise<UserTorrent[]> {
 		return data.map((t) => convertToTbUserTorrent(t));
-	}
-
-	// Hash helpers for deep comparison
-	private hashTorrents(torrents: any[]): string {
-		const str = torrents.map((t) => `${t.id}:${t.progress}`).join(',');
-		return this.simpleHash(str);
-	}
-
-	private hashMagnets(magnets: any[]): string {
-		const str = magnets.map((m) => `${m.id}:${m.statusCode}`).join(',');
-		return this.simpleHash(str);
-	}
-
-	private hashTorboxTorrents(torrents: any[]): string {
-		const str = torrents.map((t) => `${t.id}:${t.progress}`).join(',');
-		return this.simpleHash(str);
-	}
-
-	private simpleHash(str: string): string {
-		let hash = 0;
-		for (let i = 0; i < str.length; i++) {
-			const char = str.charCodeAt(i);
-			hash = (hash << 5) - hash + char;
-			hash = hash & hash; // Convert to 32bit integer
-		}
-		return hash.toString(36);
 	}
 
 	/**
