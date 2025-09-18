@@ -13,7 +13,7 @@ const CONTENT_TYPES = {
 	FORM: 'application/x-www-form-urlencoded',
 };
 
-const ALLOWED_HOSTS = ['api.real-debrid.com', 'api.alldebrid.com'];
+const ALLOWED_HOSTS = ['api.real-debrid.com', 'app.real-debrid.com', 'api.alldebrid.com'];
 
 // Utility function to append query parameters
 function appendQueryParams(url: URL, params: any) {
