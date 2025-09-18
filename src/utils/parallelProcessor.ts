@@ -14,7 +14,7 @@ export async function processWithConcurrency<T, R = void>(
 ): Promise<any[]> {
 	const queue = items.map((item, index) => ({ item, index }));
 	const results: any[] = new Array(items.length);
-	const inProgress = new Map<Promise<{ result: any; index: number }>, number>();
+	const inProgress = new Map<number, Promise<void>>();
 	let completed = 0;
 	const total = items.length;
 
@@ -23,28 +23,25 @@ export async function processWithConcurrency<T, R = void>(
 		while (inProgress.size < concurrency && queue.length > 0) {
 			const { item, index } = queue.shift()!;
 			const promise = processor(item)
-				.then((result) => ({
-					result: { item, success: true, result },
-					index,
-				}))
-				.catch((error) => ({
-					result: { item, success: false, error },
-					index,
-				}))
+				.then((result) => {
+					results[index] = { item, success: true, result };
+				})
+				.catch((error) => {
+					results[index] = { item, success: false, error };
+				})
 				.finally(() => {
-					inProgress.delete(promise);
+					inProgress.delete(index);
 					completed++;
 					if (onProgress) {
 						onProgress(completed, total);
 					}
 				});
-			inProgress.set(promise, index);
+			inProgress.set(index, promise);
 		}
 
 		// Wait for at least one task to complete before continuing
 		if (inProgress.size > 0) {
-			const { result, index } = await Promise.race(inProgress.keys());
-			results[index] = result;
+			await Promise.race(Array.from(inProgress.values()));
 		}
 	}
 

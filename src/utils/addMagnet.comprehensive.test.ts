@@ -532,7 +532,7 @@ describe('addMagnet utilities', () => {
 			const callback = vi.fn();
 			await handleAddAsMagnetInAd(adKey, hash, callback);
 
-			expect(uploadMagnet).toHaveBeenCalledWith(adKey, [hash]);
+			expect(uploadMagnet).toHaveBeenCalledWith(adKey, [`magnet:?xt=urn:btih:${hash}`]);
 			expect(callback).toHaveBeenCalled();
 			expect(toast).toHaveBeenCalledWith('Successfully added hash!', expect.any(Object));
 		});

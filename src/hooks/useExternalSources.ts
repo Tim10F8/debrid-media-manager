@@ -1,4 +1,5 @@
 import { FileData, SearchResult } from '@/services/mediasearch';
+import { normalizeHash } from '@/utils/extractHashes';
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -173,8 +174,8 @@ export function useExternalSources(rdKey: string | null) {
 					}
 				}
 
-				const hashMatch = stream.url?.match(/\/([a-f0-9]{40})\//);
-				hash = hashMatch ? hashMatch[1] : stream.infoHash || '';
+				const hashMatch = stream.url?.match(/\/([a-fA-F0-9]{40})\//);
+				hash = normalizeHash(hashMatch ? hashMatch[1] : stream.infoHash || '');
 			} else if (source === 'torrentsdb') {
 				// Parse TorrentsDB format
 				if (stream.title) {
@@ -200,7 +201,7 @@ export function useExternalSources(rdKey: string | null) {
 					}
 				}
 
-				hash = stream.infoHash || '';
+				hash = normalizeHash(stream.infoHash || '');
 			} else {
 				// Parse Comet/MediaFusion format
 				if (stream.description) {
@@ -233,7 +234,7 @@ export function useExternalSources(rdKey: string | null) {
 					}
 				}
 
-				hash = stream.infoHash || '';
+				hash = normalizeHash(stream.infoHash || '');
 			}
 
 			if (!hash) return null;
