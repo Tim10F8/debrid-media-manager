@@ -60,7 +60,7 @@ const terms = [
 	'📺 prime',
 	'🤔 provoking',
 	'🤪 quirky',
-	'⭐ rated',
+	'🌠 rated',
 	'💿 bluray',
 	'🆕 releases',
 	'❤️ romantic',
