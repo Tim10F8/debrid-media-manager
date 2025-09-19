@@ -10,13 +10,18 @@ import { useTorrentManagement } from '@/hooks/useTorrentManagement';
 import { SearchApiResponse, SearchResult } from '@/services/mediasearch';
 import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
+import { getLocalStorageBoolean, getLocalStorageItemOrDefault } from '@/utils/browserStorage';
 import { handleCastMovie } from '@/utils/castApiClient';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
 import { instantCheckInRd, instantCheckInTb } from '@/utils/instantChecks';
 import { quickSearch } from '@/utils/quickSearch';
 import { sortByBiggest } from '@/utils/results';
 import { isVideo } from '@/utils/selectable';
-import { defaultMovieSize, defaultPlayer } from '@/utils/settings';
+import {
+	defaultTorrentsFilter as defaultFilterSetting,
+	defaultMovieSize,
+	defaultPlayer,
+} from '@/utils/settings';
 import { castToastOptions, searchToastOptions } from '@/utils/toastOptions';
 import { generateTokenAndHash } from '@/utils/token';
 import { getMultipleTrackerStats } from '@/utils/trackerStats';
@@ -70,12 +75,13 @@ const MovieSearch: FunctionComponent = () => {
 	});
 
 	// Settings
-	const player = window.localStorage.getItem('settings:player') || defaultPlayer;
-	const movieMaxSize = window.localStorage.getItem('settings:movieMaxSize') || defaultMovieSize;
-	const onlyTrustedTorrents =
-		window.localStorage.getItem('settings:onlyTrustedTorrents') === 'true';
-	const defaultTorrentsFilter =
-		window.localStorage.getItem('settings:defaultTorrentsFilter') ?? '';
+	const player = getLocalStorageItemOrDefault('settings:player', defaultPlayer);
+	const movieMaxSize = getLocalStorageItemOrDefault('settings:movieMaxSize', defaultMovieSize);
+	const onlyTrustedTorrents = getLocalStorageBoolean('settings:onlyTrustedTorrents', false);
+	const defaultTorrentsFilter = getLocalStorageItemOrDefault(
+		'settings:defaultTorrentsFilter',
+		defaultFilterSetting
+	);
 	const { publicRuntimeConfig: config } = getConfig();
 
 	// State

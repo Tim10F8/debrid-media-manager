@@ -4,16 +4,26 @@ import type { GetServerSideProps, NextPage } from 'next';
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
 
-import { getStats, type OperationStats } from '@/lib/observability/rdOperationalStats';
+import {
+	getRealDebridObservabilityStats,
+	type RealDebridObservabilityStats,
+} from '@/lib/observability/getRealDebridObservabilityStats';
+import type { OperationStats } from '@/lib/observability/rdOperationalStats';
 
 type Props = {
-	stats: ReturnType<typeof getStats>;
+	stats: RealDebridObservabilityStats;
 };
 
 type StatusState = 'idle' | 'up' | 'down';
 
-export const getServerSideProps: GetServerSideProps<Props> = async () => {
-	const stats = getStats();
+export const getServerSideProps: GetServerSideProps<Props> = async ({ res }) => {
+	res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+	res.setHeader('CDN-Cache-Control', 'no-store');
+	res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
+	res.setHeader('Pragma', 'no-cache');
+	res.setHeader('Expires', '0');
+
+	const stats = getRealDebridObservabilityStats();
 	return { props: { stats } };
 };
 
@@ -191,6 +201,44 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 		};
 	};
 
+	const workingStream = stats.workingStream;
+	const workingStreamPct = workingStream ? Math.round(workingStream.rate * 100) : null;
+	const workingStreamHealth =
+		workingStream && workingStream.lastChecked
+			? operationHealthMeta(workingStream.rate, workingStream.total)
+			: null;
+	const workingStreamValue =
+		workingStream && workingStream.lastChecked ? `${workingStreamPct}%` : '—';
+	const workingStreamCounts = workingStream?.lastChecked
+		? `${workingStream.working}/${workingStream.total}`
+		: workingStream?.inProgress
+			? 'Checking…'
+			: '—';
+	const workingStreamHelper = workingStream
+		? workingStream.lastError
+			? workingStream.lastError
+			: workingStream.lastChecked
+				? 'Servers responding with HTTP 200 and Content-Length > 0.'
+				: 'Checking stream servers…'
+		: 'Stream availability monitor unavailable.';
+	const workingStreamLastCheckedLabel = workingStream?.lastChecked
+		? new Date(workingStream.lastChecked).toLocaleString(undefined, {
+				month: 'short',
+				day: 'numeric',
+				hour: '2-digit',
+				minute: '2-digit',
+			})
+		: null;
+	const workingStreamMeterWidth =
+		workingStream && workingStream.lastChecked
+			? `${Math.max(workingStreamPct ?? 0, 4)}%`
+			: workingStream?.inProgress
+				? '24%'
+				: '10%';
+	const workingStreamMeterClass = workingStream?.lastError
+		? 'bg-rose-500'
+		: (workingStreamHealth?.meter ?? 'bg-slate-500');
+
 	return (
 		<>
 			<Head>
@@ -268,6 +316,44 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 									/>
 								</div>
 								<div className="mt-3 text-xs text-slate-400">{successCopy}</div>
+								<div className="mt-5 rounded-xl border border-white/10 bg-black/30 p-4">
+									<div className="flex items-center justify-between">
+										<div className="text-xs font-medium uppercase tracking-wider text-slate-400">
+											Working Stream
+										</div>
+										{workingStreamHealth && !workingStream?.lastError ? (
+											<span
+												className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${workingStreamHealth.badge}`}
+											>
+												{workingStreamHealth.label}
+											</span>
+										) : null}
+									</div>
+									<div className="mt-3 flex items-baseline justify-between gap-2">
+										<span className="text-3xl font-semibold text-white">
+											{workingStreamValue}
+										</span>
+										<span className="text-xs text-slate-400">
+											{workingStreamCounts}
+										</span>
+									</div>
+									<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-800/60">
+										<div
+											className={`h-full rounded-full ${workingStreamMeterClass}`}
+											style={{ width: workingStreamMeterWidth }}
+										/>
+									</div>
+									<div
+										className={`mt-3 text-xs ${workingStream?.lastError ? 'text-rose-300' : 'text-slate-400'}`}
+									>
+										{workingStreamHelper}
+									</div>
+									{workingStreamLastCheckedLabel ? (
+										<div className="mt-1 text-[11px] text-slate-500">
+											Last check {workingStreamLastCheckedLabel}
+										</div>
+									) : null}
+								</div>
 							</div>
 						</div>
 

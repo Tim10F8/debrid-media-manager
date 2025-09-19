@@ -11,6 +11,7 @@ import { useTorrentManagement } from '@/hooks/useTorrentManagement';
 import { SearchApiResponse, SearchResult } from '@/services/mediasearch';
 import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
+import { getLocalStorageBoolean, getLocalStorageItemOrDefault } from '@/utils/browserStorage';
 import { handleCastTvShow } from '@/utils/castApiClient';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
 import {
@@ -22,7 +23,11 @@ import { instantCheckInRd, instantCheckInTb } from '@/utils/instantChecks';
 import { quickSearch } from '@/utils/quickSearch';
 import { sortByMedian } from '@/utils/results';
 import { isVideo } from '@/utils/selectable';
-import { defaultEpisodeSize, defaultPlayer } from '@/utils/settings';
+import {
+	defaultEpisodeSize,
+	defaultTorrentsFilter as defaultFilterSetting,
+	defaultPlayer,
+} from '@/utils/settings';
 import { castToastOptions, searchToastOptions } from '@/utils/toastOptions';
 import { generateTokenAndHash } from '@/utils/token';
 import { getMultipleTrackerStats } from '@/utils/trackerStats';
@@ -52,13 +57,14 @@ const torrentDB = new UserTorrentDB();
 const TvSearch: FunctionComponent = () => {
 	const isMounted = useRef(true);
 	const hasLoadedTrackerStats = useRef(false);
-	const player = window.localStorage.getItem('settings:player') || defaultPlayer;
-	const episodeMaxSize =
-		window.localStorage.getItem('settings:episodeMaxSize') || defaultEpisodeSize;
-	const onlyTrustedTorrents =
-		window.localStorage.getItem('settings:onlyTrustedTorrents') === 'true';
-	const defaultTorrentsFilter = useMemo(
-		() => window.localStorage.getItem('settings:defaultTorrentsFilter') ?? '',
+	const player = getLocalStorageItemOrDefault('settings:player', defaultPlayer);
+	const episodeMaxSize = getLocalStorageItemOrDefault(
+		'settings:episodeMaxSize',
+		defaultEpisodeSize
+	);
+	const onlyTrustedTorrents = getLocalStorageBoolean('settings:onlyTrustedTorrents', false);
+	const storedTorrentsFilter = useMemo(
+		() => getLocalStorageItemOrDefault('settings:defaultTorrentsFilter', defaultFilterSetting),
 		[]
 	);
 
@@ -68,7 +74,7 @@ const TvSearch: FunctionComponent = () => {
 	const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 	const [filteredResults, setFilteredResults] = useState<SearchResult[]>([]);
 	const [errorMessage, setErrorMessage] = useState('');
-	const [query, setQuery] = useState(defaultTorrentsFilter);
+	const [query, setQuery] = useState(storedTorrentsFilter);
 	const [descLimit, setDescLimit] = useState(100);
 	const [rdKey] = useRealDebridAccessToken();
 	const adKey = useAllDebridApiKey();
@@ -172,7 +178,7 @@ const TvSearch: FunctionComponent = () => {
 		// Clear previous results and query input when season changes
 		setSearchResults([]);
 		setFilteredResults([]);
-		setQuery(defaultTorrentsFilter); // Reset query to default filter
+		setQuery(storedTorrentsFilter);
 
 		const initializeData = async () => {
 			await torrentDB.initializeDB();
@@ -184,7 +190,7 @@ const TvSearch: FunctionComponent = () => {
 
 		initializeData();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [imdbid, seasonNum, isLoading, defaultTorrentsFilter]);
+	}, [imdbid, seasonNum, isLoading, storedTorrentsFilter]);
 
 	useEffect(() => {
 		return () => {
