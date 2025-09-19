@@ -124,39 +124,36 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	const cacheHitsRef = useRef({ hits: 0, misses: 0 });
 	const dbSaveTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
-	// Initialize services on mount and restore cached data for display
-	useEffect(() => {
-		initializeServices();
-		loadExistingData();
+	// Update statistics
+	const updateStats = useCallback((torrents: UserTorrent[]) => {
+		const rd = torrents.filter((t) => t.id.startsWith('rd:')).length;
+		const ad = torrents.filter((t) => t.id.startsWith('ad:')).length;
+		const tb = torrents.filter((t) => t.id.startsWith('tb:')).length;
 
-		return () => {
-			if (dbSaveTimerRef.current) {
-				clearTimeout(dbSaveTimerRef.current);
-			}
-		};
+		const cacheHitRate =
+			cacheHitsRef.current.hits + cacheHitsRef.current.misses > 0
+				? cacheHitsRef.current.hits /
+					(cacheHitsRef.current.hits + cacheHitsRef.current.misses)
+				: 0;
+
+		const avgFetchTime =
+			fetchTimesRef.current.length > 0
+				? fetchTimesRef.current.reduce((a, b) => a + b, 0) / fetchTimesRef.current.length
+				: 0;
+
+		setStats({
+			totalItems: torrents.length,
+			rdItems: rd,
+			adItems: ad,
+			tbItems: tb,
+			lastSync: new Date(),
+			cacheHitRate: Math.round(cacheHitRate * 100),
+			averageFetchTime: Math.round(avgFetchTime),
+		});
 	}, []);
 
-	// Reset per-service libraries when tokens are cleared
-	useEffect(() => {
-		if (!rdKey || rdLoading) {
-			setRdLibrary([]);
-		}
-	}, [rdKey, rdLoading]);
-
-	useEffect(() => {
-		if (!adKey) {
-			setAdLibrary([]);
-		}
-	}, [adKey]);
-
-	useEffect(() => {
-		if (!tbKey) {
-			setTbLibrary([]);
-		}
-	}, [tbKey]);
-
 	// Load existing data from IndexedDB to display while monitor initializes
-	const loadExistingData = async () => {
+	const loadExistingData = useCallback(async () => {
 		try {
 			// Load any existing data to show while monitor initializes
 			const cachedTorrents = await torrentDB.all();
@@ -179,7 +176,38 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		} finally {
 			setSyncStatus((prev) => ({ ...prev, isLoading: false }));
 		}
-	};
+	}, [updateStats]);
+
+	// Initialize services on mount and restore cached data for display
+	useEffect(() => {
+		initializeServices();
+		loadExistingData();
+
+		return () => {
+			if (dbSaveTimerRef.current) {
+				clearTimeout(dbSaveTimerRef.current);
+			}
+		};
+	}, [loadExistingData]);
+
+	// Reset per-service libraries when tokens are cleared
+	useEffect(() => {
+		if (!rdKey || rdLoading) {
+			setRdLibrary([]);
+		}
+	}, [rdKey, rdLoading]);
+
+	useEffect(() => {
+		if (!adKey) {
+			setAdLibrary([]);
+		}
+	}, [adKey]);
+
+	useEffect(() => {
+		if (!tbKey) {
+			setTbLibrary([]);
+		}
+	}, [tbKey]);
 
 	// Update combined library
 	const updateCombinedLibrary = useCallback(() => {
@@ -205,40 +233,12 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		}, 500); // Wait 500ms before saving to batch multiple updates
 
 		updateStats(combined);
-	}, [rdLibrary, adLibrary, tbLibrary]);
+	}, [rdLibrary, adLibrary, tbLibrary, updateStats]);
 
 	// Trigger combined library update when any service library changes
 	useEffect(() => {
 		updateCombinedLibrary();
 	}, [rdLibrary, adLibrary, tbLibrary, updateCombinedLibrary]);
-
-	// Update statistics
-	const updateStats = (torrents: UserTorrent[]) => {
-		const rd = torrents.filter((t) => t.id.startsWith('rd:')).length;
-		const ad = torrents.filter((t) => t.id.startsWith('ad:')).length;
-		const tb = torrents.filter((t) => t.id.startsWith('tb:')).length;
-
-		const cacheHitRate =
-			cacheHitsRef.current.hits + cacheHitsRef.current.misses > 0
-				? cacheHitsRef.current.hits /
-					(cacheHitsRef.current.hits + cacheHitsRef.current.misses)
-				: 0;
-
-		const avgFetchTime =
-			fetchTimesRef.current.length > 0
-				? fetchTimesRef.current.reduce((a, b) => a + b, 0) / fetchTimesRef.current.length
-				: 0;
-
-		setStats({
-			totalItems: torrents.length,
-			rdItems: rd,
-			adItems: ad,
-			tbItems: tb,
-			lastSync: new Date(),
-			cacheHitRate: Math.round(cacheHitRate * 100),
-			averageFetchTime: Math.round(avgFetchTime),
-		});
-	};
 
 	// Refresh library for a specific service or all
 	const refreshLibrary = async (

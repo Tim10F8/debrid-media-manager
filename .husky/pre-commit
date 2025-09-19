@@ -1,3 +1,21 @@
 #!/usr/bin/env sh
-npm run format
-git add -A
+set -e
+
+# Only operate on staged files; ignore unstaged changes
+# 1) Format/lint staged files via lint-staged (re-stages changed files)
+# 2) Type-check the project
+# 3) Run tests
+
+# If nothing is staged, exit fast
+if git diff --cached --quiet; then
+  exit 0
+fi
+
+# Run format + lint on staged files only
+npx --no-install lint-staged
+
+# TypeScript type-check
+npm run -s typecheck
+
+# Run tests (fail commit on failing tests)
+npm run -s test
