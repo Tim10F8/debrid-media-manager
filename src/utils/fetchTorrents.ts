@@ -146,7 +146,7 @@ export function convertToUserTorrent(torrentInfo: UserTorrentResponse): UserTorr
 		status,
 		serviceStatus,
 		mediaType,
-		added: new Date(addedRaw.replace?.('Z', '+01:00') || addedRaw),
+		added: new Date(addedRaw),
 		id: `rd:${torrentInfo.id}`,
 		// Decode any percent-encoded characters for display/use
 		links: linksRaw.map((l) => {

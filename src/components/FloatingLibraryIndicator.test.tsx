@@ -242,6 +242,29 @@ describe('FloatingLibraryIndicator', () => {
 			render(<FloatingLibraryIndicator />);
 			expect(screen.getByTitle('Failed to fetch')).toBeInTheDocument();
 		});
+
+		it('updates last fetch label as time passes', () => {
+			const baseTime = new Date('2024-01-01T00:00:00.000Z');
+			vi.useFakeTimers();
+			vi.setSystemTime(baseTime);
+			localStorage.setItem('rd:accessToken', 'test-token');
+			(useRealDebridAccessToken as any).mockReturnValue(['test-token', false, false]);
+			(useLibraryCache as any).mockReturnValue({
+				...mockLibraryCache,
+				lastFetchTime: baseTime,
+			});
+
+			try {
+				render(<FloatingLibraryIndicator />);
+				expect(screen.getByText('Just now')).toBeInTheDocument();
+				act(() => {
+					vi.advanceTimersByTime(61_000);
+				});
+				expect(screen.getByText('1m ago')).toBeInTheDocument();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
 	});
 
 	describe('Multiple service support', () => {

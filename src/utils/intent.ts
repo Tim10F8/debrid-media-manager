@@ -16,10 +16,10 @@ export const getInstantIntent = async (
 ) => {
 	let intent = '';
 	try {
-		const id = await addHashAsMagnet(rdKey, hash, true);
+		const id = await addHashAsMagnet(rdKey, hash, false);
 		try {
-			await handleSelectFilesInRd(rdKey, `rd:${id}`, true);
-			const torrentInfo = await getTorrentInfo(rdKey, id, true);
+			await handleSelectFilesInRd(rdKey, `rd:${id}`, false);
+			const torrentInfo = await getTorrentInfo(rdKey, id, false);
 			if (torrentInfo.status !== 'downloaded') {
 				throw new Error('Torrent not downloaded');
 			}
@@ -28,8 +28,8 @@ export const getInstantIntent = async (
 				.filter((f) => f.selected)
 				.findIndex((f) => f.id === fileId);
 			const link = torrentInfo.links[fileIdx] ?? torrentInfo.links[0];
-			const resp = await unrestrictLink(rdKey, link, ipAddress, true);
-			await deleteTorrent(rdKey, id, true);
+			const resp = await unrestrictLink(rdKey, link, ipAddress, false);
+			await deleteTorrent(rdKey, id, false);
 			if (os === 'android') {
 				intent = `intent://${resp.download.replace(
 					'https://',
@@ -53,7 +53,7 @@ export const getInstantIntent = async (
 				intent = 'https://real-debrid.com/streaming-' + resp.id;
 			}
 		} catch (e) {
-			await deleteTorrent(rdKey, id, true);
+			await deleteTorrent(rdKey, id, false);
 		}
 	} catch (e) {
 		console.log(e);
@@ -70,7 +70,7 @@ export const getIntent = async (
 ) => {
 	let intent = '';
 	try {
-		const resp = await unrestrictLink(rdKey, link, ipAddress, true);
+		const resp = await unrestrictLink(rdKey, link, ipAddress, false);
 		if (os === 'android') {
 			intent = `intent://${resp.download.replace(
 				'https://',

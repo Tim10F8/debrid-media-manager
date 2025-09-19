@@ -1,5 +1,6 @@
 import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
+import { useRelativeTimeLabel } from '@/hooks/useRelativeTimeLabel';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -14,6 +15,7 @@ export default function FloatingLibraryIndicator() {
 	const tbKey = useTorBoxAccessToken();
 	const [mounted, setMounted] = useState(false);
 	const [isLoggedIn, setIsLoggedIn] = useState(false);
+	const lastFetchLabel = useRelativeTimeLabel(lastFetchTime, 'Just now');
 
 	// Check authentication status directly from localStorage
 	const checkAuthStatus = () => {
@@ -71,6 +73,13 @@ export default function FloatingLibraryIndicator() {
 		setIsLoggedIn(hasValidAuth);
 	}, [rdToken, adKey, tbKey]);
 
+	const handleRefresh = async () => {
+		await refreshLibrary();
+	};
+
+	const isStale =
+		lastFetchTime && new Date().getTime() - lastFetchTime.getTime() > 30 * 60 * 1000; // 30 minutes
+
 	// Don't render until mounted to avoid hydration issues
 	if (!mounted) {
 		return null;
@@ -85,27 +94,6 @@ export default function FloatingLibraryIndicator() {
 	if (router.pathname === '/library') {
 		return null;
 	}
-
-	const handleRefresh = async () => {
-		await refreshLibrary();
-	};
-
-	const formatLastFetch = () => {
-		if (!lastFetchTime) return 'Never';
-		const now = new Date();
-		const diff = now.getTime() - lastFetchTime.getTime();
-		const minutes = Math.floor(diff / 60000);
-		const hours = Math.floor(minutes / 60);
-		const days = Math.floor(hours / 24);
-
-		if (days > 0) return `${days}d ago`;
-		if (hours > 0) return `${hours}h ago`;
-		if (minutes > 0) return `${minutes}m ago`;
-		return 'Just now';
-	};
-
-	const isStale =
-		lastFetchTime && new Date().getTime() - lastFetchTime.getTime() > 30 * 60 * 1000; // 30 minutes
 
 	return (
 		<div className="fixed bottom-6 left-6 z-50 flex items-center gap-2 rounded-full border border-gray-700 bg-gray-800 px-3 py-2 shadow-lg md:px-4 md:py-2">
@@ -136,7 +124,7 @@ export default function FloatingLibraryIndicator() {
 						<span
 							className={`text-xs ${isStale ? 'text-yellow-400' : 'text-gray-500'} hidden sm:block`}
 						>
-							{formatLastFetch()}
+							{lastFetchLabel}
 						</span>
 					)}
 				</div>

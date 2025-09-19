@@ -25,11 +25,11 @@ export const exportDownloadLinks = async (rdKey: string, torrentId: string, ipAd
 	let filename = '',
 		downloadLinks = '';
 	try {
-		const info = await getTorrentInfo(rdKey, torrentId, true);
+		const info = await getTorrentInfo(rdKey, torrentId, false);
 		filename = info.original_filename;
 		for (const link of info.links) {
 			try {
-				const resp = await unrestrictLink(rdKey, link, ipAddress, true);
+				const resp = await unrestrictLink(rdKey, link, ipAddress, false);
 				downloadLinks += resp.download + '\n';
 			} catch (e) {
 				console.error('exportdownload, unrestrict error', e);

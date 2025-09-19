@@ -20,10 +20,10 @@ export const getStreamUrl = async (
 	let episodeNumber = -1;
 	let fileSize = 0;
 	try {
-		const id = await addHashAsMagnet(rdKey, hash, true);
+		const id = await addHashAsMagnet(rdKey, hash, false);
 		try {
-			await handleSelectFilesInRd(rdKey, `rd:${id}`, true);
-			const torrentInfo = await getTorrentInfo(rdKey, id, true);
+			await handleSelectFilesInRd(rdKey, `rd:${id}`, false);
+			const torrentInfo = await getTorrentInfo(rdKey, id, false);
 			let link = '';
 
 			const fileIdx = torrentInfo.files
@@ -31,7 +31,7 @@ export const getStreamUrl = async (
 				.findIndex((f) => f.id === fileId);
 			link = torrentInfo.links[fileIdx] ?? torrentInfo.links[0];
 
-			const resp = await unrestrictLink(rdKey, link, ipAddress, true);
+			const resp = await unrestrictLink(rdKey, link, ipAddress, false);
 			if (!resp.streamable) {
 				throw new Error('not streamable');
 			}
@@ -47,10 +47,10 @@ export const getStreamUrl = async (
 
 			fileSize = Math.round(resp.filesize / 1024 / 1024);
 
-			await deleteTorrent(rdKey, id, true);
+			await deleteTorrent(rdKey, id, false);
 		} catch (e) {
 			console.error('error after adding hash', e);
-			await deleteTorrent(rdKey, id, true);
+			await deleteTorrent(rdKey, id, false);
 			throw e;
 		}
 	} catch (e) {
@@ -68,10 +68,10 @@ export const getBiggestFileStreamUrl = async (
 	let rdLink = '';
 	let fileSize = 0;
 	try {
-		const id = await addHashAsMagnet(rdKey, hash, true);
+		const id = await addHashAsMagnet(rdKey, hash, false);
 		try {
-			await handleSelectFilesInRd(rdKey, `rd:${id}`, true);
-			const torrent = await getTorrentInfo(rdKey, id, true);
+			await handleSelectFilesInRd(rdKey, `rd:${id}`, false);
+			const torrent = await getTorrentInfo(rdKey, id, false);
 			let link = '';
 
 			const biggestFile = torrent.files.reduce((prev, current) => {
@@ -80,7 +80,7 @@ export const getBiggestFileStreamUrl = async (
 			const biggestFileIdx = torrent.files.findIndex((f) => f.id === biggestFile.id);
 			link = torrent.links[biggestFileIdx] ?? torrent.links[0];
 
-			const resp = await unrestrictLink(rdKey, link, ipAddress, true);
+			const resp = await unrestrictLink(rdKey, link, ipAddress, false);
 			if (!resp.streamable) {
 				throw new Error('not streamable');
 			}
@@ -90,10 +90,10 @@ export const getBiggestFileStreamUrl = async (
 
 			fileSize = Math.round(resp.filesize / 1024 / 1024);
 
-			await deleteTorrent(rdKey, id, true);
+			await deleteTorrent(rdKey, id, false);
 		} catch (e) {
 			console.error('error after adding hash', e);
-			await deleteTorrent(rdKey, id, true);
+			await deleteTorrent(rdKey, id, false);
 			throw e;
 		}
 	} catch (e) {

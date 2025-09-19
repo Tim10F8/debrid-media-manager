@@ -21,6 +21,16 @@ import {
 } from 'react';
 import toast from 'react-hot-toast';
 
+const torrentSnapshotReplacer = (_key: string, value: unknown) => {
+	if (value instanceof Date) {
+		return value.toISOString();
+	}
+	return value;
+};
+
+const buildTorrentSignature = (torrent: UserTorrent): string =>
+	JSON.stringify(torrent, torrentSnapshotReplacer);
+
 interface LibraryStats {
 	totalItems: number;
 	rdItems: number;
@@ -125,9 +135,8 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	// Performance tracking
 	const fetchTimesRef = useRef<number[]>([]);
 	const cacheHitsRef = useRef({ hits: 0, misses: 0 });
-	const dbSaveTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
-	// Track last saved signature to avoid redundant IndexedDB writes
-	const lastSavedIdsSignatureRef = useRef<string | null>(null);
+	const dbSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const lastPersistedSnapshotRef = useRef<Map<string, string>>(new Map());
 
 	// Update statistics
 	const updateStats = useCallback((torrents: UserTorrent[]) => {
@@ -176,12 +185,11 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 
 				updateStats(cachedTorrents);
 
-				// Initialize last-saved signature so we don't immediately resave identical data
-				const initialSig = cachedTorrents
-					.map((t) => `${t.id}:${t.status}:${t.progress}`)
-					.sort()
-					.join(',');
-				lastSavedIdsSignatureRef.current = initialSig;
+				const snapshot = new Map<string, string>();
+				for (const torrent of cachedTorrents) {
+					snapshot.set(torrent.id, buildTorrentSignature(torrent));
+				}
+				lastPersistedSnapshotRef.current = snapshot;
 			}
 		} catch (error) {
 			console.error('Failed to load cached data:', error);
@@ -196,8 +204,9 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		loadExistingData();
 
 		return () => {
-			if (dbSaveTimerRef.current) {
+			if (dbSaveTimerRef.current !== null) {
 				clearTimeout(dbSaveTimerRef.current);
+				dbSaveTimerRef.current = null;
 			}
 		};
 	}, [loadExistingData]);
@@ -225,7 +234,6 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	const updateCombinedLibrary = useCallback(() => {
 		const combined = [...rdLibrary, ...adLibrary, ...tbLibrary];
 
-		// Skip noisy logs and DB work when unauthenticated and empty
 		const shouldLogAndPersist = hasAnyAuth || combined.length > 0;
 		if (shouldLogAndPersist) {
 			console.log(
@@ -235,31 +243,77 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 
 		setLibraryItems(combined);
 
-		// Debounce IndexedDB saves to avoid multiple writes in quick succession
-		if (dbSaveTimerRef.current) {
+		if (dbSaveTimerRef.current !== null) {
 			clearTimeout(dbSaveTimerRef.current);
+			dbSaveTimerRef.current = null;
 		}
 
 		if (shouldLogAndPersist) {
-			// Compute a simple, stable signature based on IDs plus key runtime fields (order-independent)
-			const idsSignature = combined
-				.map((t) => `${t.id}:${t.status}:${t.progress}`)
-				.sort()
-				.join(',');
+			const previousSnapshot = lastPersistedSnapshotRef.current;
+			const nextSnapshot = new Map<string, string>();
+			const toUpsert: UserTorrent[] = [];
+			const toRemove: string[] = [];
 
-			// Skip save if nothing changed since last write
-			if (idsSignature !== lastSavedIdsSignatureRef.current) {
+			for (const torrent of combined) {
+				const signature = buildTorrentSignature(torrent);
+				nextSnapshot.set(torrent.id, signature);
+				if (previousSnapshot.get(torrent.id) !== signature) {
+					toUpsert.push(torrent);
+				}
+			}
+
+			for (const id of previousSnapshot.keys()) {
+				if (!nextSnapshot.has(id)) {
+					toRemove.push(id);
+				}
+			}
+
+			if (toUpsert.length === 0 && toRemove.length === 0) {
+				lastPersistedSnapshotRef.current = nextSnapshot;
+			} else {
+				const combinedCopy = combined.map((torrent) => torrent);
+				const upserts = toUpsert.slice();
+				const removals = toRemove.slice();
+				const snapshotForPersist = new Map(nextSnapshot);
+				const bulkThreshold = 400;
+				const shouldBulkReplace = upserts.length + removals.length > bulkThreshold;
+
 				dbSaveTimerRef.current = setTimeout(() => {
-					console.log(`[LibraryCache] Saving ${combined.length} items to IndexedDB...`);
-					const dbStart = Date.now();
-					torrentDB.clear().then(() => {
-						combined.forEach((torrent) => torrentDB.add(torrent));
-						lastSavedIdsSignatureRef.current = idsSignature;
-						console.log(
-							`[LibraryCache] IndexedDB save completed in ${Date.now() - dbStart}ms`
-						);
-					});
-				}, 500); // Wait 500ms before saving to batch multiple updates
+					dbSaveTimerRef.current = null;
+					void (async () => {
+						const dbStart = Date.now();
+						try {
+							if (shouldBulkReplace) {
+								console.log(
+									`[LibraryCache] Saving ${combinedCopy.length} items to IndexedDB (bulk replace)...`
+								);
+								await torrentDB.replaceAll(combinedCopy);
+							} else {
+								console.log(
+									`[LibraryCache] Saving updates to IndexedDB (upsert=${upserts.length}, remove=${removals.length})...`
+								);
+								// Use optimized batch operations
+								if (upserts.length === 1) {
+									// Use dedicated single upsert for better performance
+									await torrentDB.upsert(upserts[0]);
+								} else if (upserts.length > 1) {
+									await torrentDB.addAll(upserts);
+								}
+								if (removals.length === 1) {
+									await torrentDB.deleteById(removals[0]);
+								} else if (removals.length > 1) {
+									await torrentDB.deleteMany(removals);
+								}
+							}
+							lastPersistedSnapshotRef.current = snapshotForPersist;
+							console.log(
+								`[LibraryCache] IndexedDB save completed in ${Date.now() - dbStart}ms`
+							);
+						} catch (error) {
+							console.error('[LibraryCache] IndexedDB save failed', error);
+						}
+					})();
+				}, 1000); // Increased debounce time from 500ms to 1s for better batching
 			}
 		}
 

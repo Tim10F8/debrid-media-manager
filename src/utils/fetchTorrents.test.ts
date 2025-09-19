@@ -250,7 +250,7 @@ describe('fetchTorrents utilities', () => {
 			expect(result.status).toBe(UserTorrentStatus.waiting);
 		});
 
-		it('should handle date conversion with timezone offset', () => {
+		it('should preserve the added timestamp without applying offsets', () => {
 			const rdTorrent: UserTorrentResponse = {
 				id: '999',
 				filename: 'Test.mkv',
@@ -264,7 +264,7 @@ describe('fetchTorrents utilities', () => {
 			const result = convertToUserTorrent(rdTorrent);
 
 			expect(result.added).toBeInstanceOf(Date);
-			expect(result.added.toISOString()).toBe('2024-01-01T11:00:00.000Z');
+			expect(result.added.toISOString()).toBe('2024-01-01T12:00:00.000Z');
 		});
 
 		it('should handle links with encoded characters', () => {

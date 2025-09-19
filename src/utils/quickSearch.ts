@@ -13,14 +13,14 @@ export function quickSearchLibrary(query: string, unfiltered: UserTorrent[]) {
 							t.id.substring(0, 3).toLowerCase() === q ||
 							t.id.substring(3).toLowerCase() === q ||
 							t.hash.toLowerCase() === q ||
-							t.serviceStatus.toLowerCase() === q
+							(t.serviceStatus && t.serviceStatus.toLowerCase() === q)
 						);
 					} catch (e) {
 						return (
 							t.id.substring(0, 3).toLowerCase() === q ||
 							t.id.substring(3).toLowerCase() === q ||
 							t.hash.toLowerCase() === q ||
-							t.serviceStatus.toLowerCase() === q
+							(t.serviceStatus && t.serviceStatus.toLowerCase() === q)
 						);
 					}
 				})

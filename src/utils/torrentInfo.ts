@@ -132,22 +132,70 @@ export async function handleShowInfoForRD(
 		reload: boolean,
 		selectedFileIds?: string[]
 	) => {
-		await handleReinsertTorrentinRd(key, torrent, reload, selectedFileIds);
-		await fetchLatestRDTorrents(
-			rdKey,
-			torrentDB,
-			setUserTorrentsList,
-			(loading) => console.log('Loading:', loading),
-			(syncing) => console.log('Syncing:', syncing),
-			setSelectedTorrents,
-			2
+		const baseForReinsert: UserTorrent = {
+			...t,
+			id: torrent.id,
+			hash: torrent.hash,
+		};
+
+		const newId = await handleReinsertTorrentinRd(
+			key,
+			baseForReinsert,
+			reload,
+			selectedFileIds
 		);
-		setUserTorrentsList((prev) => prev.filter((t) => t.id !== torrent.id));
+
+		let newInfo: TorrentInfoResponse | undefined;
+		try {
+			newInfo = await getTorrentInfo(key, newId.substring(3));
+		} catch (error) {
+			console.error('Failed to fetch reinserted torrent info', error);
+		}
+
+		const addedDate = newInfo?.added
+			? new Date(newInfo.added)
+			: baseForReinsert.added
+				? new Date(baseForReinsert.added)
+				: new Date();
+
+		let updatedTorrent: UserTorrent | undefined;
+
+		setUserTorrentsList((prev) => {
+			const existing = prev.find((item) => item.id === torrent.id);
+			const base = existing ? { ...existing } : { ...baseForReinsert };
+			updatedTorrent = {
+				...base,
+				id: newId,
+				added: addedDate,
+				...(newInfo
+					? {
+							serviceStatus: newInfo.status,
+							status: getRdStatus(newInfo),
+							progress: newInfo.progress,
+							seeders: newInfo.seeders,
+							speed: newInfo.speed,
+							links: newInfo.links,
+						}
+					: {}),
+			};
+			const filtered = prev.filter((item) => item.id !== torrent.id);
+			return [...filtered, updatedTorrent!];
+		});
+
+		const dbRecord = updatedTorrent ?? {
+			...baseForReinsert,
+			id: newId,
+			added: addedDate,
+		};
+
+		await torrentDB.upsert(dbRecord);
 		await torrentDB.deleteById(torrent.id);
+
 		setSelectedTorrents((prev) => {
 			prev.delete(torrent.id);
 			return new Set(prev);
 		});
+
 		Modal.close();
 	};
 

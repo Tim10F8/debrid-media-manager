@@ -1,3 +1,6 @@
-always conform to KISS, DRY, YAGNI, and SOLID principles.
-less is more. intuition and convention over configuration.
-always make sure test lint tsc typecheck and build works.
+dont add comments that are obvious or doesnt add new information
+tv show page: src/pages/show/[imdbid]/[seasonNum].tsx
+movie page: src/pages/movie/[imdbid].tsx
+settings page: src/components/SettingsSection.tsx
+refer to .env.local for environment variables
+every error you fix, add a corresponding test to prevent regression

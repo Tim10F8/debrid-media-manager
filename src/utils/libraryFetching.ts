@@ -157,16 +157,20 @@ export async function fetchLatestRDTorrents(
 	const deleteStart = Date.now();
 	const toDelete = Array.from(oldIds).filter((id) => !newIds.has(id));
 	if (toDelete.length > 0) {
-		await Promise.all(
-			toDelete.map(async (id) => {
-				setUserTorrentsList((prev) => prev.filter((torrent) => torrent.id !== id));
-				await torrentDB.deleteById(id);
-				setSelectedTorrents((prev) => {
-					prev.delete(id);
-					return new Set(prev);
-				});
-			})
-		);
+		// Update UI state first
+		toDelete.forEach((id) => {
+			setUserTorrentsList((prev) => prev.filter((torrent) => torrent.id !== id));
+			setSelectedTorrents((prev) => {
+				prev.delete(id);
+				return new Set(prev);
+			});
+		});
+		// Then batch delete from database
+		if (toDelete.length === 1) {
+			await torrentDB.deleteById(toDelete[0]);
+		} else {
+			await torrentDB.deleteMany(toDelete);
+		}
 		console.log(
 			`[${new Date().toISOString()}]   Delete old torrents: ${Date.now() - deleteStart}ms (${toDelete.length} deleted)`
 		);
@@ -252,16 +256,22 @@ export async function fetchLatestADTorrents(
 	}
 
 	const toDelete = Array.from(oldIds).filter((id) => !newIds.has(id));
-	await Promise.all(
-		toDelete.map(async (id) => {
+	if (toDelete.length > 0) {
+		// Update UI state first
+		toDelete.forEach((id) => {
 			setUserTorrentsList((prev) => prev.filter((torrent) => torrent.id !== id));
-			await torrentDB.deleteById(id);
 			setSelectedTorrents((prev) => {
 				prev.delete(id);
 				return new Set(prev);
 			});
-		})
-	);
+		});
+		// Then batch delete from database
+		if (toDelete.length === 1) {
+			await torrentDB.deleteById(toDelete[0]);
+		} else {
+			await torrentDB.deleteMany(toDelete);
+		}
+	}
 }
 
 export async function fetchLatestTBTorrents(
@@ -340,14 +350,20 @@ export async function fetchLatestTBTorrents(
 	}
 
 	const toDelete = Array.from(oldIds).filter((id) => !newIds.has(id));
-	await Promise.all(
-		toDelete.map(async (id) => {
+	if (toDelete.length > 0) {
+		// Update UI state first
+		toDelete.forEach((id) => {
 			setUserTorrentsList((prev) => prev.filter((torrent) => torrent.id !== id));
-			await torrentDB.deleteById(id);
 			setSelectedTorrents((prev) => {
 				prev.delete(id);
 				return new Set(prev);
 			});
-		})
-	);
+		});
+		// Then batch delete from database
+		if (toDelete.length === 1) {
+			await torrentDB.deleteById(toDelete[0]);
+		} else {
+			await torrentDB.deleteMany(toDelete);
+		}
+	}
 }

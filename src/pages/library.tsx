@@ -6,6 +6,7 @@ import LibraryTableHeader from '@/components/LibraryTableHeader';
 import LibraryTorrentRow from '@/components/LibraryTorrentRow';
 import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
+import { useRelativeTimeLabel } from '@/hooks/useRelativeTimeLabel';
 import { getTorrentInfo, proxyUnrestrictLink } from '@/services/realDebrid';
 import UserTorrentDB from '@/torrent/db';
 import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
@@ -96,6 +97,8 @@ function TorrentsPage() {
 		error: cacheError,
 		lastFetchTime,
 	} = useLibraryCache();
+
+	const lastFetchLabel = useRelativeTimeLabel(lastFetchTime, 'Just now');
 
 	// loading states
 	const [rdSyncing, setRdSyncing] = useState(false);
@@ -436,13 +439,30 @@ function TorrentsPage() {
 		if (helpText !== 'hide') setHelpText(randomTip);
 	}
 
+	// Memoize counts to avoid recalculating on every render
+	const {
+		slowCount: memoSlowCount,
+		inProgressCount: memoInProgressCount,
+		failedCount: memoFailedCount,
+	} = useMemo(() => {
+		let slow = 0,
+			inProgress = 0,
+			failed = 0;
+		for (const torrent of userTorrentsList) {
+			if (isSlowOrNoLinks(torrent)) slow++;
+			if (isInProgress(torrent)) inProgress++;
+			if (isFailed(torrent)) failed++;
+		}
+		return { slowCount: slow, inProgressCount: inProgress, failedCount: failed };
+	}, [userTorrentsList]);
+
 	// filter the list
 	useEffect(() => {
 		if (loading || grouping) return;
 		setFiltering(true);
-		setSlowCount(userTorrentsList.filter(isSlowOrNoLinks).length);
-		setInProgressCount(userTorrentsList.filter(isInProgress).length);
-		setFailedCount(userTorrentsList.filter(isFailed).length);
+		setSlowCount(memoSlowCount);
+		setInProgressCount(memoInProgressCount);
+		setFailedCount(memoFailedCount);
 		if (hasNoQueryParamsBut('page')) {
 			setFilteredList(quickSearchLibrary(query, userTorrentsList));
 			// deleteFailedTorrents(userTorrentsList); // disabled because this is BAD!
@@ -707,77 +727,83 @@ function TorrentsPage() {
 		resetSelection(setSelectedTorrents);
 	}
 
-	function wrapDeleteFn(t: UserTorrent) {
-		return async () => {
-			const oldId = t.id;
-			const torrentBackup = t; // Store the torrent for rollback
+	const wrapDeleteFn = useCallback(
+		(t: UserTorrent) => {
+			return async () => {
+				const oldId = t.id;
+				const torrentBackup = t; // Store the torrent for rollback
 
-			// Optimistic update - remove from cache immediately
-			removeFromCache(oldId);
-			setSelectedTorrents((prev) => {
-				const newSet = new Set(prev);
-				newSet.delete(oldId);
-				return newSet;
-			});
-
-			try {
-				if (rdKey && t.id.startsWith('rd:')) {
-					await handleDeleteRdTorrent(rdKey, t.id);
-				}
-				if (adKey && t.id.startsWith('ad:')) {
-					await handleDeleteAdTorrent(adKey, t.id);
-				}
-				if (tbKey && t.id.startsWith('tb:')) {
-					await handleDeleteTbTorrent(tbKey, t.id);
-				}
-			} catch (error) {
-				// Rollback optimistic update on failure
-				console.error('Failed to delete torrent:', error);
-
-				// Re-add the torrent to cache
-				addTorrent(torrentBackup);
-
-				// Re-add to selection if it was selected
+				// Optimistic update - remove from cache immediately
+				removeFromCache(oldId);
 				setSelectedTorrents((prev) => {
 					const newSet = new Set(prev);
-					newSet.add(oldId);
+					newSet.delete(oldId);
 					return newSet;
 				});
 
-				// Show error message to user
-				toast.error(
-					`Failed to delete torrent: ${error instanceof Error ? error.message : 'Unknown error'}`,
-					libraryToastOptions
-				);
+				try {
+					if (rdKey && t.id.startsWith('rd:')) {
+						await handleDeleteRdTorrent(rdKey, t.id);
+					}
+					if (adKey && t.id.startsWith('ad:')) {
+						await handleDeleteAdTorrent(adKey, t.id);
+					}
+					if (tbKey && t.id.startsWith('tb:')) {
+						await handleDeleteTbTorrent(tbKey, t.id);
+					}
+				} catch (error) {
+					// Rollback optimistic update on failure
+					console.error('Failed to delete torrent:', error);
 
-				// Throw error so caller knows it failed
-				throw error;
-			}
-		};
-	}
+					// Re-add the torrent to cache
+					addTorrent(torrentBackup);
 
-	function wrapReinsertFn(t: UserTorrent) {
-		return async () => {
-			try {
-				const oldId = t.id;
-				if (rdKey && t.id.startsWith('rd:')) {
-					// The function now handles fetching info and preserving selection internally
-					await handleReinsertTorrentinRd(rdKey, t, true);
-					await torrentDB.deleteById(oldId);
-					removeFromCache(oldId); // Update global cache - this will trigger re-render
+					// Re-add to selection if it was selected
 					setSelectedTorrents((prev) => {
-						prev.delete(oldId);
-						return new Set(prev);
+						const newSet = new Set(prev);
+						newSet.add(oldId);
+						return newSet;
 					});
+
+					// Show error message to user
+					toast.error(
+						`Failed to delete torrent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+						libraryToastOptions
+					);
+
+					// Throw error so caller knows it failed
+					throw error;
 				}
-				if (adKey && t.id.startsWith('ad:')) {
-					await handleRestartTorrent(adKey, t.id);
+			};
+		},
+		[rdKey, adKey, tbKey, removeFromCache, addTorrent]
+	);
+
+	const wrapReinsertFn = useCallback(
+		(t: UserTorrent) => {
+			return async () => {
+				try {
+					const oldId = t.id;
+					if (rdKey && t.id.startsWith('rd:')) {
+						// The function now handles fetching info and preserving selection internally
+						await handleReinsertTorrentinRd(rdKey, t, true);
+						await torrentDB.deleteById(oldId);
+						removeFromCache(oldId); // Update global cache - this will trigger re-render
+						setSelectedTorrents((prev) => {
+							prev.delete(oldId);
+							return new Set(prev);
+						});
+					}
+					if (adKey && t.id.startsWith('ad:')) {
+						await handleRestartTorrent(adKey, t.id);
+					}
+				} catch (error) {
+					throw error;
 				}
-			} catch (error) {
-				throw error;
-			}
-		};
-	}
+			};
+		},
+		[rdKey, adKey, removeFromCache]
+	);
 
 	async function dedupeBySize() {
 		const deletePreference = await Modal.fire({
@@ -1571,18 +1597,7 @@ function TorrentsPage() {
 						)}
 					</h1>
 					<div className="flex items-center gap-2">
-						{lastFetchTime && (
-							<span className="text-xs text-gray-500">
-								{(() => {
-									const diff = Date.now() - lastFetchTime.getTime();
-									const minutes = Math.floor(diff / 60000);
-									const hours = Math.floor(minutes / 60);
-									if (hours > 0) return `${hours}h ago`;
-									if (minutes > 0) return `${minutes}m ago`;
-									return 'Just now';
-								})()}
-							</span>
-						)}
+						<span className="text-xs text-gray-500">{lastFetchLabel}</span>
 						<button
 							onClick={refreshLibrary}
 							disabled={isFetching}

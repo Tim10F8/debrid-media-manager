@@ -10,9 +10,15 @@ export const handleDeleteRdTorrent = async (
 	disableToast: boolean = false
 ) => {
 	try {
+		console.log('[rdDelete] request', { id, disableToast });
 		await deleteRdTorrent(rdKey, id.substring(3));
+		console.log('[rdDelete] success', { id });
 		if (!disableToast) toast(`Torrent deleted (${id})`, magnetToastOptions);
 	} catch (error) {
+		console.error('[rdDelete] failed', {
+			id,
+			error: error instanceof Error ? error.message : 'Unknown error',
+		});
 		console.error(
 			'Error deleting RD torrent:',
 			error instanceof Error ? error.message : 'Unknown error'

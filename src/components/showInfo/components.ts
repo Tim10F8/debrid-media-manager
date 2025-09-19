@@ -13,8 +13,15 @@ const LIBRARY_ACTION_TYPES = new Set<keyof typeof buttonStyles>([
 	'castAll',
 ]);
 
+const FILE_ACTION_TYPES = new Set<keyof typeof buttonStyles>(['download', 'watch', 'cast']);
+
 const BASE_BUTTON_CLASSES =
-	'haptic-sm inline-flex items-center gap-1 rounded px-3 py-1.5 text-sm transition-colors cursor-pointer';
+	'haptic-sm inline-flex items-center gap-1 rounded transition-colors cursor-pointer';
+const BUTTON_SIZE_CLASSES = {
+	default: 'px-3 py-1.5 text-sm',
+	file: 'px-1 py-0.5 text-xs',
+	library: 'px-3 py-1.5 text-sm',
+} as const;
 
 export const renderButton = (
 	type: keyof typeof buttonStyles,
@@ -26,19 +33,28 @@ export const renderButton = (
 	const isLibraryAction = LIBRARY_ACTION_TYPES.has(type);
 	const spacingClass = isLibraryAction ? 'm-1' : '';
 	const touchClass = isLibraryAction ? 'touch-manipulation' : '';
-	const buttonClasses = [BASE_BUTTON_CLASSES, style, spacingClass, touchClass]
+	const sizeClass = isLibraryAction
+		? BUTTON_SIZE_CLASSES.library
+		: FILE_ACTION_TYPES.has(type)
+			? BUTTON_SIZE_CLASSES.file
+			: BUTTON_SIZE_CLASSES.default;
+	const buttonClasses = [BASE_BUTTON_CLASSES, sizeClass, style, spacingClass, touchClass]
 		.filter(Boolean)
 		.join(' ');
 
 	// If link is provided, render a form that opens in a new tab.
-	// Only include the hidden input if linkParam is provided.
+	// Collect hidden inputs from link params when supplied.
 	if ('link' in props) {
 		const idAttr = props.id ? ` id="${props.id}"` : '';
-		const hiddenInput = props.linkParam
-			? `<input type="hidden" name="${props.linkParam.name}" value="${props.linkParam.value}" />`
-			: '';
+		const paramList = [
+			...(('linkParams' in props && props.linkParams) || []),
+			...(props.linkParam ? [props.linkParam] : []),
+		];
+		const hiddenInputs = paramList
+			.map((param) => `<input type="hidden" name="${param.name}" value="${param.value}" />`)
+			.join('');
 		return `<form action="${props.link}" method="get" target="_blank" class="inline-block">
-	            ${hiddenInput}
+	            ${hiddenInputs}
 	            <button type="submit" class="${buttonClasses}"${idAttr}>${icon} ${
 					props.text || defaultLabel
 				}</button>

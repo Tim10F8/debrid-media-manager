@@ -165,9 +165,16 @@ export const handleReinsertTorrentinRd = async (
 	torrent: UserTorrent,
 	forceDeleteOld: boolean,
 	selectedFileIds?: string[]
-) => {
+): Promise<string> => {
 	const oldId = torrent.id;
 	try {
+		console.log('[rdReinsert] start', {
+			rdKeyPresent: Boolean(rdKey),
+			oldId,
+			hash: torrent.hash,
+			providedSelection: selectedFileIds,
+			forceDeleteOld,
+		});
 		// If no selectedFileIds provided, fetch current selection from RD
 		let fileIdsToSelect = selectedFileIds;
 		if (!fileIdsToSelect || fileIdsToSelect.length === 0) {
@@ -183,6 +190,11 @@ export const handleReinsertTorrentinRd = async (
 		}
 
 		const newId = await addHashAsMagnet(rdKey, torrent.hash);
+		console.log('[rdReinsert] added magnet', {
+			oldId,
+			newId: `rd:${newId}`,
+			selectionCount: fileIdsToSelect?.length ?? 0,
+		});
 
 		// Use the determined file selection
 		if (fileIdsToSelect && fileIdsToSelect.length > 0) {
@@ -199,15 +211,21 @@ export const handleReinsertTorrentinRd = async (
 					`Torrent reinserted (${newId}) but not yet ready`,
 					magnetToastOptions
 				);
-				return;
+				return `rd:${newId}`;
 			}
 		} else if (selectedFileIds && selectedFileIds.length > 0) {
 			// When explicit selection is provided, still perform a single info check
 			await getTorrentInfo(rdKey, newId);
 		}
 		await handleDeleteRdTorrent(rdKey, oldId, true);
+		console.log('[rdReinsert] old torrent removed', { oldId, newId: `rd:${newId}` });
 		toast.success(`Torrent reinserted (${oldId}👉${newId})`, magnetToastOptions);
+		return `rd:${newId}`;
 	} catch (error: any) {
+		console.error('[rdReinsert] failed', {
+			oldId,
+			error: error?.message || error,
+		});
 		toast.error(
 			`Error reinserting torrent (${oldId}) ${error.response?.data?.error || error.message}`,
 			magnetToastOptions

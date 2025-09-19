@@ -73,12 +73,19 @@ export const showInfoForRD = async (
 	const downloadAllLinksParam = info.links.slice(0, 553).join('\n');
 	const libraryActions = !info.fake
 		? `
-    <div class="mb-4 flex justify-center items-center flex-wrap">
+    <div class="mb-3 flex justify-center items-center flex-wrap">
         ${renderButton('share', { link: `${await handleShare(torrent)}` })}
         ${renderButton('delete', { id: 'btn-delete-rd' })}
         ${renderButton('magnet', { id: 'btn-magnet-copy', text: shouldDownloadMagnets ? 'Download' : 'Copy' })}
         ${renderButton('reinsert', { id: 'btn-reinsert-rd' })}
-        ${rdKey ? renderButton('castAll', { link: `/api/stremio/cast/library/${info.id}:${info.hash}?rdToken=${rdKey}` }) : ''}
+		${
+			rdKey
+				? renderButton('castAll', {
+						link: `/api/stremio/cast/library/${info.id}:${info.hash}`,
+						linkParams: [{ name: 'rdToken', value: rdKey }],
+					})
+				: ''
+		}
 		${
 			info.links.length > 0
 				? renderButton('downloadAll', {
@@ -93,10 +100,10 @@ export const showInfoForRD = async (
     </div>`
 		: '';
 
-	let html = `<h1 class="text-lg font-bold mt-6 mb-4 text-gray-100">${info.filename}</h1>
+	let html = `<h1 class="text-lg font-bold mt-3 mb-2 text-gray-100">${info.filename}</h1>
     ${libraryActions}
     <hr class="border-gray-600"/>
-    <div class="text-sm max-h-60 mb-4 text-left p-1 bg-gray-900">
+    <div class="text-sm max-h-60 mb-2 text-left p-1 bg-gray-900">
         <div class="overflow-x-auto" style="max-width: 100%;">
             <table class="table-auto">
                 <tbody>
@@ -110,13 +117,15 @@ export const showInfoForRD = async (
 		? (() => {
 				return `
                 <div class="m-2 text-center">
-                    <div id="selection-count" class="text-sm text-cyan-400 mb-2">${info.files.filter((f: ApiTorrentFile) => f.selected === 1).length}/${info.files.length} files selected</div>
-                    <div class="flex gap-1 sm:gap-2 justify-center flex-wrap">
-                        <button id="btn-select-all-videos"
+                    <div id="selection-count" class="mb-2 inline-flex items-center justify-center rounded border border-cyan-500/40 bg-gray-900 px-2 py-1 text-sm font-semibold text-cyan-200">
+                        ${info.files.filter((f: ApiTorrentFile) => f.selected === 1).length}/${info.files.length} files selected
+                    </div>
+                    <div class="flex flex-wrap justify-center gap-1 sm:gap-2">
+                        <button id="btn-only-videos"
                             class="px-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
-                            title="Select All Videos"
+                            title="Only Videos"
                         >
-                            <span class="inline-flex items-center">${icons.selectVideos}<span class="hidden sm:inline ml-1">Select All Videos</span></span>
+                            <span class="inline-flex items-center">${icons.selectVideos}<span class="hidden sm:inline ml-1">Only Videos</span></span>
                         </button>
                         <button id="btn-unselect-all"
                             class="px-2 bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
@@ -128,14 +137,14 @@ export const showInfoForRD = async (
                             class="px-2 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
                             title="Reset Selection"
                         >
-                            ${icons.reset}
+                            <span class="inline-flex items-center">${icons.reset}<span class="hidden sm:inline ml-1">Reset</span></span>
                         </button>
-                    <button id="btn-save-selection"
-                        class="px-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
-                        title="Save File Selection"
-                    >
-                        <span class="inline-flex items-center">${icons.saveSelection}<span class="hidden sm:inline ml-1">Save Selection</span></span>
-                    </button>
+                        <button id="btn-save-selection"
+                            class="px-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+                            title="Save File Selection"
+                        >
+                            <span class="inline-flex items-center">${icons.saveSelection}<span class="hidden sm:inline ml-1">Save Selection</span></span>
+                        </button>
                     </div>
                 </div>
             `;
@@ -163,7 +172,10 @@ export const showInfoForRD = async (
 							{ label: 'Seeders', value: info.seeders },
 						]
 					: []),
-				{ label: 'Added', value: new Date(info.added).toLocaleString() },
+				{
+					label: 'Added',
+					value: new Date(info.added).toLocaleString(undefined, { timeZone: 'UTC' }),
+				},
 				{ label: 'Progress', value: info.progress + '%' },
 				...getStreamInfo(mediaInfo),
 			];
@@ -180,9 +192,10 @@ export const showInfoForRD = async (
 	await Modal.fire({
 		html,
 		showConfirmButton: false,
+		showCancelButton: false,
 		customClass: {
 			htmlContainer: '!mx-1',
-			popup: '!bg-gray-900 !text-gray-100',
+			popup: '!bg-gray-900 !text-gray-100 !px-4 !py-3',
 			confirmButton: 'haptic',
 			cancelButton: 'haptic',
 		},
@@ -203,16 +216,20 @@ export const showInfoForRD = async (
 				if (el) el.textContent = `${checked}/${total} files selected`;
 			};
 			checkboxes().forEach((cb) => cb.addEventListener('change', updateSelectionCount));
+			const unselectAll = () => {
+				checkboxes().forEach((cb) => (cb.checked = false));
+			};
 
-			const selectAllVideosBtn = document.getElementById('btn-select-all-videos');
-			logAction('binding select-all-videos button (RD)', {
-				exists: Boolean(selectAllVideosBtn),
+			const onlyVideosBtn = document.getElementById('btn-only-videos');
+			logAction('binding only-videos button (RD)', {
+				exists: Boolean(onlyVideosBtn),
 				hash: info.hash,
 			});
-			selectAllVideosBtn?.addEventListener('click', () => {
-				logAction('select-all-videos clicked (RD)', {
+			onlyVideosBtn?.addEventListener('click', () => {
+				logAction('only-videos clicked (RD)', {
 					hash: info.hash,
 				});
+				unselectAll();
 				checkboxes().forEach((cb) => {
 					const filePath = cb.dataset.filePath;
 					if (filePath && isVideo({ path: filePath })) cb.checked = true;
@@ -229,7 +246,7 @@ export const showInfoForRD = async (
 				logAction('unselect-all clicked (RD)', {
 					hash: info.hash,
 				});
-				checkboxes().forEach((cb) => (cb.checked = false));
+				unselectAll();
 				updateSelectionCount();
 			});
 
@@ -265,17 +282,28 @@ export const showInfoForRD = async (
 					hash: info.hash,
 					selectedIds,
 				});
+				const usedHandler = Boolean(handlers.onReinsertRd);
 				try {
-					const oldId = `rd:${info.id}`;
-					const newId = await addHashAsMagnet(rdKey, info.hash);
-					await selectFiles(rdKey, newId, selectedIds);
-					await handleDeleteRdTorrent(rdKey, oldId, true);
-					toast.success('Selection saved and torrent reinserted', magnetToastOptions);
+					if (handlers.onReinsertRd) {
+						await handlers.onReinsertRd(
+							rdKey,
+							{ id: `rd:${info.id}`, hash: info.hash },
+							true,
+							selectedIds
+						);
+					} else {
+						const oldId = `rd:${info.id}`;
+						const newId = await addHashAsMagnet(rdKey, info.hash);
+						await selectFiles(rdKey, newId, selectedIds);
+						await handleDeleteRdTorrent(rdKey, oldId, true);
+						toast.success('Selection saved and torrent reinserted', magnetToastOptions);
+					}
 					logAction('save-selection completed (RD)', {
 						hash: info.hash,
 						selectedIdsCount: selectedIds.length,
+						usedHandler,
 					});
-					if (handlers.onRefreshRd) await handlers.onRefreshRd(2);
+					if (!usedHandler && handlers.onRefreshRd) await handlers.onRefreshRd(2);
 					Modal.close();
 				} catch (error) {
 					logAction('save-selection failed (RD)', {
@@ -359,6 +387,7 @@ export const showInfoForRD = async (
 					hash: info.hash,
 					selectedIds,
 				});
+				const usedHandler = Boolean(handlers.onReinsertRd);
 				try {
 					if (handlers.onReinsertRd) {
 						await handlers.onReinsertRd(
@@ -378,8 +407,9 @@ export const showInfoForRD = async (
 						hash: info.hash,
 						selectedIdsCount: selectedIds.length,
 						newSelection: selectedIds,
+						usedHandler,
 					});
-					if (handlers.onRefreshRd) await handlers.onRefreshRd(2);
+					if (!usedHandler && handlers.onRefreshRd) await handlers.onRefreshRd(2);
 					Modal.close();
 				} catch (error: any) {
 					logAction('reinsert failed (RD)', {
@@ -543,7 +573,7 @@ export const showInfoForAD = async (
 
 	const downloadAllLink = `https://alldebrid.com/service/?url=${info.links.map((l: MagnetLink) => encodeURIComponent(l.link)).join('%0D%0A')}`;
 	const libraryActions = `
-        <div class="mb-4 flex justify-center items-center flex-wrap">
+        <div class="mb-3 flex justify-center items-center flex-wrap">
             ${renderButton('share', { link: `${await handleShare(torrent)}` })}
             ${renderButton('delete', { id: 'btn-delete-ad' })}
             ${renderButton('magnet', { id: 'btn-magnet-copy', text: shouldDownloadMagnets ? 'Download' : 'Copy' })}
@@ -557,16 +587,19 @@ export const showInfoForAD = async (
 		{ label: 'Size', value: (info.size / 1024 ** 3).toFixed(2) + ' GB' },
 		{ label: 'ID', value: info.id },
 		{ label: 'Status', value: `${info.status} (code: ${info.statusCode})` },
-		{ label: 'Added', value: new Date(info.uploadDate * 1000).toLocaleString() },
+		{
+			label: 'Added',
+			value: new Date(info.uploadDate * 1000).toLocaleString(undefined, { timeZone: 'UTC' }),
+		},
 		...getStreamInfo(mediaInfo),
 	];
 
-	const html = `<h1 class="text-lg font-bold mt-6 mb-4 text-gray-100">${info.filename}</h1>
+	const html = `<h1 class="text-lg font-bold mt-3 mb-2 text-gray-100">${info.filename}</h1>
     ${libraryActions}
     <div class="text-sm text-gray-200">
         ${renderInfoTable(allInfoRows)}
     </div>
-    <div class="text-sm max-h-60 mb-4 text-left p-1 bg-gray-900">
+    <div class="text-sm max-h-60 mb-2 text-left p-1 bg-gray-900">
         <div class="overflow-x-auto" style="max-width: 100%;">
             <table class="table-auto">
                 <tbody>
@@ -579,9 +612,10 @@ export const showInfoForAD = async (
 	await Modal.fire({
 		html,
 		showConfirmButton: false,
+		showCancelButton: false,
 		customClass: {
 			htmlContainer: '!mx-1',
-			popup: '!bg-gray-900 !text-gray-100',
+			popup: '!bg-gray-900 !text-gray-100 !px-4 !py-3',
 			confirmButton: 'haptic',
 			cancelButton: 'haptic',
 		},

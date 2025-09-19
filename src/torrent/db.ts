@@ -112,13 +112,53 @@ class UserTorrentDB {
 	}
 
 	public async add(torrent: UserTorrent) {
-		await this.insertToDB(torrent);
+		// Use upsert for better performance
+		await this.upsert(torrent);
+	}
+
+	public async upsert(torrent: UserTorrent) {
+		const db = await this.getDB();
+		await db.put(this.torrentsTbl, torrent);
 	}
 
 	public async addAll(torrents: UserTorrent[]) {
-		for (const torrent of torrents) {
-			await this.insertToDB(torrent);
+		if (torrents.length === 0) return;
+
+		const db = await this.getDB();
+		const tx = db.transaction(this.torrentsTbl, 'readwrite');
+		const store = tx.objectStore(this.torrentsTbl);
+
+		// Batch all operations in a single transaction
+		await Promise.all(torrents.map((torrent) => store.put(torrent)));
+
+		await tx.done;
+	}
+
+	public async replaceAll(torrents: UserTorrent[]) {
+		const db = await this.getDB();
+		const storeNames = Array.from(db.objectStoreNames);
+		const includeHashesStore = storeNames.includes(this.rdHashesTbl);
+		const transactionStores = includeHashesStore
+			? [this.torrentsTbl, this.rdHashesTbl]
+			: [this.torrentsTbl];
+
+		const tx = db.transaction(transactionStores, 'readwrite');
+		const torrentsStore = tx.objectStore(this.torrentsTbl);
+
+		await torrentsStore.clear();
+		if (includeHashesStore) {
+			await tx.objectStore(this.rdHashesTbl).clear();
 		}
+
+		if (torrents.length > 0) {
+			const chunkSize = 500;
+			for (let i = 0; i < torrents.length; i += chunkSize) {
+				const chunk = torrents.slice(i, i + chunkSize);
+				await Promise.all(chunk.map((torrent) => torrentsStore.put(torrent)));
+			}
+		}
+
+		await tx.done;
 	}
 
 	public async deleteByHash(service: string, hash: string) {
@@ -133,6 +173,18 @@ class UserTorrentDB {
 	public async deleteById(id: string) {
 		const db = await this.getDB();
 		await db.delete(this.torrentsTbl, id);
+	}
+
+	public async deleteMany(ids: string[]) {
+		if (ids.length === 0) return;
+
+		const db = await this.getDB();
+		const tx = db.transaction(this.torrentsTbl, 'readwrite');
+		const store = tx.objectStore(this.torrentsTbl);
+
+		// Batch all deletions in a single transaction
+		await Promise.all(ids.map((id) => store.delete(id)));
+		await tx.done;
 	}
 
 	public async clear() {

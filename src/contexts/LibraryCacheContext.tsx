@@ -3,7 +3,9 @@ import {
 	useEnhancedLibraryCache,
 } from '@/contexts/EnhancedLibraryCacheContext';
 import { UserTorrent } from '@/torrent/userTorrent';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
+
+const LAST_SYNC_STORAGE_KEY = 'library:lastSync';
 
 export interface LibraryCacheContextType {
 	libraryItems: UserTorrent[];
@@ -26,6 +28,45 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
 // Hook keeps the same name/signature but adapts to the enhanced context
 export function useLibraryCache(): LibraryCacheContextType {
 	const enhanced = useEnhancedLibraryCache();
+	const [persistedLastSync, setPersistedLastSync] = useState<Date | null>(() => {
+		if (typeof window === 'undefined') return null;
+		const stored = window.localStorage.getItem(LAST_SYNC_STORAGE_KEY);
+		if (!stored) return null;
+		const parsed = new Date(stored);
+		return Number.isNaN(parsed.getTime()) ? null : parsed;
+	});
+
+	useEffect(() => {
+		if (!enhanced.stats.lastSync) return;
+		setPersistedLastSync(enhanced.stats.lastSync);
+		if (typeof window !== 'undefined') {
+			window.localStorage.setItem(
+				LAST_SYNC_STORAGE_KEY,
+				enhanced.stats.lastSync.toISOString()
+			);
+		}
+	}, [enhanced.stats.lastSync]);
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const handleStorage = (event: StorageEvent) => {
+			if (event.key !== LAST_SYNC_STORAGE_KEY) return;
+			if (!event.newValue) {
+				setPersistedLastSync(null);
+				return;
+			}
+			const parsed = new Date(event.newValue);
+			if (Number.isNaN(parsed.getTime())) return;
+			setPersistedLastSync(parsed);
+		};
+		window.addEventListener('storage', handleStorage);
+		return () => window.removeEventListener('storage', handleStorage);
+	}, []);
+
+	const lastFetchTime = useMemo(
+		() => enhanced.stats.lastSync ?? persistedLastSync,
+		[enhanced.stats.lastSync, persistedLastSync]
+	);
 
 	const setLibraryItems: React.Dispatch<React.SetStateAction<UserTorrent[]>> = (next) => {
 		const current = enhanced.libraryItems;
@@ -57,7 +98,7 @@ export function useLibraryCache(): LibraryCacheContextType {
 		libraryItems: enhanced.libraryItems,
 		isLoading: enhanced.syncStatus.isLoading,
 		isFetching: enhanced.syncStatus.isSyncing,
-		lastFetchTime: enhanced.stats.lastSync,
+		lastFetchTime,
 		error: enhanced.syncStatus.error,
 		refreshLibrary,
 		setLibraryItems,

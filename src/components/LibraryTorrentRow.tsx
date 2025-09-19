@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { memo } from 'react';
 
 const ONE_GIGABYTE = 1024 * 1024 * 1024;
 
@@ -54,7 +55,7 @@ interface TorrentRowProps {
 	onRefreshLibrary?: () => Promise<void>;
 }
 
-export default function TorrentRow({
+function TorrentRow({
 	torrent,
 	rdKey,
 	adKey,
@@ -200,7 +201,7 @@ export default function TorrentRow({
 				torrent.status !== UserTorrentStatus.error ? (
 					<>
 						<span className="inline-block align-middle">
-							{torrent.progress.toFixed(2)}%&nbsp;
+							{(torrent.progress ?? 0).toFixed(2)}%&nbsp;
 						</span>
 						<span className="inline-block align-middle">
 							<Leaf className="inline-block h-4 w-4 text-green-500" />
@@ -216,7 +217,7 @@ export default function TorrentRow({
 				)}
 			</td>
 			<td onClick={() => onShowInfo(torrent)} className="px-0.5 py-1 text-center text-xs">
-				{new Date(torrent.added).toLocaleString()}
+				{new Date(torrent.added).toLocaleString(undefined, { timeZone: 'UTC' })}
 			</td>
 			<td
 				onClick={() => onShowInfo(torrent)}
@@ -301,3 +302,5 @@ export default function TorrentRow({
 		</tr>
 	);
 }
+
+export default memo(TorrentRow);

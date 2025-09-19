@@ -31,11 +31,14 @@ export interface MediaInfoResponse {
 	};
 }
 
+type HiddenField = { name: string; value: string };
+
 export interface ActionButtonProps {
 	link?: string;
 	onClick?: string;
 	text?: string;
-	linkParam?: { name: string; value: string };
+	linkParam?: HiddenField;
+	linkParams?: HiddenField[];
 	id?: string; // optional id for event binding instead of inline onclick
 }
 

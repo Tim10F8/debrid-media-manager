@@ -33,14 +33,24 @@ export const renderTorrentInfo = (
 					if (rdInfo.fake) {
 						actions.push(
 							renderButton('watch', {
-								link: `/api/watch/instant/${app}?token=${rdKey}&hash=${info.hash}&fileId=${file.id}`,
+								link: `/api/watch/instant/${app}`,
+								linkParams: [
+									{ name: 'token', value: rdKey },
+									{ name: 'hash', value: info.hash },
+									{ name: 'fileId', value: String(file.id) },
+								],
 								text: 'Watch',
 							})
 						);
 					} else {
 						actions.push(
 							renderButton('watch', {
-								link: `/api/watch/${app}?token=${rdKey}&hash=${info.hash}&link=${encodeURIComponent(fileLink)}`,
+								link: `/api/watch/${app}`,
+								linkParams: [
+									{ name: 'token', value: rdKey },
+									{ name: 'hash', value: info.hash },
+									{ name: 'link', value: fileLink },
+								],
 								text: 'Watch',
 							})
 						);
@@ -54,7 +64,13 @@ export const renderTorrentInfo = (
 					) {
 						actions.push(
 							renderButton('cast', {
-								link: `/api/stremio/cast/${imdbId}?token=${rdKey}&hash=${info.hash}&fileId=${file.id}&mediaType=${mediaType}`,
+								link: `/api/stremio/cast/${imdbId}`,
+								linkParams: [
+									{ name: 'token', value: rdKey },
+									{ name: 'hash', value: info.hash },
+									{ name: 'fileId', value: String(file.id) },
+									{ name: 'mediaType', value: mediaType },
+								],
 								text: 'Cast',
 							})
 						);

@@ -93,7 +93,7 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 
 	describe('Reinsert Button Click', () => {
 		it('should call handleReinsertTorrentinRd without selectedFileIds for RD torrents', async () => {
-			mockHandleReinsertTorrentinRd.mockResolvedValueOnce(undefined);
+			mockHandleReinsertTorrentinRd.mockResolvedValueOnce('rd:reinserted');
 
 			const { container } = render(<LibraryTorrentRow {...defaultProps} />);
 
@@ -179,6 +179,47 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 			expect(tbProps.onRefreshLibrary).toHaveBeenCalled();
 		});
 
+		it('waits for RD reinsertion before refreshing library', async () => {
+			const refreshSpy = vi.fn();
+			const onDelete = vi.fn();
+			let resolveReinsert: ((value: string) => void) | undefined;
+			const reinsertPromise = new Promise<string>((resolve) => {
+				resolveReinsert = resolve;
+			});
+
+			mockHandleReinsertTorrentinRd.mockReturnValueOnce(reinsertPromise);
+
+			const { container } = render(
+				<LibraryTorrentRow
+					{...defaultProps}
+					onRefreshLibrary={refreshSpy}
+					onDelete={onDelete}
+				/>
+			);
+
+			const reinsertButton = container.querySelector('button[title="Reinsert"]');
+			fireEvent.click(reinsertButton!);
+
+			await waitFor(() => {
+				expect(mockHandleReinsertTorrentinRd).toHaveBeenCalledWith(
+					'test-rd-key',
+					expect.any(Object),
+					true
+				);
+			});
+
+			expect(refreshSpy).not.toHaveBeenCalled();
+			expect(onDelete).not.toHaveBeenCalled();
+			expect(typeof resolveReinsert).toBe('function');
+
+			resolveReinsert?.('rd:deferred');
+
+			await waitFor(() => {
+				expect(refreshSpy).toHaveBeenCalled();
+				expect(onDelete).toHaveBeenCalledWith('rd:123');
+			});
+		});
+
 		it('should handle errors gracefully', async () => {
 			const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 			const error = new Error('Reinsert failed');
@@ -201,7 +242,7 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 		});
 
 		it('should stop event propagation to prevent row click', async () => {
-			mockHandleReinsertTorrentinRd.mockResolvedValueOnce(undefined);
+			mockHandleReinsertTorrentinRd.mockResolvedValueOnce('rd:reinserted-again');
 
 			const { container } = render(<LibraryTorrentRow {...defaultProps} />);
 
@@ -212,6 +253,29 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 			fireEvent(reinsertButton!, clickEvent);
 
 			expect(stopPropagationSpy).toHaveBeenCalled();
+		});
+	});
+
+	describe('Added Column Formatting', () => {
+		it('formats added timestamp using UTC timezone', () => {
+			const spy = vi.spyOn(Date.prototype, 'toLocaleString');
+			try {
+				render(<LibraryTorrentRow {...defaultProps} />);
+
+				const sawUtc = spy.mock.calls.some(
+					([localeArg, optionsArg]) =>
+						localeArg === undefined &&
+						Boolean(
+							optionsArg &&
+								typeof optionsArg === 'object' &&
+								'timeZone' in optionsArg &&
+								optionsArg.timeZone === 'UTC'
+						)
+				);
+				expect(sawUtc).toBe(true);
+			} finally {
+				spy.mockRestore();
+			}
 		});
 	});
 
