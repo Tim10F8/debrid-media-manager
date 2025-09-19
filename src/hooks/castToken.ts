@@ -31,30 +31,7 @@ export function useCastToken() {
 					saveCastProfile(clientId, clientSecret, refreshToken);
 					setDmmCastToken(data.id);
 
-					// Trigger migration for existing users
-					try {
-						const migrationRes = await fetch('/api/stremio/migrate', {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify({ token: accessToken }),
-						});
-						const migrationData = await migrationRes.json();
-						if (migrationData.migratedCasts > 0) {
-							toast.success(
-								`Migration complete! ${migrationData.migratedCasts} casted items preserved.`
-							);
-						} else if (migrationData.totalCasts > 0) {
-							toast(
-								`Migration complete, but only links with downloads could be preserved.`,
-								{
-									icon: '⚠️',
-								}
-							);
-						}
-					} catch (error) {
-						// Migration is optional, don't fail if it errors
-						console.error('Migration error:', error);
-					}
+					// Migration endpoint removed; no action needed here
 				}
 			} catch (error) {
 				toast.error('failed to fetch DMM Cast token');
