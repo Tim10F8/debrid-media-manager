@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs';
+import { promises as fs, readFileSync } from 'fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -41,12 +41,14 @@ describe('streamServersHealth', () => {
 		await fs.writeFile(tempFile, `${contents}\n`, 'utf8');
 		process.env.DMM_STREAM_SERVERS_FILE = tempFile;
 		__testing.reset();
+		__testing.setReadFileImplementation(readFileSync);
 	});
 
 	afterEach(async () => {
 		globalThis.fetch = originalFetch;
 		vi.restoreAllMocks();
 		__testing.reset();
+		__testing.clearReadFileImplementation();
 		delete process.env.DMM_STREAM_SERVERS_FILE;
 		await fs.unlink(tempFile).catch(() => {});
 	});
@@ -132,5 +134,19 @@ describe('streamServersHealth', () => {
 		const metrics = await __testing.runNow();
 		expect(metrics.total).toBe(1);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('gracefully handles missing fs module', () => {
+		__testing.reset();
+		__testing.setReadFileImplementation(null);
+
+		const metrics = getWorkingStreamMetrics();
+
+		expect(metrics.total).toBe(0);
+		expect(metrics.working).toBe(0);
+		expect(metrics.rate).toBe(0);
+		expect(metrics.lastError).toBe('Stream server list unavailable');
+		expect(metrics.inProgress).toBe(false);
+		expect(metrics.statuses).toHaveLength(0);
 	});
 });

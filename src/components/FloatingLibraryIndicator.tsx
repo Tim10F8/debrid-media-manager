@@ -4,7 +4,7 @@ import { useRelativeTimeLabel } from '@/hooks/useRelativeTimeLabel';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export default function FloatingLibraryIndicator() {
 	const { libraryItems, isLoading, isFetching, lastFetchTime, error, refreshLibrary } =
@@ -16,6 +16,7 @@ export default function FloatingLibraryIndicator() {
 	const [mounted, setMounted] = useState(false);
 	const [isLoggedIn, setIsLoggedIn] = useState(false);
 	const lastFetchLabel = useRelativeTimeLabel(lastFetchTime, 'Just now');
+	const initialRefreshRequestedRef = useRef(false);
 
 	// Check authentication status directly from localStorage
 	const checkAuthStatus = () => {
@@ -24,13 +25,27 @@ export default function FloatingLibraryIndicator() {
 		const hasAd = localStorage.getItem('ad:apiKey');
 		const hasTb = localStorage.getItem('tb:apiKey');
 		// Only return true if at least one key exists and is not empty
-		return !!(hasRd && hasRd.trim()) || !!(hasAd && hasAd.trim()) || !!(hasTb && hasTb.trim());
+		const result =
+			!!(hasRd && hasRd.trim()) || !!(hasAd && hasAd.trim()) || !!(hasTb && hasTb.trim());
+		console.log('[FloatingLibraryIndicator] checkAuthStatus', {
+			hasRd: !!(hasRd && hasRd.trim()),
+			hasAd: !!(hasAd && hasAd.trim()),
+			hasTb: !!(hasTb && hasTb.trim()),
+			result,
+		});
+		return result;
 	};
 
 	// Handle client-side mounting to avoid hydration mismatch
 	useEffect(() => {
 		setMounted(true);
 		setIsLoggedIn(checkAuthStatus());
+		console.log('[FloatingLibraryIndicator] mounted', {
+			pathname: router.pathname,
+			initialLibrarySize: libraryItems.length,
+			isLoading,
+			isFetching,
+		});
 	}, []);
 
 	// Listen for storage changes to detect logout/login
@@ -41,17 +56,23 @@ export default function FloatingLibraryIndicator() {
 				e.key &&
 				(e.key.startsWith('rd:') || e.key.startsWith('ad:') || e.key.startsWith('tb:'))
 			) {
+				console.log('[FloatingLibraryIndicator] storage change detected', {
+					key: e.key,
+					newValuePresent: !!e.newValue,
+				});
 				setIsLoggedIn(checkAuthStatus());
 			}
 		};
 
 		const handleLogout = () => {
 			// Immediately hide the floating window on logout
+			console.log('[FloatingLibraryIndicator] logout event received');
 			setIsLoggedIn(false);
 		};
 
 		const handleLogin = () => {
 			// Show the floating window on login
+			console.log('[FloatingLibraryIndicator] login event received');
 			setIsLoggedIn(checkAuthStatus());
 		};
 
@@ -71,14 +92,89 @@ export default function FloatingLibraryIndicator() {
 		const hasValidAuth =
 			!!(rdToken && rdToken.trim()) || !!(adKey && adKey.trim()) || !!(tbKey && tbKey.trim());
 		setIsLoggedIn(hasValidAuth);
+		console.log('[FloatingLibraryIndicator] auth hooks updated', {
+			hasRdToken: !!(rdToken && rdToken.trim()),
+			hasAdKey: !!(adKey && adKey.trim()),
+			hasTbKey: !!(tbKey && tbKey.trim()),
+			hasValidAuth,
+		});
+		if (!hasValidAuth) {
+			initialRefreshRequestedRef.current = false;
+		}
 	}, [rdToken, adKey, tbKey]);
 
+	useEffect(() => {
+		if (!mounted || !isLoggedIn) {
+			return;
+		}
+
+		if (isLoading || isFetching) {
+			return;
+		}
+
+		if (initialRefreshRequestedRef.current) {
+			return;
+		}
+
+		if (!!lastFetchTime || libraryItems.length > 0) {
+			initialRefreshRequestedRef.current = true;
+			return;
+		}
+
+		initialRefreshRequestedRef.current = true;
+		console.log('[FloatingLibraryIndicator] triggering initial refresh after login', {
+			hasRdToken: !!(rdToken && rdToken.trim()),
+			hasAdKey: !!(adKey && adKey.trim()),
+			hasTbKey: !!(tbKey && tbKey.trim()),
+		});
+		void (async () => {
+			try {
+				await refreshLibrary();
+				console.log('[FloatingLibraryIndicator] initial refresh complete');
+			} catch (err) {
+				console.error('[FloatingLibraryIndicator] initial refresh failed', err);
+				initialRefreshRequestedRef.current = false;
+			}
+		})();
+	}, [
+		mounted,
+		isLoggedIn,
+		isLoading,
+		isFetching,
+		lastFetchTime,
+		libraryItems.length,
+		rdToken,
+		adKey,
+		tbKey,
+		refreshLibrary,
+	]);
+
 	const handleRefresh = async () => {
-		await refreshLibrary();
+		console.log('[FloatingLibraryIndicator] manual refresh requested');
+		const start = performance.now();
+		try {
+			await refreshLibrary();
+			console.log('[FloatingLibraryIndicator] manual refresh completed', {
+				durationMs: Math.round(performance.now() - start),
+			});
+		} catch (err) {
+			console.error('[FloatingLibraryIndicator] manual refresh failed', err);
+		}
 	};
 
 	const isStale =
 		lastFetchTime && new Date().getTime() - lastFetchTime.getTime() > 30 * 60 * 1000; // 30 minutes
+
+	useEffect(() => {
+		console.log('[FloatingLibraryIndicator] state update', {
+			librarySize: libraryItems.length,
+			isLoading,
+			isFetching,
+			lastFetchTime: lastFetchTime?.toISOString() ?? null,
+			error,
+			isStale,
+		});
+	}, [libraryItems.length, isLoading, isFetching, lastFetchTime, error, isStale]);
 
 	// Don't render until mounted to avoid hydration issues
 	if (!mounted) {

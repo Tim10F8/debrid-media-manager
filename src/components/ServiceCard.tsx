@@ -2,7 +2,6 @@ import { AllDebridUser, RealDebridUser } from '@/hooks/auth';
 import { TraktUser } from '@/services/trakt';
 import { TorBoxUser } from '@/services/types';
 import { Check, X } from 'lucide-react';
-import Link from 'next/link';
 import Modal from '../components/modals/modal';
 
 interface ServiceCardProps {
@@ -146,12 +145,13 @@ export function ServiceCard({ service, user, onTraktLogin, onLogout }: ServiceCa
 				)}
 			</button>
 		) : (
-			<Link
-				href="/realdebrid/login"
+			<button
+				type="button"
+				onClick={onTraktLogin}
 				className="haptic w-full rounded border-2 border-green-500 bg-green-900/30 py-1 text-center text-green-100 transition-colors hover:bg-green-800/50"
 			>
 				Real-Debrid Login
-			</Link>
+			</button>
 		);
 	}
 
@@ -171,12 +171,13 @@ export function ServiceCard({ service, user, onTraktLogin, onLogout }: ServiceCa
 				)}
 			</button>
 		) : (
-			<Link
-				href="/alldebrid/login"
+			<button
+				type="button"
+				onClick={onTraktLogin}
 				className="haptic w-full rounded border-2 border-yellow-500 bg-yellow-900/30 py-1 text-center text-yellow-100 transition-colors hover:bg-yellow-800/50"
 			>
 				AllDebrid Login
-			</Link>
+			</button>
 		);
 	}
 
@@ -199,12 +200,13 @@ export function ServiceCard({ service, user, onTraktLogin, onLogout }: ServiceCa
 				)}
 			</button>
 		) : (
-			<Link
-				href="/torbox/login"
+			<button
+				type="button"
+				onClick={onTraktLogin}
 				className="haptic w-full rounded border-2 border-purple-500 bg-purple-900/30 py-1 text-center text-purple-100 transition-colors hover:bg-purple-800/50"
 			>
 				Torbox Login
-			</Link>
+			</button>
 		);
 	}
 

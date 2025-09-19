@@ -90,8 +90,26 @@ export function useLibraryCache(): LibraryCacheContextType {
 	};
 
 	const refreshLibrary = async () => {
-		// Legacy behavior: full refresh across all services
-		await enhanced.refreshAll(true);
+		const start = performance.now();
+		console.log('[LibraryCache] refreshLibrary start', {
+			timestamp: new Date().toISOString(),
+			source: 'LibraryCacheContext',
+		});
+		try {
+			// Legacy behavior: full refresh across all services
+			await enhanced.refreshAll(true);
+			console.log('[LibraryCache] refreshLibrary success', {
+				librarySize: enhanced.libraryItems.length,
+				lastSync: enhanced.stats.lastSync?.toISOString() ?? null,
+				durationMs: Math.round(performance.now() - start),
+			});
+		} catch (error) {
+			console.error('[LibraryCache] refreshLibrary failure', {
+				error,
+				durationMs: Math.round(performance.now() - start),
+			});
+			throw error;
+		}
 	};
 
 	return {

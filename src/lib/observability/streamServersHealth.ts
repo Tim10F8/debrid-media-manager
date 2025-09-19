@@ -1,4 +1,3 @@
-import { readFileSync } from 'fs';
 import path from 'path';
 
 const GLOBAL_KEY = '__DMM_STREAM_HEALTH__';
@@ -6,6 +5,10 @@ const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const MAX_CONCURRENT_REQUESTS = 8;
 const STREAM_URL_PLACEHOLDER = 'XX-Y';
 const TEST_SUFFIX_PATTERN = /\/test\.rar\/[^/?#]+/;
+
+type ReadFile = (typeof import('fs'))['readFileSync'];
+
+let cachedReadFile: ReadFile | null | undefined;
 
 interface StreamServer {
 	id: string;
@@ -46,6 +49,33 @@ type StreamHealthGlobal = typeof globalThis & {
 
 function getGlobalStore(): StreamHealthGlobal {
 	return globalThis as StreamHealthGlobal;
+}
+
+function loadReadFile(): ReadFile | null {
+	if (typeof cachedReadFile !== 'undefined') {
+		return cachedReadFile;
+	}
+	if (typeof window !== 'undefined') {
+		cachedReadFile = null;
+		return cachedReadFile;
+	}
+	const globalAny = globalThis as Record<string, unknown>;
+	const moduleId = ['f', 's'].join('');
+	const loader = (() => {
+		try {
+			return Function('return require')() as (id: string) => unknown;
+		} catch {
+			const alt = globalAny.__non_webpack_require__;
+			return typeof alt === 'function' ? (alt as (id: string) => unknown) : null;
+		}
+	})();
+	try {
+		const fsModule = loader ? (loader(moduleId) as typeof import('fs')) : null;
+		cachedReadFile = fsModule?.readFileSync ?? null;
+	} catch {
+		cachedReadFile = null;
+	}
+	return cachedReadFile;
 }
 
 export interface WorkingStreamMetrics {
@@ -96,8 +126,12 @@ function parseServers(raw: string): StreamServer[] {
 
 function loadServers(): { servers: StreamServer[]; error: string | null } {
 	const filePath = resolveServersFile();
+	const readFile = loadReadFile();
+	if (!readFile) {
+		return { servers: [], error: 'Stream server list unavailable' };
+	}
 	try {
-		const raw = readFileSync(filePath, 'utf8');
+		const raw = readFile(filePath, 'utf8');
 		const servers = parseServers(raw);
 		if (!servers.length) {
 			return { servers: [], error: 'No stream servers extracted from stream-servers.txt' };
@@ -281,6 +315,12 @@ export const __testing = {
 			clearInterval(current.interval);
 		}
 		g[GLOBAL_KEY] = undefined;
+	},
+	setReadFileImplementation(readFile: ReadFile | null) {
+		cachedReadFile = readFile;
+	},
+	clearReadFileImplementation() {
+		cachedReadFile = undefined;
 	},
 	async runNow() {
 		const state = getStore();

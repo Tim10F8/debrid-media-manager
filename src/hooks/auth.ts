@@ -5,6 +5,7 @@ import { getCurrentUser as getRealDebridUser, getToken } from '../services/realD
 import { TorBoxUser, getUserData } from '../services/torbox';
 import { TraktUser, getTraktUser } from '../services/trakt';
 import { clearRdKeys } from '../utils/clearLocalStorage';
+import { getSafeRedirectPath } from '../utils/router';
 import useLocalStorage from './localStorage';
 
 export interface RealDebridUser {
@@ -277,9 +278,26 @@ export const useCurrentUser = () => {
 export const useDebridLogin = () => {
 	const router = useRouter();
 
+	const navigateToLogin = (pathname: string) => {
+		const redirect = getSafeRedirectPath(router.asPath, '/');
+		console.log('[Auth] navigateToLogin', {
+			currentPath: router.asPath,
+			loginPath: pathname,
+			redirect,
+		});
+		if (redirect && redirect !== pathname) {
+			console.log('[Auth] pushing with redirect query', { pathname, redirect });
+			router.push({ pathname, query: { redirect } });
+			return;
+		}
+
+		console.log('[Auth] pushing without redirect query', { pathname });
+		router.push({ pathname });
+	};
+
 	return {
-		loginWithRealDebrid: () => router.push('/realdebrid/login'),
-		loginWithAllDebrid: () => router.push('/alldebrid/login'),
-		loginWithTorbox: () => router.push('/torbox/login'),
+		loginWithRealDebrid: () => navigateToLogin('/realdebrid/login'),
+		loginWithAllDebrid: () => navigateToLogin('/alldebrid/login'),
+		loginWithTorbox: () => navigateToLogin('/torbox/login'),
 	};
 };

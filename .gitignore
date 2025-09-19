@@ -64,3 +64,5 @@ public/sw.js
 public/sw.js.map
 public/workbox-*.js.map
 **/.claude/settings.local.json
+
+credentials.txt

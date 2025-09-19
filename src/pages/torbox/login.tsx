@@ -1,5 +1,6 @@
 import useLocalStorage from '@/hooks/localStorage';
 import { getUserData } from '@/services/torbox';
+import { getSafeRedirectPath } from '@/utils/router';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
@@ -13,18 +14,27 @@ export default function TorboxLoginPage() {
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setError('');
+		console.log('[TorboxLogin] validating api key', {
+			redirect: router.query.redirect,
+		});
 		try {
 			// Verify the API key works by attempting to get user info
 			const userData = await getUserData(inputApiKey);
+			console.log('[TorboxLogin] user data received', {
+				success: userData?.success ?? false,
+			});
 
 			// If successful, save the API key
 			setApiKey(inputApiKey);
-			await router.push('/');
+			const redirectPath = getSafeRedirectPath(router.query.redirect, '/');
+			console.log('[TorboxLogin] redirecting after login', { redirectPath });
+			await router.replace(redirectPath);
 		} catch (err: any) {
 			console.error(
 				'Failed to validate API key:',
 				err instanceof Error ? err.message : 'Unknown error'
 			);
+			console.error('[TorboxLogin] validation failed', err);
 			setError(
 				`API Error: ${err.response?.data?.message || err.message || 'Could not validate API key'}. Status: ${err.response?.status || 'unknown'}`
 			);
@@ -32,6 +42,7 @@ export default function TorboxLoginPage() {
 	};
 
 	const handleGetApiKey = () => {
+		console.log('[TorboxLogin] opening torbox settings for api key');
 		window.open('https://torbox.app/settings', '_blank');
 	};
 

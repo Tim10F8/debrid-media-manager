@@ -1,8 +1,9 @@
 import useLocalStorage from '@/hooks/localStorage';
 import { checkPin, getPin } from '@/services/allDebrid';
+import { getSafeRedirectPath } from '@/utils/router';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 // Current limits are at 12 requests per second and 600 requests per minute.
 // This is the pin auth flow
@@ -13,11 +14,18 @@ export default function AllDebridLoginPage() {
 	const router = useRouter();
 	const [apiKey, setApiKey] = useLocalStorage<string>('ad:apiKey');
 	const [isCopied, setIsCopied] = useState(false);
+	const { isReady, query, replace } = router;
+	const redirectPath = useMemo(() => getSafeRedirectPath(query.redirect, '/'), [query.redirect]);
 
 	useEffect(() => {
 		const fetchDeviceCode = async () => {
+			console.log('[AllDebridLogin] requesting pin');
 			const pinResponse = await getPin();
 			if (pinResponse) {
+				console.log('[AllDebridLogin] pin response received', {
+					userUrl: pinResponse.user_url,
+					checkUrl: pinResponse.check,
+				});
 				setPinCodeInputUrl(pinResponse.user_url);
 				setPinCode(pinResponse.pin);
 
@@ -32,6 +40,7 @@ export default function AllDebridLoginPage() {
 				const checkResponse = await checkPin(pinResponse.pin, pinResponse.check);
 				if (checkResponse && checkResponse.apikey) {
 					setApiKey(checkResponse.apikey, 86400);
+					console.log('[AllDebridLogin] api key stored from pin flow');
 				}
 			}
 		};
@@ -40,12 +49,18 @@ export default function AllDebridLoginPage() {
 	}, [router]);
 
 	useEffect(() => {
-		(async () => {
-			if (apiKey) {
-				await router.push('/');
-			}
-		})();
-	}, [apiKey, router]);
+		if (!isReady || !apiKey) {
+			console.log('[AllDebridLogin] redirect guard not satisfied', {
+				isReady,
+				hasApiKey: !!apiKey,
+				redirectPath,
+			});
+			return;
+		}
+
+		console.log('[AllDebridLogin] redirecting after login', { redirectPath });
+		void replace(redirectPath);
+	}, [apiKey, isReady, redirectPath, replace]);
 
 	const handleAuthorize = () => {
 		if (pinCodeInputUrl) {
