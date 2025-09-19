@@ -23,6 +23,12 @@ const withPWA = require('next-pwa')({
 
 const nextConfig = {
 	output: 'standalone',
+	async rewrites() {
+		return [
+			// Support external callers using /anticors path by rewriting to API route
+			{ source: '/anticors', destination: '/api/anticors' },
+		];
+	},
 	images: {
 		unoptimized: true,
 		minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
@@ -93,7 +99,8 @@ const nextConfig = {
 	publicRuntimeConfig: {
 		// Will be available on both server and client
 		externalSearchApiHostname: process.env.EXTERNAL_SEARCH_API_HOSTNAME,
-		proxy: 'https://#num#.cors.debridmediamanager.com/anticors?url=',
+		// Use external cors.* subdomains (rewritten /anticors -> /api/anticors)
+		proxy: 'https://#num#.cors.debridmediamanager.com/api/anticors?url=',
 		realDebridHostname: 'https://app.real-debrid.com',
 		realDebridClientId: 'X245A4XAIBGVM',
 		allDebridHostname: 'https://api.alldebrid.com',

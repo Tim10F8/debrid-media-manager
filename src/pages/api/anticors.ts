@@ -1,7 +1,13 @@
 import { randomUUID } from 'crypto';
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 
-const ALLOWED_ORIGINS = ['http://localhost:3000'];
+// Origins allowed to use this cross-origin proxy
+const ALLOWED_ORIGINS = [
+	'http://localhost:3000',
+	'https://debridmediamanager.com',
+	'https://www.debridmediamanager.com',
+	'https://app.debridmediamanager.com',
+];
 
 const DEFAULT_ORIGIN = 'https://debridmediamanager.com';
 

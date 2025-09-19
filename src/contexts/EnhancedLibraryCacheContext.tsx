@@ -98,6 +98,9 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	const [adLibrary, setAdLibrary] = useState<UserTorrent[]>([]);
 	const [tbLibrary, setTbLibrary] = useState<UserTorrent[]>([]);
 
+	// Auth state helper
+	const hasAnyAuth = Boolean(rdKey || adKey || tbKey);
+
 	// Sync status
 	const [syncStatus, setSyncStatus] = useState<SyncStatus>({
 		isLoading: true,
@@ -212,9 +215,14 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	// Update combined library
 	const updateCombinedLibrary = useCallback(() => {
 		const combined = [...rdLibrary, ...adLibrary, ...tbLibrary];
-		console.log(
-			`[LibraryCache] Updating combined library: RD:${rdLibrary.length}, AD:${adLibrary.length}, TB:${tbLibrary.length}, Total:${combined.length}`
-		);
+
+		// Skip noisy logs and DB work when unauthenticated and empty
+		const shouldLogAndPersist = hasAnyAuth || combined.length > 0;
+		if (shouldLogAndPersist) {
+			console.log(
+				`[LibraryCache] Updating combined library: RD:${rdLibrary.length}, AD:${adLibrary.length}, TB:${tbLibrary.length}, Total:${combined.length}`
+			);
+		}
 
 		setLibraryItems(combined);
 
@@ -223,17 +231,21 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 			clearTimeout(dbSaveTimerRef.current);
 		}
 
-		dbSaveTimerRef.current = setTimeout(() => {
-			console.log(`[LibraryCache] Saving ${combined.length} items to IndexedDB...`);
-			const dbStart = Date.now();
-			torrentDB.clear().then(() => {
-				combined.forEach((torrent) => torrentDB.add(torrent));
-				console.log(`[LibraryCache] IndexedDB save completed in ${Date.now() - dbStart}ms`);
-			});
-		}, 500); // Wait 500ms before saving to batch multiple updates
+		if (shouldLogAndPersist) {
+			dbSaveTimerRef.current = setTimeout(() => {
+				console.log(`[LibraryCache] Saving ${combined.length} items to IndexedDB...`);
+				const dbStart = Date.now();
+				torrentDB.clear().then(() => {
+					combined.forEach((torrent) => torrentDB.add(torrent));
+					console.log(
+						`[LibraryCache] IndexedDB save completed in ${Date.now() - dbStart}ms`
+					);
+				});
+			}, 500); // Wait 500ms before saving to batch multiple updates
+		}
 
 		updateStats(combined);
-	}, [rdLibrary, adLibrary, tbLibrary, updateStats]);
+	}, [rdLibrary, adLibrary, tbLibrary, updateStats, hasAnyAuth]);
 
 	// Trigger combined library update when any service library changes
 	useEffect(() => {
