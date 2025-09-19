@@ -1,6 +1,11 @@
 import { randomUUID } from 'crypto';
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 
+import {
+	recordRdUnrestrictEvent,
+	resolveRealDebridOperation,
+} from '@/lib/observability/rdOperationalStats';
+
 // Origins allowed to use this cross-origin proxy
 const ALLOWED_ORIGINS = [
 	'http://127.0.0.1:3000',
@@ -200,8 +205,53 @@ const handler: NextApiHandler = async (req: NextApiRequest, res: NextApiResponse
 
 		res.status(upstreamResponse.status);
 		res.send(responseBody);
+
+		// Record tracked Real-Debrid operations (2xx/5xx considered later in stats)
+		const operation = resolveRealDebridOperation(req.method, parsedProxyUrl.pathname);
+		if (
+			operation &&
+			(parsedProxyUrl.hostname === 'app.real-debrid.com' ||
+				parsedProxyUrl.hostname === 'api.real-debrid.com')
+		) {
+			recordRdUnrestrictEvent({
+				ts: Date.now(),
+				status: upstreamResponse.status,
+				method: (req.method || 'GET').toUpperCase(),
+				host: parsedProxyUrl.hostname,
+				path: parsedProxyUrl.pathname,
+				operation,
+			});
+		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unknown error';
+		// If this was a target RD unrestrict/link call, record a 500 failure
+		try {
+			if (typeof req.query.url === 'string') {
+				const attempted = new URL(
+					Array.isArray(req.query.url) ? req.query.url[0] : req.query.url
+				);
+				if (
+					attempted.hostname === 'app.real-debrid.com' ||
+					attempted.hostname === 'api.real-debrid.com'
+				) {
+					const failedOperation = resolveRealDebridOperation(
+						req.method,
+						attempted.pathname
+					);
+					if (failedOperation) {
+						recordRdUnrestrictEvent({
+							ts: Date.now(),
+							status: 500,
+							method: (req.method || 'GET').toUpperCase(),
+							host: attempted.hostname,
+							path: attempted.pathname,
+							operation: failedOperation,
+						});
+					}
+				}
+			}
+		} catch {}
+
 		res.status(500).send(`Error fetching the proxy URL: ${message}`);
 	}
 };

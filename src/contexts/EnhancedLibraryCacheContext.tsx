@@ -126,6 +126,8 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	const fetchTimesRef = useRef<number[]>([]);
 	const cacheHitsRef = useRef({ hits: 0, misses: 0 });
 	const dbSaveTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
+	// Track last saved signature to avoid redundant IndexedDB writes
+	const lastSavedIdsSignatureRef = useRef<string | null>(null);
 
 	// Update statistics
 	const updateStats = useCallback((torrents: UserTorrent[]) => {
@@ -173,6 +175,13 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 				setTbLibrary(tb);
 
 				updateStats(cachedTorrents);
+
+				// Initialize last-saved signature so we don't immediately resave identical data
+				const initialSig = cachedTorrents
+					.map((t) => `${t.id}:${t.status}:${t.progress}`)
+					.sort()
+					.join(',');
+				lastSavedIdsSignatureRef.current = initialSig;
 			}
 		} catch (error) {
 			console.error('Failed to load cached data:', error);
@@ -232,16 +241,26 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		}
 
 		if (shouldLogAndPersist) {
-			dbSaveTimerRef.current = setTimeout(() => {
-				console.log(`[LibraryCache] Saving ${combined.length} items to IndexedDB...`);
-				const dbStart = Date.now();
-				torrentDB.clear().then(() => {
-					combined.forEach((torrent) => torrentDB.add(torrent));
-					console.log(
-						`[LibraryCache] IndexedDB save completed in ${Date.now() - dbStart}ms`
-					);
-				});
-			}, 500); // Wait 500ms before saving to batch multiple updates
+			// Compute a simple, stable signature based on IDs plus key runtime fields (order-independent)
+			const idsSignature = combined
+				.map((t) => `${t.id}:${t.status}:${t.progress}`)
+				.sort()
+				.join(',');
+
+			// Skip save if nothing changed since last write
+			if (idsSignature !== lastSavedIdsSignatureRef.current) {
+				dbSaveTimerRef.current = setTimeout(() => {
+					console.log(`[LibraryCache] Saving ${combined.length} items to IndexedDB...`);
+					const dbStart = Date.now();
+					torrentDB.clear().then(() => {
+						combined.forEach((torrent) => torrentDB.add(torrent));
+						lastSavedIdsSignatureRef.current = idsSignature;
+						console.log(
+							`[LibraryCache] IndexedDB save completed in ${Date.now() - dbStart}ms`
+						);
+					});
+				}, 500); // Wait 500ms before saving to batch multiple updates
+			}
 		}
 
 		updateStats(combined);
