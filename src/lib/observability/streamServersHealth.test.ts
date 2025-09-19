@@ -1,10 +1,8 @@
-import { promises as fs, readFileSync } from 'fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getRealDebridObservabilityStats } from './getRealDebridObservabilityStats';
 import { __testing, getWorkingStreamMetrics } from './streamServersHealth';
+import { STREAM_SERVER_IDS, STREAM_SERVER_TEMPLATE } from './streamServersList';
 
 type MockHeaders = Record<string, string>;
 
@@ -24,33 +22,18 @@ function mockResponse(status: number, headers: MockHeaders = {}) {
 }
 
 describe('streamServersHealth', () => {
-	let tempFile: string;
+	const TEST_TEMPLATE = STREAM_SERVER_TEMPLATE;
 	let originalFetch: typeof fetch;
 
-	beforeEach(async () => {
+	beforeEach(() => {
 		originalFetch = globalThis.fetch;
-		tempFile = path.join(
-			tmpdir(),
-			`stream-servers-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`
-		);
-		const contents = [
-			'https://XX-Y.download.real-debrid.com/speedtest/test.rar/0.123456',
-			'- 20-4',
-			'- 21-4',
-		].join('\n');
-		await fs.writeFile(tempFile, `${contents}\n`, 'utf8');
-		process.env.DMM_STREAM_SERVERS_FILE = tempFile;
-		__testing.reset();
-		__testing.setReadFileImplementation(readFileSync);
+		__testing.setServerSourceForTesting(['20-4', '21-4'], TEST_TEMPLATE);
 	});
 
-	afterEach(async () => {
+	afterEach(() => {
 		globalThis.fetch = originalFetch;
 		vi.restoreAllMocks();
-		__testing.reset();
-		__testing.clearReadFileImplementation();
-		delete process.env.DMM_STREAM_SERVERS_FILE;
-		await fs.unlink(tempFile).catch(() => {});
+		__testing.clearServerSourceOverride();
 	});
 
 	it('reports working stream percentage after a run', async () => {
@@ -95,6 +78,22 @@ describe('streamServersHealth', () => {
 		expect(failure?.error).toBe('Unexpected status 503');
 	});
 
+	it('uses decimal cache busters when replacing the test suffix', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(mockResponse(200, { 'content-length': '512' }));
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.987654321);
+
+		await __testing.runNow();
+		const requestedUrls = fetchMock.mock.calls.map(([arg]) =>
+			typeof arg === 'string' ? arg : ((arg as { url?: string })?.url ?? String(arg ?? ''))
+		);
+		requestedUrls.forEach((url) => {
+			expect(url).toContain('/test.rar/0.98765432');
+			expect(url).not.toContain('/test.rar/0.123456');
+		});
+		randomSpy.mockRestore();
+	});
+
 	it('connects working stream metrics to getStats', async () => {
 		const fetchMock = vi
 			.fn()
@@ -110,22 +109,18 @@ describe('streamServersHealth', () => {
 		expect(stats.workingStream.lastError).toBeNull();
 	});
 
-	it('reloads servers from disk after reset', async () => {
+	it('reloads overridden servers after reset', async () => {
 		const fetchMock = vi.fn().mockResolvedValue(mockResponse(200, { 'content-length': '512' }));
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		await __testing.runNow();
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 
-		const updated = [
-			'https://XX-Y.download.real-debrid.com/speedtest/test.rar/0.123456',
-			'- 21-4',
-		].join('\n');
-		await fs.writeFile(tempFile, `${updated}\n`, 'utf8');
-
+		__testing.setServerSourceForTesting(['21-4'], TEST_TEMPLATE);
 		fetchMock.mockClear();
+
 		await __testing.runNow();
-		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 
 		__testing.reset();
 		fetchMock.mockReset().mockResolvedValue(mockResponse(200, { 'content-length': '512' }));
@@ -136,17 +131,32 @@ describe('streamServersHealth', () => {
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 
-	it('gracefully handles missing fs module', () => {
-		__testing.reset();
-		__testing.setReadFileImplementation(null);
+	it('reports parse error when no server ids are configured', () => {
+		__testing.setServerSourceForTesting([], TEST_TEMPLATE);
 
 		const metrics = getWorkingStreamMetrics();
 
 		expect(metrics.total).toBe(0);
 		expect(metrics.working).toBe(0);
 		expect(metrics.rate).toBe(0);
-		expect(metrics.lastError).toBe('Stream server list unavailable');
+		expect(metrics.lastError).toBe('No stream servers extracted from stream-servers.txt');
 		expect(metrics.inProgress).toBe(false);
 		expect(metrics.statuses).toHaveLength(0);
+	});
+
+	it('restores default servers after clearing override', () => {
+		const fetchMock = vi.fn().mockResolvedValue(mockResponse(200, { 'content-length': '512' }));
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		let metrics = getWorkingStreamMetrics();
+		expect(metrics.total).toBe(2);
+
+		__testing.setServerSourceForTesting(['21-4'], TEST_TEMPLATE);
+		metrics = getWorkingStreamMetrics();
+		expect(metrics.total).toBe(1);
+
+		__testing.clearServerSourceOverride();
+		metrics = getWorkingStreamMetrics();
+		expect(metrics.total).toBe(STREAM_SERVER_IDS.length);
 	});
 });

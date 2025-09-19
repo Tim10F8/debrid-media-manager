@@ -1,18 +1,20 @@
-import path from 'path';
+import { STREAM_SERVER_IDS, STREAM_SERVER_TEMPLATE } from './streamServersList';
 
 const GLOBAL_KEY = '__DMM_STREAM_HEALTH__';
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const MAX_CONCURRENT_REQUESTS = 8;
 const STREAM_URL_PLACEHOLDER = 'XX-Y';
 const TEST_SUFFIX_PATTERN = /\/test\.rar\/[^/?#]+/;
-
-type ReadFile = (typeof import('fs'))['readFileSync'];
-
-let cachedReadFile: ReadFile | null | undefined;
+const SERVER_PARSE_ERROR = 'No stream servers extracted from stream-servers.txt';
 
 interface StreamServer {
 	id: string;
 	url: string;
+}
+
+interface StreamServerSource {
+	template: string;
+	ids: readonly string[];
 }
 
 export interface WorkingStreamServerStatus {
@@ -51,33 +53,6 @@ function getGlobalStore(): StreamHealthGlobal {
 	return globalThis as StreamHealthGlobal;
 }
 
-function loadReadFile(): ReadFile | null {
-	if (typeof cachedReadFile !== 'undefined') {
-		return cachedReadFile;
-	}
-	if (typeof window !== 'undefined') {
-		cachedReadFile = null;
-		return cachedReadFile;
-	}
-	const globalAny = globalThis as Record<string, unknown>;
-	const moduleId = ['f', 's'].join('');
-	const loader = (() => {
-		try {
-			return Function('return require')() as (id: string) => unknown;
-		} catch {
-			const alt = globalAny.__non_webpack_require__;
-			return typeof alt === 'function' ? (alt as (id: string) => unknown) : null;
-		}
-	})();
-	try {
-		const fsModule = loader ? (loader(moduleId) as typeof import('fs')) : null;
-		cachedReadFile = fsModule?.readFileSync ?? null;
-	} catch {
-		cachedReadFile = null;
-	}
-	return cachedReadFile;
-}
-
 export interface WorkingStreamMetrics {
 	total: number;
 	working: number;
@@ -88,60 +63,41 @@ export interface WorkingStreamMetrics {
 	inProgress: boolean;
 }
 
-function resolveServersFile(): string {
-	const override = process.env.DMM_STREAM_SERVERS_FILE;
-	if (override) {
-		return path.isAbsolute(override) ? override : path.resolve(process.cwd(), override);
+const DEFAULT_SOURCE: StreamServerSource = {
+	template: STREAM_SERVER_TEMPLATE,
+	ids: STREAM_SERVER_IDS,
+};
+
+let sourceOverride: StreamServerSource | null = null;
+
+function getActiveSource(): StreamServerSource | null {
+	const source = sourceOverride ?? DEFAULT_SOURCE;
+	if (!source.template.includes(STREAM_URL_PLACEHOLDER)) {
+		return null;
 	}
-	return path.resolve(process.cwd(), 'stream-servers.txt');
+	return source;
 }
 
-function parseServers(raw: string): StreamServer[] {
-	const lines = raw
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.filter(Boolean);
-	if (!lines.length) {
-		return [];
-	}
-	const template = lines[0];
-	if (!template.includes(STREAM_URL_PLACEHOLDER)) {
-		return [];
-	}
-	const ids = new Set<string>();
-	for (const line of lines.slice(1)) {
-		if (!line.startsWith('-')) {
-			continue;
-		}
-		const id = line.replace(/^-\s*/, '');
-		if (id) {
-			ids.add(id);
-		}
-	}
-	return Array.from(ids).map((id) => ({
+function buildServersFromSource(source: StreamServerSource): StreamServer[] {
+	const ids = Array.from(
+		new Set(source.ids.map((id) => id.trim()).filter((id): id is string => Boolean(id)))
+	);
+	return ids.map((id) => ({
 		id,
-		url: template.replace(STREAM_URL_PLACEHOLDER, id),
+		url: source.template.replace(STREAM_URL_PLACEHOLDER, id),
 	}));
 }
 
 function loadServers(): { servers: StreamServer[]; error: string | null } {
-	const filePath = resolveServersFile();
-	const readFile = loadReadFile();
-	if (!readFile) {
-		return { servers: [], error: 'Stream server list unavailable' };
+	const source = getActiveSource();
+	if (!source) {
+		return { servers: [], error: SERVER_PARSE_ERROR };
 	}
-	try {
-		const raw = readFile(filePath, 'utf8');
-		const servers = parseServers(raw);
-		if (!servers.length) {
-			return { servers: [], error: 'No stream servers extracted from stream-servers.txt' };
-		}
-		return { servers, error: null };
-	} catch (error) {
-		const message =
-			error instanceof Error ? error.message : 'Failed to read stream server list';
-		return { servers: [], error: message };
+	const servers = buildServersFromSource(source);
+	if (!servers.length) {
+		return { servers: [], error: SERVER_PARSE_ERROR };
 	}
+	return { servers, error: null };
 }
 
 function getStore(): StreamHealthState {
@@ -170,13 +126,15 @@ function getStore(): StreamHealthState {
 }
 
 function buildRequestUrl(baseUrl: string): string {
-	const randomToken = Math.random().toString().slice(2, 10);
-	const replacement = `/test.rar/0.${randomToken}`;
+	const fraction = Math.random().toString().split('.')[1] ?? '';
+	const digits = fraction.slice(0, 8) || Date.now().toString().slice(-8);
+	const randomToken = `0.${digits}`;
+	const replacement = `/test.rar/${randomToken}`;
 	if (TEST_SUFFIX_PATTERN.test(baseUrl)) {
 		return baseUrl.replace(TEST_SUFFIX_PATTERN, replacement);
 	}
 	const separator = baseUrl.includes('?') ? '&' : '?';
-	return `${baseUrl}${separator}nocache=0.${randomToken}`;
+	return `${baseUrl}${separator}nocache=${randomToken}`;
 }
 
 async function checkServer(server: StreamServer): Promise<WorkingStreamServerStatus> {
@@ -294,6 +252,15 @@ function executeCheck(state: StreamHealthState): Promise<void> {
 	return promise;
 }
 
+function clearState() {
+	const g = getGlobalStore();
+	const current = g[GLOBAL_KEY];
+	if (current?.interval) {
+		clearInterval(current.interval);
+	}
+	g[GLOBAL_KEY] = undefined;
+}
+
 export function getWorkingStreamMetrics(): WorkingStreamMetrics {
 	const state = getStore();
 	return {
@@ -309,18 +276,15 @@ export function getWorkingStreamMetrics(): WorkingStreamMetrics {
 
 export const __testing = {
 	reset() {
-		const g = getGlobalStore();
-		const current = g[GLOBAL_KEY];
-		if (current?.interval) {
-			clearInterval(current.interval);
-		}
-		g[GLOBAL_KEY] = undefined;
+		clearState();
 	},
-	setReadFileImplementation(readFile: ReadFile | null) {
-		cachedReadFile = readFile;
+	setServerSourceForTesting(ids: readonly string[], template = STREAM_SERVER_TEMPLATE) {
+		sourceOverride = { template, ids: [...ids] };
+		clearState();
 	},
-	clearReadFileImplementation() {
-		cachedReadFile = undefined;
+	clearServerSourceOverride() {
+		sourceOverride = null;
+		clearState();
 	},
 	async runNow() {
 		const state = getStore();
