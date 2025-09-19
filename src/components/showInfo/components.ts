@@ -2,6 +2,20 @@ import { buttonStyles, defaultLabels, icons } from './styles';
 import { ActionButtonProps, FileRowProps, InfoTableRow, LibraryActionButtonProps } from './types';
 import { formatSize } from './utils';
 
+const LIBRARY_ACTION_TYPES = new Set<keyof typeof buttonStyles>([
+	'share',
+	'delete',
+	'magnet',
+	'reinsert',
+	'downloadAll',
+	'exportLinks',
+	'generateStrm',
+	'castAll',
+]);
+
+const BASE_BUTTON_CLASSES =
+	'haptic-sm inline-flex items-center gap-1 rounded px-3 py-1.5 text-sm transition-colors cursor-pointer';
+
 export const renderButton = (
 	type: keyof typeof buttonStyles,
 	props: ActionButtonProps | LibraryActionButtonProps
@@ -9,22 +23,12 @@ export const renderButton = (
 	const style = buttonStyles[type];
 	const icon = icons[type];
 	const defaultLabel = defaultLabels[type];
-	const libraryActionTypes = new Set<keyof typeof buttonStyles>([
-		'share',
-		'delete',
-		'magnet',
-		'reinsert',
-		'downloadAll',
-		'exportLinks',
-		'generateStrm',
-		'castAll',
-	]);
-	const isLibraryAction = libraryActionTypes.has(type);
-	const baseClasses =
-		'haptic-sm inline-flex items-center gap-1 rounded px-3 py-1.5 text-sm transition-colors';
-	const touchClass = isLibraryAction ? 'touch-manipulation' : '';
+	const isLibraryAction = LIBRARY_ACTION_TYPES.has(type);
 	const spacingClass = isLibraryAction ? 'm-1' : '';
-	const buttonClasses = [baseClasses, style, touchClass, spacingClass].filter(Boolean).join(' ');
+	const touchClass = isLibraryAction ? 'touch-manipulation' : '';
+	const buttonClasses = [BASE_BUTTON_CLASSES, style, spacingClass, touchClass]
+		.filter(Boolean)
+		.join(' ');
 
 	// If link is provided, render a form that opens in a new tab.
 	// Only include the hidden input if linkParam is provided.

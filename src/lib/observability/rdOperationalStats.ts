@@ -2,11 +2,9 @@
 // Uses globalThis to ensure a single instance across Next.js route bundles.
 
 export type RealDebridOperation =
-	| 'POST /unrestrict/link'
 	| 'GET /user'
 	| 'GET /torrents'
 	| 'GET /torrents/info/{id}'
-	| 'PUT /torrents/addTorrent'
 	| 'POST /torrents/addMagnet'
 	| 'POST /torrents/selectFiles/{id}'
 	| 'DELETE /torrents/delete/{id}';
@@ -33,11 +31,6 @@ const OPERATION_DEFINITIONS: Array<{
 	test: (pathname: string) => boolean;
 }> = [
 	{
-		operation: 'POST /unrestrict/link',
-		method: 'POST',
-		test: (pathname) => pathname.endsWith('/unrestrict/link'),
-	},
-	{
 		operation: 'GET /user',
 		method: 'GET',
 		test: (pathname) => pathname.endsWith('/user'),
@@ -51,11 +44,6 @@ const OPERATION_DEFINITIONS: Array<{
 		operation: 'GET /torrents/info/{id}',
 		method: 'GET',
 		test: (pathname) => /\/torrents\/info(\/|$)/.test(pathname),
-	},
-	{
-		operation: 'PUT /torrents/addTorrent',
-		method: 'PUT',
-		test: (pathname) => pathname.endsWith('/torrents/addTorrent'),
 	},
 	{
 		operation: 'POST /torrents/addMagnet',

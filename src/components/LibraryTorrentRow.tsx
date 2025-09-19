@@ -256,7 +256,7 @@ export default function TorrentRow({
 					className="mb-2 mr-2 cursor-pointer text-pink-500"
 					onClick={(e) => {
 						e.stopPropagation();
-						handleCopyOrDownloadMagnet(torrent.hash, shouldDownloadMagnets);
+						void handleCopyOrDownloadMagnet(torrent.hash, shouldDownloadMagnets);
 					}}
 				>
 					<Link2 className="h-4 w-4 text-teal-500" />

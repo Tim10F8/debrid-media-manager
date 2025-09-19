@@ -7,7 +7,13 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
 
-export default function App({ Component, pageProps }: AppProps) {
+type AppWithProvidersProps = AppProps & {
+	Component: AppProps['Component'] & {
+		disableLibraryProvider?: boolean;
+	};
+};
+
+export default function App({ Component, pageProps }: AppWithProvidersProps) {
 	const router = useRouter();
 
 	useEffect(() => {
@@ -61,7 +67,9 @@ export default function App({ Component, pageProps }: AppProps) {
 		};
 	}, [router]);
 	const authRoutes = ['/start', '/realdebrid/login', '/alldebrid/login', '/torbox/login'];
-	const isAuthRoute = authRoutes.includes(router.pathname);
+	const disableLibraryProvider =
+		authRoutes.includes(router.pathname) || Component.disableLibraryProvider === true;
+	const shouldWrapWithLibraryProvider = !disableLibraryProvider;
 
 	const AppContent = (
 		<>
@@ -75,13 +83,17 @@ export default function App({ Component, pageProps }: AppProps) {
 				<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 			</Head>
 			<Component {...pageProps} />
-			{!isAuthRoute && <FloatingLibraryIndicator />}
+			{shouldWrapWithLibraryProvider && <FloatingLibraryIndicator />}
 		</>
 	);
 
 	return (
 		<ModalProvider>
-			{isAuthRoute ? AppContent : <LibraryCacheProvider>{AppContent}</LibraryCacheProvider>}
+			{shouldWrapWithLibraryProvider ? (
+				<LibraryCacheProvider>{AppContent}</LibraryCacheProvider>
+			) : (
+				AppContent
+			)}
 		</ModalProvider>
 	);
 }

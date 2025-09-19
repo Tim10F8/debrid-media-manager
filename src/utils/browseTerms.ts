@@ -63,7 +63,7 @@ const terms = [
 	'🌠 rated',
 	'💿 bluray',
 	'🆕 releases',
-	'❤️ romantic',
+	'💖 romantic',
 	'🍅 rotten',
 	'🔬 sci',
 	'🪐 scifi',

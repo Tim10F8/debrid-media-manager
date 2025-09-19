@@ -70,10 +70,7 @@ export const showInfoForRD = async (
 		mediaType,
 	};
 
-	const downloadAllLink = `https://real-debrid.com/downloader?links=${info.links
-		.slice(0, 553)
-		.map((l: string) => encodeURIComponent(l))
-		.join('%0A')}`;
+	const downloadAllLinksParam = info.links.slice(0, 553).join('\n');
 	const libraryActions = !info.fake
 		? `
     <div class="mb-4 flex justify-center items-center flex-wrap">
@@ -82,7 +79,14 @@ export const showInfoForRD = async (
         ${renderButton('magnet', { id: 'btn-magnet-copy', text: shouldDownloadMagnets ? 'Download' : 'Copy' })}
         ${renderButton('reinsert', { id: 'btn-reinsert-rd' })}
         ${rdKey ? renderButton('castAll', { link: `/api/stremio/cast/library/${info.id}:${info.hash}?rdToken=${rdKey}` }) : ''}
-        ${info.links.length > 0 ? renderButton('downloadAll', { link: `${downloadAllLink}` }) : ''}
+		${
+			info.links.length > 0
+				? renderButton('downloadAll', {
+						link: 'https://real-debrid.com/downloader',
+						linkParam: { name: 'links', value: downloadAllLinksParam },
+					})
+				: ''
+		}
         ${info.links.length > 0 ? renderButton('exportLinks', { id: 'btn-export-links' }) : ''}
         ${info.links.length > 0 ? renderButton('generateStrm', { id: 'btn-generate-strm' }) : ''}
     </div>`
@@ -224,7 +228,7 @@ export const showInfoForRD = async (
 
 			const magnetBtn = document.getElementById('btn-magnet-copy');
 			magnetBtn?.addEventListener('click', () => {
-				handleCopyOrDownloadMagnet(info.hash, shouldDownloadMagnets);
+				void handleCopyOrDownloadMagnet(info.hash, shouldDownloadMagnets);
 			});
 
 			const deleteBtn = document.getElementById('btn-delete-rd');
@@ -397,7 +401,7 @@ export const showInfoForAD = async (
 		didOpen: () => {
 			const magnetBtn = document.getElementById('btn-magnet-copy');
 			magnetBtn?.addEventListener('click', () => {
-				handleCopyOrDownloadMagnet(info.hash, shouldDownloadMagnets);
+				void handleCopyOrDownloadMagnet(info.hash, shouldDownloadMagnets);
 			});
 
 			const deleteBtn = document.getElementById('btn-delete-ad');

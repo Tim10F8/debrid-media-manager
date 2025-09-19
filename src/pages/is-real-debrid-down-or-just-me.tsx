@@ -1,7 +1,8 @@
 import type { LucideIcon } from 'lucide-react';
 import { Activity, AlertTriangle, CheckCircle2, Clock, History } from 'lucide-react';
-import { GetServerSideProps } from 'next';
+import type { GetServerSideProps, NextPage } from 'next';
 import Head from 'next/head';
+import { useEffect, useState } from 'react';
 
 import { getStats, type OperationStats } from '@/lib/observability/rdOperationalStats';
 
@@ -16,7 +17,38 @@ export const getServerSideProps: GetServerSideProps<Props> = async () => {
 	return { props: { stats } };
 };
 
-export default function RealDebridStatusPage({ stats }: Props) {
+const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean } = ({
+	stats: initialStats,
+}) => {
+	const [stats, setStats] = useState(initialStats);
+
+	useEffect(() => {
+		let cancelled = false;
+
+		const loadFreshStats = async () => {
+			try {
+				const response = await fetch('/api/observability/real-debrid', {
+					cache: 'no-store',
+				});
+				if (!response.ok) {
+					return;
+				}
+				const payload: Props['stats'] = await response.json();
+				if (!cancelled) {
+					setStats(payload);
+				}
+			} catch (error) {
+				console.error('Failed to refresh Real-Debrid stats', error);
+			}
+		};
+
+		loadFreshStats();
+
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
 	const state: StatusState = !stats.considered ? 'idle' : stats.isDown ? 'down' : 'up';
 	const successPct = Math.round(stats.successRate * 100);
 	const lastUpdated = stats.lastTs ? new Date(stats.lastTs) : null;
@@ -334,4 +366,8 @@ export default function RealDebridStatusPage({ stats }: Props) {
 			</div>
 		</>
 	);
-}
+};
+
+RealDebridStatusPage.disableLibraryProvider = true;
+
+export default RealDebridStatusPage;
