@@ -4,7 +4,7 @@ import { useRelativeTimeLabel } from '@/hooks/useRelativeTimeLabel';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function FloatingLibraryIndicator() {
 	const { libraryItems, isLoading, isFetching, lastFetchTime, error, refreshLibrary } =
@@ -19,7 +19,7 @@ export default function FloatingLibraryIndicator() {
 	const initialRefreshRequestedRef = useRef(false);
 
 	// Check authentication status directly from localStorage
-	const checkAuthStatus = () => {
+	const checkAuthStatus = useCallback(() => {
 		if (typeof window === 'undefined') return false;
 		const hasRd = localStorage.getItem('rd:accessToken');
 		const hasAd = localStorage.getItem('ad:apiKey');
@@ -34,19 +34,23 @@ export default function FloatingLibraryIndicator() {
 			result,
 		});
 		return result;
-	};
+	}, []);
 
 	// Handle client-side mounting to avoid hydration mismatch
 	useEffect(() => {
 		setMounted(true);
 		setIsLoggedIn(checkAuthStatus());
-		console.log('[FloatingLibraryIndicator] mounted', {
+	}, [checkAuthStatus]);
+
+	useEffect(() => {
+		if (!mounted) return;
+		console.log('[FloatingLibraryIndicator] mounted state update', {
 			pathname: router.pathname,
-			initialLibrarySize: libraryItems.length,
+			librarySize: libraryItems.length,
 			isLoading,
 			isFetching,
 		});
-	}, []);
+	}, [mounted, router.pathname, libraryItems.length, isLoading, isFetching]);
 
 	// Listen for storage changes to detect logout/login
 	useEffect(() => {
@@ -85,7 +89,7 @@ export default function FloatingLibraryIndicator() {
 			window.removeEventListener('logout', handleLogout);
 			window.removeEventListener('login', handleLogin);
 		};
-	}, []);
+	}, [checkAuthStatus]);
 
 	// Sync with auth hooks when they change - use hooks as source of truth
 	useEffect(() => {

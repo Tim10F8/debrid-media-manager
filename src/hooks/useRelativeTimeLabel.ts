@@ -9,6 +9,7 @@ const DAY_MS = 86_400_000;
 
 export function useRelativeTimeLabel(timestamp: Date | null, fallback: string): string {
 	const [nowMs, setNowMs] = useState(() => Date.now());
+	const timestampMs = timestamp ? timestamp.getTime() : null;
 
 	useEffect(() => {
 		let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -34,7 +35,7 @@ export function useRelativeTimeLabel(timestamp: Date | null, fallback: string): 
 			if (!isActive) return;
 			const now = Date.now();
 			setNowMs(now);
-			const diff = timestamp ? now - timestamp.getTime() : null;
+			const diff = timestampMs === null ? null : now - timestampMs;
 			const interval = computeNextInterval(diff);
 			timeoutId = setTimeout(tick, interval);
 		};
@@ -47,11 +48,11 @@ export function useRelativeTimeLabel(timestamp: Date | null, fallback: string): 
 				clearTimeout(timeoutId);
 			}
 		};
-	}, [timestamp?.getTime()]);
+	}, [timestampMs]);
 
 	return useMemo(() => {
-		if (!timestamp) return fallback;
-		const diffMs = nowMs - timestamp.getTime();
+		if (timestampMs === null) return fallback;
+		const diffMs = nowMs - timestampMs;
 		if (diffMs <= 0) return fallback;
 		const seconds = Math.floor(diffMs / 1000);
 		if (seconds <= 0) return fallback;
@@ -62,5 +63,5 @@ export function useRelativeTimeLabel(timestamp: Date | null, fallback: string): 
 		if (days > 0) return `${days}d ago`;
 		if (hours > 0) return `${hours}h ago`;
 		return `${minutes}m ago`;
-	}, [fallback, nowMs, timestamp]);
+	}, [fallback, nowMs, timestampMs]);
 }

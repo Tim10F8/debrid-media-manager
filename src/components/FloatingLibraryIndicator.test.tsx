@@ -207,6 +207,22 @@ describe('FloatingLibraryIndicator', () => {
 			expect(screen.getByText('3')).toBeInTheDocument();
 		});
 
+		it('triggers an initial refresh when mounting with empty library data', async () => {
+			localStorage.setItem('rd:accessToken', 'test-token');
+			(useRealDebridAccessToken as any).mockReturnValue(['test-token', false, false]);
+			const refreshLibrary = vi.fn().mockResolvedValue(undefined);
+			(useLibraryCache as any).mockReturnValue({
+				...mockLibraryCache,
+				refreshLibrary,
+			});
+
+			render(<FloatingLibraryIndicator />);
+
+			await waitFor(() => {
+				expect(refreshLibrary).toHaveBeenCalledTimes(1);
+			});
+		});
+
 		it('should show loading state', () => {
 			localStorage.setItem('rd:accessToken', 'test-token');
 			(useRealDebridAccessToken as any).mockReturnValue(['test-token', false, false]);

@@ -137,6 +137,11 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	const cacheHitsRef = useRef({ hits: 0, misses: 0 });
 	const dbSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const lastPersistedSnapshotRef = useRef<Map<string, string>>(new Map());
+	const previousTokenStateRef = useRef({
+		rd: typeof rdKey === 'string' && rdKey.trim().length > 0,
+		ad: typeof adKey === 'string' && adKey.trim().length > 0,
+		tb: typeof tbKey === 'string' && tbKey.trim().length > 0,
+	});
 
 	// Update statistics
 	const updateStats = useCallback((torrents: UserTorrent[]) => {
@@ -228,6 +233,44 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		if (!tbKey) {
 			setTbLibrary([]);
 		}
+	}, [tbKey]);
+
+	useEffect(() => {
+		const hasAd = typeof adKey === 'string' && adKey.trim().length > 0;
+		const wasAd = previousTokenStateRef.current.ad;
+		console.log('[LibraryCache] AllDebrid token check', { hasAd, wasAd });
+		previousTokenStateRef.current.ad = hasAd;
+		if (!hasAd || wasAd) {
+			return;
+		}
+
+		console.log('[LibraryCache] New AllDebrid token detected, triggering refresh');
+		void (async () => {
+			try {
+				await refreshLibraryRef.current?.('alldebrid', true);
+			} catch (error) {
+				console.error('[LibraryCache] Auto refresh for AllDebrid failed', error);
+			}
+		})();
+	}, [adKey]);
+
+	useEffect(() => {
+		const hasTb = typeof tbKey === 'string' && tbKey.trim().length > 0;
+		const wasTb = previousTokenStateRef.current.tb;
+		console.log('[LibraryCache] TorBox token check', { hasTb, wasTb });
+		previousTokenStateRef.current.tb = hasTb;
+		if (!hasTb || wasTb) {
+			return;
+		}
+
+		console.log('[LibraryCache] New TorBox token detected, triggering refresh');
+		void (async () => {
+			try {
+				await refreshLibraryRef.current?.('torbox', true);
+			} catch (error) {
+				console.error('[LibraryCache] Auto refresh for TorBox failed', error);
+			}
+		})();
 	}, [tbKey]);
 
 	// Update combined library
@@ -326,122 +369,124 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	}, [rdLibrary, adLibrary, tbLibrary, updateCombinedLibrary]);
 
 	// Refresh library for a specific service or all
-	const refreshLibrary = async (
-		service?: 'realdebrid' | 'alldebrid' | 'torbox',
-		force: boolean = false
-	) => {
-		if (!service) {
-			await refreshAll(force);
-			return;
-		}
-
-		console.log(`[LibraryCache] Starting refresh for ${service}, force: ${force}`);
-
-		setSyncStatus({
-			isLoading: false,
-			isSyncing: true,
-			service,
-			progress: 0,
-			total: 0,
-			error: null,
-		});
-
-		const startTime = Date.now();
-
-		try {
-			const options: FetchOptions = {
-				forceRefresh: force,
-				onProgress: (progress, total) => {
-					setSyncStatus((prev) => ({
-						...prev,
-						progress,
-						total,
-					}));
-				},
+	const refreshLibrary = useCallback(
+		async (service?: 'realdebrid' | 'alldebrid' | 'torbox', force: boolean = false) => {
+			type Service = 'realdebrid' | 'alldebrid' | 'torbox';
+			const tokens: Record<Service, string | undefined> = {
+				realdebrid:
+					typeof rdKey === 'string' && rdKey.trim().length > 0 ? rdKey : undefined,
+				alldebrid: typeof adKey === 'string' && adKey.trim().length > 0 ? adKey : undefined,
+				torbox: typeof tbKey === 'string' && tbKey.trim().length > 0 ? tbKey : undefined,
 			};
 
-			let token: string | undefined;
-			switch (service) {
-				case 'realdebrid':
-					token = rdKey || undefined;
-					break;
-				case 'alldebrid':
-					token = adKey || undefined;
-					break;
-				case 'torbox':
-					token = tbKey || undefined;
-					break;
+			const runSingle = async (target: Service, token: string | undefined) => {
+				if (!token) {
+					throw new Error(`No token for ${target}`);
+				}
+
+				console.log(`[LibraryCache] Starting refresh for ${target}, force: ${force}`);
+
+				setSyncStatus({
+					isLoading: false,
+					isSyncing: true,
+					service: target,
+					progress: 0,
+					total: 0,
+					error: null,
+				});
+
+				const startTime = Date.now();
+
+				try {
+					const options: FetchOptions = {
+						forceRefresh: force,
+						onProgress: (progress, total) => {
+							setSyncStatus((prev) => ({
+								...prev,
+								progress,
+								total,
+							}));
+						},
+					};
+
+					const torrents = await libraryFetcher.fetchLibrary(target, token, options);
+					const syncCompletedAt = new Date();
+
+					const fetchTime = Date.now() - startTime;
+					fetchTimesRef.current.push(fetchTime);
+					if (fetchTimesRef.current.length > 100) {
+						fetchTimesRef.current.shift();
+					}
+
+					if (force) {
+						cacheHitsRef.current.misses++;
+					} else {
+						cacheHitsRef.current.hits++;
+					}
+
+					switch (target) {
+						case 'realdebrid':
+							setRdLibrary(torrents);
+							break;
+						case 'alldebrid':
+							setAdLibrary(torrents);
+							break;
+						case 'torbox':
+							setTbLibrary(torrents);
+							break;
+					}
+
+					setStats((prev) => ({ ...prev, lastSync: syncCompletedAt }));
+
+					toast.success(`${target} library refreshed (${torrents.length}).`);
+				} catch (error: any) {
+					const errorTime = Date.now() - startTime;
+					console.error(
+						`[LibraryCache] Failed to refresh ${target} after ${errorTime}ms:`,
+						error
+					);
+					setSyncStatus((prev) => ({
+						...prev,
+						error: error.message,
+					}));
+					toast.error(`Failed to refresh ${target}: ${error.message}`);
+				} finally {
+					console.log(`[LibraryCache] Refresh completed for ${target}`);
+					setSyncStatus((prev) => ({
+						...prev,
+						isSyncing: false,
+						service: null,
+					}));
+				}
+			};
+
+			if (!service) {
+				const services: Service[] = ['realdebrid', 'alldebrid', 'torbox'];
+				for (const target of services) {
+					const token = tokens[target];
+					if (token) {
+						await runSingle(target, token);
+					}
+				}
+				return;
 			}
 
-			if (!token) {
-				throw new Error(`No token for ${service}`);
-			}
+			await runSingle(service, tokens[service]);
+		},
+		[rdKey, adKey, tbKey]
+	);
 
-			const torrents = await libraryFetcher.fetchLibrary(service, token, options);
-			const syncCompletedAt = new Date();
+	const refreshAll = useCallback(
+		async (force: boolean = false) => {
+			await refreshLibrary(undefined, force);
+		},
+		[refreshLibrary]
+	);
 
-			const fetchTime = Date.now() - startTime;
-			fetchTimesRef.current.push(fetchTime);
-			if (fetchTimesRef.current.length > 100) {
-				fetchTimesRef.current.shift();
-			}
-
-			if (force) {
-				cacheHitsRef.current.misses++;
-			} else {
-				cacheHitsRef.current.hits++;
-			}
-
-			switch (service) {
-				case 'realdebrid':
-					setRdLibrary(torrents);
-					break;
-				case 'alldebrid':
-					setAdLibrary(torrents);
-					break;
-				case 'torbox':
-					setTbLibrary(torrents);
-					break;
-			}
-
-			setStats((prev) => ({ ...prev, lastSync: syncCompletedAt }));
-
-			toast.success(`${service} library refreshed (${torrents.length}).`);
-		} catch (error: any) {
-			const errorTime = Date.now() - startTime;
-			console.error(
-				`[LibraryCache] Failed to refresh ${service} after ${errorTime}ms:`,
-				error
-			);
-			setSyncStatus((prev) => ({
-				...prev,
-				error: error.message,
-			}));
-			toast.error(`Failed to refresh ${service}: ${error.message}`);
-		} finally {
-			console.log(`[LibraryCache] Refresh completed for ${service}`);
-			setSyncStatus((prev) => ({
-				...prev,
-				isSyncing: false,
-				service: null,
-			}));
-		}
-	};
-
-	// Refresh all services
-	const refreshAll = async (force: boolean = false) => {
-		const services: Array<['realdebrid' | 'alldebrid' | 'torbox', string | undefined]> = [
-			['realdebrid', rdKey || undefined],
-			['alldebrid', adKey || undefined],
-			['torbox', tbKey || undefined],
-		];
-
-		for (const [service, token] of services) {
-			if (token) {
-				await refreshLibrary(service, force);
-			}
-		}
-	};
+	const refreshLibraryRef = useRef(refreshLibrary);
+	useEffect(() => {
+		refreshLibraryRef.current = refreshLibrary;
+	}, [refreshLibrary]);
 
 	// Clear cache
 	const clearCache = async (service?: string) => {

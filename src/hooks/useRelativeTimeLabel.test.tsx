@@ -56,4 +56,16 @@ describe('useRelativeTimeLabel', () => {
 		rerender(<TestComponent timestamp={refreshedAt} fallback="Just now" />);
 		expect(screen.getByText('Just now')).toBeInTheDocument();
 	});
+
+	it('updates immediately when timestamp jumps forward to now', () => {
+		const { rerender } = render(<TestComponent timestamp={baseTime} fallback="Just now" />);
+		expect(screen.getByText('Just now')).toBeInTheDocument();
+		act(() => {
+			vi.advanceTimersByTime(90_000);
+		});
+		expect(screen.getByText('1m ago')).toBeInTheDocument();
+		const updatedTime = new Date(Date.now());
+		rerender(<TestComponent timestamp={updatedTime} fallback="Just now" />);
+		expect(screen.getByText('Just now')).toBeInTheDocument();
+	});
 });
