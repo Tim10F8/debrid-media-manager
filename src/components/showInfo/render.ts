@@ -33,14 +33,14 @@ export const renderTorrentInfo = (
 					if (rdInfo.fake) {
 						actions.push(
 							renderButton('watch', {
-								onClick: `window.open('/api/watch/instant/${app}?token=${rdKey}&hash=${info.hash}&fileId=${file.id}')`,
+								link: `/api/watch/instant/${app}?token=${rdKey}&hash=${info.hash}&fileId=${file.id}`,
 								text: 'Watch',
 							})
 						);
 					} else {
 						actions.push(
 							renderButton('watch', {
-								onClick: `window.open('/api/watch/${app}?token=${rdKey}&hash=${info.hash}&link=${fileLink}')`,
+								link: `/api/watch/${app}?token=${rdKey}&hash=${info.hash}&link=${encodeURIComponent(fileLink)}`,
 								text: 'Watch',
 							})
 						);
@@ -54,7 +54,7 @@ export const renderTorrentInfo = (
 					) {
 						actions.push(
 							renderButton('cast', {
-								onClick: `window.open('/api/stremio/cast/${imdbId}?token=${rdKey}&hash=${info.hash}&fileId=${file.id}&mediaType=${mediaType}')`,
+								link: `/api/stremio/cast/${imdbId}?token=${rdKey}&hash=${info.hash}&fileId=${file.id}&mediaType=${mediaType}`,
 								text: 'Cast',
 							})
 						);

@@ -72,7 +72,7 @@ function getUniqueRequestId() {
 
 // Function to replace #num# with random number 0-9
 function getProxyUrl(baseUrl: string): string {
-	return baseUrl.replace('#num#', Math.floor(Math.random() * 10).toString());
+	return baseUrl.replace('#num#', Math.floor(Math.random() * 1000).toString());
 }
 
 // Validate SHA40 hash format

@@ -8,10 +8,8 @@ import { every, some } from 'lodash';
 import { Dispatch, SetStateAction } from 'react';
 import Modal from '../components/modals/modal';
 import { handleReinsertTorrentinRd } from './addMagnet';
-import { handleCopyOrDownloadMagnet } from './copyMagnet';
 import { handleDeleteRdTorrent } from './deleteTorrent';
 import { getRdStatus } from './fetchTorrents';
-import { handleShare } from './hashList';
 import { fetchLatestRDTorrents } from './libraryFetching';
 import { checkArithmeticSequenceInFilenames, isVideo } from './selectable';
 
@@ -108,9 +106,8 @@ export async function handleShowInfoForRD(
 		await torrentDB.add(t);
 	}
 
-	// Set up window handlers
-	(window as any).handleShare = handleShare;
-	(window as any).handleDeleteRdTorrent = async (key: string, id: string) => {
+	// Define handlers and pass into the modal to avoid window globals
+	const onDeleteRd = async (key: string, id: string) => {
 		await handleDeleteRdTorrent(key, id);
 		setUserTorrentsList((prev) => prev.filter((torrent) => torrent.id !== id));
 		await torrentDB.deleteById(id);
@@ -120,8 +117,8 @@ export async function handleShowInfoForRD(
 		});
 		Modal.close();
 	};
-	(window as any).handleCopyMagnet = handleCopyOrDownloadMagnet;
-	(window as any).handleReinsertTorrentinRd = async (
+
+	const onReinsertRd = async (
 		key: string,
 		torrent: UserTorrent,
 		reload: boolean,
@@ -145,15 +142,30 @@ export async function handleShowInfoForRD(
 		});
 		Modal.close();
 	};
-	// Note: triggerFetchLatestRDTorrents is now set in the library page component
-	// where it has access to the refreshLibrary function from cache context
-	(window as any).closePopup = Modal.close;
-	(window as any).saveSelection = async (key: string, hash: string, fileIDs: string[]) => {
-		console.log('Saving selection', key, hash, fileIDs);
-		Modal.close();
-	};
 
-	showInfoForRD(window.localStorage.getItem('settings:player') || defaultPlayer, rdKey, info);
+	showInfoForRD(
+		window.localStorage.getItem('settings:player') || defaultPlayer,
+		rdKey,
+		info,
+		'',
+		'movie',
+		undefined,
+		{
+			onDeleteRd,
+			onReinsertRd,
+			onRefreshRd: async () => {
+				await fetchLatestRDTorrents(
+					rdKey,
+					torrentDB,
+					setUserTorrentsList,
+					(loading) => console.log('Loading:', loading),
+					(syncing) => console.log('Syncing:', syncing),
+					setSelectedTorrents,
+					2
+				);
+			},
+		}
+	);
 }
 
 export function handleShowInfoForAD(t: UserTorrent, adKey: string) {

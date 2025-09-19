@@ -36,10 +36,13 @@ export interface ActionButtonProps {
 	onClick?: string;
 	text?: string;
 	linkParam?: { name: string; value: string };
+	id?: string; // optional id for event binding instead of inline onclick
 }
 
 export interface LibraryActionButtonProps {
-	onClick: string;
+	onClick?: string;
+	id?: string; // optional id for event binding
+	text?: string;
 }
 
 export interface FileRowProps {

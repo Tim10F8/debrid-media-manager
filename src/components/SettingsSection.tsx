@@ -20,119 +20,173 @@ export const SettingsSection = () => {
 		defaultMagnetInstructionsHidden
 	);
 
-	const storedPlayer = window.localStorage.getItem('settings:player') || defaultPlayer;
-	const movieMaxSize = window.localStorage.getItem('settings:movieMaxSize') || defaultMovieSize;
-	const episodeMaxSize =
-		window.localStorage.getItem('settings:episodeMaxSize') || defaultEpisodeSize;
-	const onlyTrustedTorrents =
-		window.localStorage.getItem('settings:onlyTrustedTorrents') === 'true';
-	const defaultTorrentsFilterValue =
-		window.localStorage.getItem('settings:defaultTorrentsFilter') || defaultTorrentsFilter;
-	const downloadMagnets =
-		window.localStorage.getItem('settings:downloadMagnets') === 'true' ||
-		defaultDownloadMagnets;
-	const showMassReportButtons =
-		window.localStorage.getItem('settings:showMassReportButtons') === 'true';
-	const availabilityCheckLimit =
-		window.localStorage.getItem('settings:availabilityCheckLimit') ||
-		defaultAvailabilityCheckLimit;
-	const includeTrackerStats =
-		window.localStorage.getItem('settings:includeTrackerStats') === 'true';
-	const enableTorrentio = window.localStorage.getItem('settings:enableTorrentio') !== 'false'; // Default to true
-	const enableComet = window.localStorage.getItem('settings:enableComet') !== 'false'; // Default to true
-	const enableMediaFusion = window.localStorage.getItem('settings:enableMediaFusion') !== 'false'; // Default to true
-	const enablePeerflix = window.localStorage.getItem('settings:enablePeerflix') !== 'false'; // Default to true
-	const enableTorrentsDB = window.localStorage.getItem('settings:enableTorrentsDB') !== 'false'; // Default to true
+	const [storedPlayer, setStoredPlayer] = useState(defaultPlayer);
+	const [movieMaxSize, setMovieMaxSize] = useState(defaultMovieSize);
+	const [episodeMaxSize, setEpisodeMaxSize] = useState(defaultEpisodeSize);
+	const [onlyTrustedTorrents, setOnlyTrustedTorrents] = useState(false);
+	const [defaultTorrentsFilterValue, setDefaultTorrentsFilterValue] =
+		useState(defaultTorrentsFilter);
+	const [downloadMagnets, setDownloadMagnets] = useState(defaultDownloadMagnets);
+	const [showMassReportButtons, setShowMassReportButtons] = useState(false);
+	const [availabilityCheckLimit, setAvailabilityCheckLimit] = useState(
+		defaultAvailabilityCheckLimit
+	);
+	const [includeTrackerStats, setIncludeTrackerStats] = useState(false);
+	const [enableTorrentio, setEnableTorrentio] = useState(true);
+	const [enableComet, setEnableComet] = useState(true);
+	const [enableMediaFusion, setEnableMediaFusion] = useState(true);
+	const [enablePeerflix, setEnablePeerflix] = useState(true);
+	const [enableTorrentsDB, setEnableTorrentsDB] = useState(true);
 
 	useEffect(() => {
+		if (typeof localStorage === 'undefined') return;
 		// Check if protocol handler is registered
-		const checkProtocolHandler = () => {
-			const isEnabled =
-				window.localStorage.getItem('settings:magnetHandlerEnabled') === 'true';
-			setIsMagnetHandlerEnabled(isEnabled);
-		};
-		checkProtocolHandler();
+		setIsMagnetHandlerEnabled(localStorage.getItem('settings:magnetHandlerEnabled') === 'true');
 
 		// Check if instructions are hidden
-		const checkInstructionsHidden = () => {
-			const isHidden =
-				window.localStorage.getItem('settings:magnetInstructionsHidden') === 'true';
-			setIsInstructionsHidden(isHidden);
-		};
-		checkInstructionsHidden();
+		setIsInstructionsHidden(
+			localStorage.getItem('settings:magnetInstructionsHidden') === 'true'
+		);
+
+		// Load persistent settings
+		setStoredPlayer(localStorage.getItem('settings:player') || defaultPlayer);
+		setMovieMaxSize(localStorage.getItem('settings:movieMaxSize') || defaultMovieSize);
+		setEpisodeMaxSize(localStorage.getItem('settings:episodeMaxSize') || defaultEpisodeSize);
+		setOnlyTrustedTorrents(localStorage.getItem('settings:onlyTrustedTorrents') === 'true');
+		setDefaultTorrentsFilterValue(
+			localStorage.getItem('settings:defaultTorrentsFilter') || defaultTorrentsFilter
+		);
+		setDownloadMagnets(
+			localStorage.getItem('settings:downloadMagnets') === 'true' || defaultDownloadMagnets
+		);
+		setShowMassReportButtons(localStorage.getItem('settings:showMassReportButtons') === 'true');
+		setAvailabilityCheckLimit(
+			localStorage.getItem('settings:availabilityCheckLimit') || defaultAvailabilityCheckLimit
+		);
+		setIncludeTrackerStats(localStorage.getItem('settings:includeTrackerStats') === 'true');
+		setEnableTorrentio(localStorage.getItem('settings:enableTorrentio') !== 'false');
+		setEnableComet(localStorage.getItem('settings:enableComet') !== 'false');
+		setEnableMediaFusion(localStorage.getItem('settings:enableMediaFusion') !== 'false');
+		setEnablePeerflix(localStorage.getItem('settings:enablePeerflix') !== 'false');
+		setEnableTorrentsDB(localStorage.getItem('settings:enableTorrentsDB') !== 'false');
 	}, []);
 
 	const handlePlayerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-		window.localStorage.setItem('settings:player', e.target.value);
+		const value = e.target.value;
+		setStoredPlayer(value);
+		if (typeof localStorage !== 'undefined') localStorage.setItem('settings:player', value);
 	};
 
 	const handleMovieSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-		window.localStorage.setItem('settings:movieMaxSize', e.target.value);
+		const value = e.target.value;
+		setMovieMaxSize(value);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:movieMaxSize', value);
 	};
 
 	const handleEpisodeSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-		window.localStorage.setItem('settings:episodeMaxSize', e.target.value);
+		const value = e.target.value;
+		setEpisodeMaxSize(value);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:episodeMaxSize', value);
 	};
 
 	const handleTorrentsFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		window.localStorage.setItem('settings:defaultTorrentsFilter', e.target.value);
+		const value = e.target.value;
+		setDefaultTorrentsFilterValue(value);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:defaultTorrentsFilter', value);
 	};
 
 	const handleTrustedTorrentsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		window.localStorage.setItem('settings:onlyTrustedTorrents', String(e.target.checked));
+		const checked = e.target.checked;
+		setOnlyTrustedTorrents(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:onlyTrustedTorrents', String(checked));
 	};
 
 	const handleDownloadMagnetsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		window.localStorage.setItem('settings:downloadMagnets', String(e.target.checked));
+		const checked = e.target.checked;
+		setDownloadMagnets(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:downloadMagnets', String(checked));
 	};
 
 	const handleMassReportButtonsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		window.localStorage.setItem('settings:showMassReportButtons', String(e.target.checked));
+		const checked = e.target.checked;
+		setShowMassReportButtons(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:showMassReportButtons', String(checked));
 	};
 
 	const handleAvailabilityCheckLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const value = e.target.value;
 		// Only allow numbers
 		if (value === '' || /^\d+$/.test(value)) {
-			window.localStorage.setItem('settings:availabilityCheckLimit', value);
+			setAvailabilityCheckLimit(value);
+			if (typeof localStorage !== 'undefined')
+				localStorage.setItem('settings:availabilityCheckLimit', value);
 		}
 	};
 
 	const handleIncludeTrackerStatsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		window.localStorage.setItem('settings:includeTrackerStats', String(e.target.checked));
+		const checked = e.target.checked;
+		setIncludeTrackerStats(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:includeTrackerStats', String(checked));
 	};
 
 	const handleEnableTorrentioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		window.localStorage.setItem('settings:enableTorrentio', String(e.target.checked));
+		const checked = e.target.checked;
+		setEnableTorrentio(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:enableTorrentio', String(checked));
 	};
 
 	const handleEnableCometChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		window.localStorage.setItem('settings:enableComet', String(e.target.checked));
+		const checked = e.target.checked;
+		setEnableComet(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:enableComet', String(checked));
 	};
 
 	const handleEnableMediaFusionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		window.localStorage.setItem('settings:enableMediaFusion', String(e.target.checked));
+		const checked = e.target.checked;
+		setEnableMediaFusion(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:enableMediaFusion', String(checked));
 	};
 
 	const handleEnablePeerflixChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		window.localStorage.setItem('settings:enablePeerflix', String(e.target.checked));
+		const checked = e.target.checked;
+		setEnablePeerflix(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:enablePeerflix', String(checked));
 	};
 
 	const handleEnableTorrentsDBChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		window.localStorage.setItem('settings:enableTorrentsDB', String(e.target.checked));
+		const checked = e.target.checked;
+		setEnableTorrentsDB(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:enableTorrentsDB', String(checked));
 	};
 
 	const handleHideInstructions = () => {
-		window.localStorage.setItem('settings:magnetInstructionsHidden', 'true');
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:magnetInstructionsHidden', 'true');
 		setIsInstructionsHidden(true);
 	};
 
 	const handleShowInstructions = () => {
-		window.localStorage.setItem('settings:magnetInstructionsHidden', 'false');
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:magnetInstructionsHidden', 'false');
 		setIsInstructionsHidden(false);
 	};
 
 	const getBrowserSettingsInfo = () => {
+		if (typeof navigator === 'undefined') {
+			return { text: 'Browser protocol handler settings:', url: '' };
+		}
 		const ua = navigator.userAgent;
 		if (ua.includes('Chrome') && !ua.includes('Edg')) {
 			return {
@@ -220,7 +274,7 @@ export const SettingsSection = () => {
 									<select
 										id="dmm-movie-max-size"
 										className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
-										defaultValue={movieMaxSize}
+										value={movieMaxSize}
 										onChange={handleMovieSizeChange}
 									>
 										<option value="1">1 GB (~1.5 Mbps)</option>
@@ -238,7 +292,7 @@ export const SettingsSection = () => {
 									<select
 										id="dmm-episode-max-size"
 										className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
-										defaultValue={episodeMaxSize}
+										value={episodeMaxSize}
 										onChange={handleEpisodeSizeChange}
 									>
 										<option value="0.1">100 MB (~0.7 Mbps)</option>
@@ -258,7 +312,7 @@ export const SettingsSection = () => {
 							<select
 								id="dmm-player"
 								className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
-								defaultValue={storedPlayer}
+								value={storedPlayer}
 								onChange={handlePlayerChange}
 							>
 								<optgroup label="Web">
@@ -299,7 +353,7 @@ export const SettingsSection = () => {
 								type="text"
 								className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
 								placeholder="filter results, supports regex"
-								defaultValue={defaultTorrentsFilterValue}
+								value={defaultTorrentsFilterValue}
 								onChange={handleTorrentsFilterChange}
 							/>
 						</div>
@@ -309,7 +363,7 @@ export const SettingsSection = () => {
 								id="dmm-only-trusted-torrents"
 								type="checkbox"
 								className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-								defaultChecked={onlyTrustedTorrents}
+								checked={onlyTrustedTorrents}
 								onChange={handleTrustedTorrentsChange}
 							/>
 							<label className="font-semibold">Only trusted torrents</label>
@@ -320,7 +374,7 @@ export const SettingsSection = () => {
 								id="dmm-download-magnets"
 								type="checkbox"
 								className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-								defaultChecked={downloadMagnets}
+								checked={downloadMagnets}
 								onChange={handleDownloadMagnetsChange}
 							/>
 							<label className="font-semibold">
@@ -333,7 +387,7 @@ export const SettingsSection = () => {
 								id="dmm-show-mass-report-buttons"
 								type="checkbox"
 								className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-								defaultChecked={showMassReportButtons}
+								checked={showMassReportButtons}
 								onChange={handleMassReportButtonsChange}
 							/>
 							<label className="font-semibold">Show mass report buttons</label>
@@ -347,7 +401,7 @@ export const SettingsSection = () => {
 								min="0"
 								className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
 								placeholder="0 for no limit"
-								defaultValue={availabilityCheckLimit}
+								value={availabilityCheckLimit}
 								onChange={handleAvailabilityCheckLimitChange}
 							/>
 							<span className="text-xs text-gray-400">
@@ -362,7 +416,7 @@ export const SettingsSection = () => {
 									id="dmm-include-tracker-stats"
 									type="checkbox"
 									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									defaultChecked={includeTrackerStats}
+									checked={includeTrackerStats}
 									onChange={handleIncludeTrackerStatsChange}
 								/>
 								<label className="font-semibold">
@@ -386,7 +440,7 @@ export const SettingsSection = () => {
 									id="dmm-enable-torrentio"
 									type="checkbox"
 									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									defaultChecked={enableTorrentio}
+									checked={enableTorrentio}
 									onChange={handleEnableTorrentioChange}
 								/>
 								<label className="font-semibold">Enable Torrentio</label>
@@ -397,7 +451,7 @@ export const SettingsSection = () => {
 									id="dmm-enable-comet"
 									type="checkbox"
 									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									defaultChecked={enableComet}
+									checked={enableComet}
 									onChange={handleEnableCometChange}
 								/>
 								<label className="font-semibold">Enable Comet</label>
@@ -408,7 +462,7 @@ export const SettingsSection = () => {
 									id="dmm-enable-mediafusion"
 									type="checkbox"
 									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									defaultChecked={enableMediaFusion}
+									checked={enableMediaFusion}
 									onChange={handleEnableMediaFusionChange}
 								/>
 								<label className="font-semibold">Enable MediaFusion</label>
@@ -419,7 +473,7 @@ export const SettingsSection = () => {
 									id="dmm-enable-peerflix"
 									type="checkbox"
 									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									defaultChecked={enablePeerflix}
+									checked={enablePeerflix}
 									onChange={handleEnablePeerflixChange}
 								/>
 								<label className="font-semibold">Enable Peerflix</label>
@@ -430,7 +484,7 @@ export const SettingsSection = () => {
 									id="dmm-enable-torrentsdb"
 									type="checkbox"
 									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									defaultChecked={enableTorrentsDB}
+									checked={enableTorrentsDB}
 									onChange={handleEnableTorrentsDBChange}
 								/>
 								<label className="font-semibold">Enable TorrentsDB</label>
@@ -455,16 +509,17 @@ export const SettingsSection = () => {
 							: 'border-blue-500 bg-blue-900/30 text-blue-100 hover:bg-blue-800/50'
 					} px-4 py-2 text-sm transition-colors`}
 					onClick={() => {
-						if ('registerProtocolHandler' in navigator) {
+						if (
+							typeof navigator !== 'undefined' &&
+							'registerProtocolHandler' in navigator
+						) {
 							try {
 								navigator.registerProtocolHandler(
 									'magnet',
-									`${window.location.origin}/library?addMagnet=%s`
+									`${(typeof location !== 'undefined' && location.origin) || ''}/library?addMagnet=%s`
 								);
-								window.localStorage.setItem(
-									'settings:magnetHandlerEnabled',
-									'true'
-								);
+								if (typeof localStorage !== 'undefined')
+									localStorage.setItem('settings:magnetHandlerEnabled', 'true');
 								setIsMagnetHandlerEnabled(true);
 							} catch (error) {
 								console.error('Error registering protocol handler:', error);

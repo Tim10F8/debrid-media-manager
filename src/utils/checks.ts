@@ -1,32 +1,12 @@
 import { ScrapeSearchResult } from '@/services/mediasearch';
 import { filenameParse } from '@ctrl/video-filename-parser';
-import fs from 'fs';
 import ptt from 'parse-torrent-title';
 import { cleanSearchQuery, liteCleanSearchQuery } from './search';
+import { BANNED_COMPOUND_WORDS, BANNED_WORDS_SET, STOPWORDS_SET } from './wordlists';
 
-let dictionary: Set<string>;
-try {
-	let data = fs.readFileSync('./wordlist.txt', 'utf8');
-	dictionary = new Set(data.toLowerCase().split('\n'));
-} catch (err) {
-	console.error('error loading wordlist', err);
-}
-
-let bannedWordSet: Set<string>;
-try {
-	let data = fs.readFileSync('./bannedwordlist.txt', 'utf8');
-	bannedWordSet = new Set(data.toLowerCase().split('\n'));
-} catch (err) {
-	console.error('error loading banned wordlist', err);
-}
-
-let bannedWordSet2: Array<string>;
-try {
-	let data = fs.readFileSync('./bannedwordlist2.txt', 'utf8');
-	bannedWordSet2 = data.toLowerCase().split('\n');
-} catch (err) {
-	console.error('error loading banned wordlist 2', err);
-}
+const dictionary: Set<string> = STOPWORDS_SET;
+const bannedWordSet: Set<string> = BANNED_WORDS_SET;
+const bannedWordSet2: Array<string> = BANNED_COMPOUND_WORDS;
 
 function removeDiacritics(str: string) {
 	return str.normalize('NFD').replace(/[\u0300-\u036f]/gi, '');

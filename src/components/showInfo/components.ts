@@ -10,11 +10,16 @@ export const renderButton = (
 	const icon = icons[type];
 	const defaultLabel = defaultLabels[type];
 
+	// If link is provided, render a form that opens in a new tab.
+	// Only include the hidden input if linkParam is provided.
 	if ('link' in props) {
+		const hiddenInput = props.linkParam
+			? `<input type="hidden" name="${props.linkParam.name}" value="${props.linkParam.value}" />`
+			: '';
 		return `<form action="${props.link}" method="get" target="_blank" class="inline">
-            <input type="hidden" name="${props.linkParam?.name || 'links'}" value="${props.linkParam?.value || props.onClick || ''}" />
-            <button type="submit" class="inline m-0 ${style} text-xs rounded px-1 haptic-sm">${icon} ${props.text || defaultLabel}</button>
-        </form>`;
+	            ${hiddenInput}
+	            <button type="submit" class="inline m-0 ${style} text-xs rounded px-1 haptic-sm">${icon} ${props.text || defaultLabel}</button>
+	        </form>`;
 	}
 
 	const isLibraryAction = [
@@ -30,7 +35,13 @@ export const renderButton = (
 	const textSize = isLibraryAction ? 'text-base' : 'text-xs';
 	const touchClass = isLibraryAction ? 'touch-manipulation' : '';
 
-	return `<button type="button" class="inline ${style} ${textSize} rounded cursor-pointer ${touchClass}" onclick="${props.onClick}">${icon} ${'text' in props ? props.text || defaultLabel : defaultLabel}</button>`;
+	// Support both legacy inline onClick (if still passed) and id for external binding
+	const onClickAttr = 'onClick' in props && props.onClick ? ` onclick="${props.onClick}"` : '';
+	const idAttr = 'id' in props && (props as any).id ? ` id="${(props as any).id}"` : '';
+
+	return `<button type="button" class="inline ${style} ${textSize} rounded cursor-pointer ${touchClass}"${idAttr}${onClickAttr}>${icon} ${
+		'text' in props ? props.text || defaultLabel : defaultLabel
+	}</button>`;
 };
 
 export const renderFileRow = (file: FileRowProps, showCheckbox: boolean = false): string => {
@@ -44,8 +55,7 @@ export const renderFileRow = (file: FileRowProps, showCheckbox: boolean = false)
                 class="file-selector"
                 data-file-id="${file.id}"
                 data-file-path="${file.path}"
-                ${file.isSelected ? 'checked' : ''}
-                onchange="if (window.updateSelectionCount) window.updateSelectionCount();"
+				${file.isSelected ? 'checked' : ''}
             />
         </td>
     `
