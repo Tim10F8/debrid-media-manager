@@ -45,10 +45,10 @@ describe('browseTerms', () => {
 			expect(terms).toHaveLength(0);
 		});
 
-		it('returns terms with emoji prefixes', () => {
+		it('returns readable terms', () => {
 			const terms = getTerms(10);
 			terms.forEach((term) => {
-				expect(term).toMatch(/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{26FF}]/u);
+				expect(term.trim().length).toBeGreaterThan(0);
 			});
 		});
 

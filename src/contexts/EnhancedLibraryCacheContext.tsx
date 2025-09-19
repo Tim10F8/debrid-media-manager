@@ -146,15 +146,15 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 				? fetchTimesRef.current.reduce((a, b) => a + b, 0) / fetchTimesRef.current.length
 				: 0;
 
-		setStats({
+		setStats((prev) => ({
 			totalItems: torrents.length,
 			rdItems: rd,
 			adItems: ad,
 			tbItems: tb,
-			lastSync: new Date(),
+			lastSync: prev.lastSync,
 			cacheHitRate: Math.round(cacheHitRate * 100),
 			averageFetchTime: Math.round(avgFetchTime),
-		});
+		}));
 	}, []);
 
 	// Load existing data from IndexedDB to display while monitor initializes
@@ -324,6 +324,7 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 			}
 
 			const torrents = await libraryFetcher.fetchLibrary(service, token, options);
+			const syncCompletedAt = new Date();
 
 			const fetchTime = Date.now() - startTime;
 			fetchTimesRef.current.push(fetchTime);
@@ -348,6 +349,8 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 					setTbLibrary(torrents);
 					break;
 			}
+
+			setStats((prev) => ({ ...prev, lastSync: syncCompletedAt }));
 
 			toast.success(`${service} library refreshed (${torrents.length} items)`);
 		} catch (error: any) {

@@ -33,12 +33,15 @@ export const renderButton = (
 	// If link is provided, render a form that opens in a new tab.
 	// Only include the hidden input if linkParam is provided.
 	if ('link' in props) {
+		const idAttr = props.id ? ` id="${props.id}"` : '';
 		const hiddenInput = props.linkParam
 			? `<input type="hidden" name="${props.linkParam.name}" value="${props.linkParam.value}" />`
 			: '';
 		return `<form action="${props.link}" method="get" target="_blank" class="inline-block">
 	            ${hiddenInput}
-	            <button type="submit" class="${buttonClasses}">${icon} ${props.text || defaultLabel}</button>
+	            <button type="submit" class="${buttonClasses}"${idAttr}>${icon} ${
+					props.text || defaultLabel
+				}</button>
 	        </form>`;
 	}
 

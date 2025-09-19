@@ -6,6 +6,7 @@ import React, {
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from 'react';
 import type { FireOptions, ModalResult } from './types';
@@ -70,12 +71,7 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 			setModalState({
 				type,
 				options,
-				resolve: (result) => {
-					if (options.didOpen) {
-						setTimeout(options.didOpen, 0);
-					}
-					resolve(result);
-				},
+				resolve,
 			});
 		});
 	}, []);
@@ -428,6 +424,7 @@ const CustomHtmlDialog: React.FC<FireOptions & BaseModalProps> = ({
 	showConfirmButton = true,
 	allowOutsideClick = true,
 	allowEscapeKey = true,
+	didOpen,
 	onClose,
 }) => {
 	useEffect(() => {
@@ -439,6 +436,18 @@ const CustomHtmlDialog: React.FC<FireOptions & BaseModalProps> = ({
 		window.addEventListener('keydown', handleEscape);
 		return () => window.removeEventListener('keydown', handleEscape);
 	}, [onClose, allowEscapeKey]);
+
+	const didOpenRef = useRef(false);
+	useEffect(() => {
+		if (!didOpen || didOpenRef.current) return;
+		didOpenRef.current = true;
+		const rAF = requestAnimationFrame(() => {
+			didOpen();
+		});
+		return () => {
+			cancelAnimationFrame(rAF);
+		};
+	}, [didOpen]);
 
 	const handleConfirm = async () => {
 		if (preConfirm) {

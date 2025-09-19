@@ -52,10 +52,37 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 	const state: StatusState = !stats.considered ? 'idle' : stats.isDown ? 'down' : 'up';
 	const successPct = Math.round(stats.successRate * 100);
 	const lastUpdated = stats.lastTs ? new Date(stats.lastTs) : null;
+	const lastUpdatedIso = lastUpdated ? lastUpdated.toISOString() : null;
 	const operationStats = stats.monitoredOperations
 		.map((operation) => stats.byOperation[operation])
 		.filter((entry): entry is OperationStats => Boolean(entry));
 	const trackingWindowLabel = stats.windowSize.toLocaleString();
+	const pageTitle = 'Is Real-Debrid Down Or Just Me?';
+	const canonicalUrl = 'https://debridmediamanager.com/is-real-debrid-down-or-just-me';
+	const monitoredSummary = 'Real-Debrid account and torrent management endpoints';
+	const description = stats.considered
+		? `Live Real-Debrid availability across account and torrent endpoints based on the last ${trackingWindowLabel} proxy responses.`
+		: 'Live Real-Debrid availability dashboard covering account and torrent endpoints.';
+	const structuredData: Record<string, unknown> = {
+		'@context': 'https://schema.org',
+		'@type': 'WebPage',
+		name: pageTitle,
+		description,
+		url: canonicalUrl,
+		isPartOf: {
+			'@type': 'WebSite',
+			name: 'Debrid Media Manager',
+			url: 'https://debridmediamanager.com',
+		},
+		about: {
+			'@type': 'Service',
+			name: 'Real-Debrid',
+			sameAs: 'https://real-debrid.com',
+		},
+	};
+	if (lastUpdatedIso) {
+		structuredData.dateModified = lastUpdatedIso;
+	}
 
 	const statusMeta: Record<
 		StatusState,
@@ -70,7 +97,7 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 		idle: {
 			label: 'Waiting for data',
 			description:
-				'We need at least one 2xx or 5xx response across the tracked Real-Debrid endpoints before judging health.',
+				'Waiting for the first 2xx or 5xx response across the monitored Real-Debrid endpoints before we report availability.',
 			badge: 'border border-slate-500/40 bg-slate-500/20 text-slate-200',
 			meter: 'bg-slate-400',
 			icon: Clock,
@@ -78,7 +105,7 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 		up: {
 			label: 'All clear',
 			description:
-				'Recent proxy calls across monitored Real-Debrid operations look healthy. Responses appear normal.',
+				'Latest proxy responses across the monitored Real-Debrid endpoints look healthy.',
 			badge: 'border border-emerald-500/40 bg-emerald-500/20 text-emerald-200',
 			meter: 'bg-emerald-400',
 			icon: CheckCircle2,
@@ -86,7 +113,7 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 		down: {
 			label: 'Service disruption',
 			description:
-				'A sustained spike in 5xx responses was detected across the tracked endpoints. Expect degraded service.',
+				'We are seeing sustained 5xx failures across the monitored Real-Debrid endpoints. Expect degraded service.',
 			badge: 'border border-rose-500/50 bg-rose-500/20 text-rose-200',
 			meter: 'bg-rose-500',
 			icon: AlertTriangle,
@@ -167,10 +194,23 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 	return (
 		<>
 			<Head>
-				<title>Is Real-Debrid Down Or Just Me?</title>
-				<meta
-					name="description"
-					content={`Checks the last ${trackingWindowLabel} Real-Debrid proxy calls across /unrestrict/link, /user, and torrent endpoints (2xx vs 5xx).`}
+				<title>{pageTitle}</title>
+				<link rel="canonical" href={canonicalUrl} />
+				<meta name="description" content={description} />
+				<meta property="og:type" content="website" />
+				<meta property="og:site_name" content="Debrid Media Manager" />
+				<meta property="og:title" content={pageTitle} />
+				<meta property="og:description" content={description} />
+				<meta property="og:url" content={canonicalUrl} />
+				{lastUpdatedIso ? (
+					<meta property="og:updated_time" content={lastUpdatedIso} />
+				) : null}
+				<meta name="twitter:card" content="summary" />
+				<meta name="twitter:title" content={pageTitle} />
+				<meta name="twitter:description" content={description} />
+				<script
+					type="application/ld+json"
+					dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
 				/>
 			</Head>
 			<div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
@@ -193,9 +233,9 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 									Is Real-Debrid Down Or Just Me?
 								</h1>
 								<p className="mt-3 max-w-xl text-sm text-slate-300 md:text-base">
-									Based on the last {trackingWindowLabel} tracked Real-Debrid
-									proxy calls: /unrestrict/link, /user, and key torrent management
-									endpoints. Only 2xx and 5xx responses are considered.
+									We track the last {trackingWindowLabel} Real-Debrid proxy
+									responses across {monitoredSummary}. Only 2xx and 5xx status
+									codes count toward the availability score.
 								</p>
 								<p className="mt-4 text-sm text-slate-400">
 									{statusMeta[state].description}

@@ -1,5 +1,6 @@
 import { showInfoForAD, showInfoForRD } from '@/components/showInfo';
 import { getTorrentInfo } from '@/services/realDebrid';
+import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
 import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
 import { defaultPlayer } from '@/utils/settings';
@@ -20,7 +21,14 @@ export async function handleShowInfoForRD(
 	torrentDB: UserTorrentDB,
 	setSelectedTorrents: Dispatch<SetStateAction<Set<string>>>
 ) {
-	const info = await getTorrentInfo(rdKey, t.id.substring(3));
+	Modal.showLoading();
+	let info: TorrentInfoResponse;
+	try {
+		info = await getTorrentInfo(rdKey, t.id.substring(3));
+	} catch (error) {
+		Modal.close();
+		throw error;
+	}
 
 	if (t.status === UserTorrentStatus.waiting || t.status === UserTorrentStatus.downloading) {
 		setUserTorrentsList((prev) => {
@@ -143,7 +151,7 @@ export async function handleShowInfoForRD(
 		Modal.close();
 	};
 
-	showInfoForRD(
+	void showInfoForRD(
 		window.localStorage.getItem('settings:player') || defaultPlayer,
 		rdKey,
 		info,
