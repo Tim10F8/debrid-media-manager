@@ -10,7 +10,7 @@ export async function deleteFilteredTorrents(
 	const toDelete = torrentList.map(wrapDeleteFn);
 
 	if (toDelete.length === 0) {
-		toast('No torrents to delete', magnetToastOptions);
+		toast('No torrents to delete.', magnetToastOptions);
 		return;
 	}
 
@@ -34,17 +34,17 @@ export async function deleteFilteredTorrents(
 
 	// Update the progress toast to show final result
 	if (errors.length && results.length) {
-		toast.error(`Deleted ${results.length} torrents, failed ${errors.length}`, {
+		toast.error(`Deleted ${results.length}; ${errors.length} failed.`, {
 			id: progressToast,
 			...magnetToastOptions,
 		});
 	} else if (errors.length) {
-		toast.error(`Failed to delete ${errors.length} torrents`, {
+		toast.error(`Failed to delete ${errors.length} torrents.`, {
 			id: progressToast,
 			...magnetToastOptions,
 		});
 	} else if (results.length) {
-		toast.success(`Deleted ${results.length} torrents`, {
+		toast.success(`Deleted ${results.length} torrents.`, {
 			id: progressToast,
 			...magnetToastOptions,
 		});

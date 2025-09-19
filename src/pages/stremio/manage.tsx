@@ -74,7 +74,7 @@ function ManagePage() {
 				setGroupedLinks(grouped);
 			} catch (error) {
 				console.error(error);
-				toast.error('Failed to fetch casted links');
+				toast.error('Failed to fetch casted links.');
 			} finally {
 				setLoading(false);
 			}
@@ -136,10 +136,10 @@ function ManagePage() {
 				return newGrouped;
 			});
 
-			toast.success('Link deleted successfully');
+			toast.success('Link deleted from Stremio list.');
 		} catch (error) {
 			console.error(error);
-			toast.error('Failed to delete link');
+			toast.error('Failed to delete Stremio link.');
 		}
 	};
 
@@ -188,10 +188,10 @@ function ManagePage() {
 			});
 
 			setSelectedLinks(new Set());
-			toast.success('Selected links deleted successfully');
+			toast.success('Deleted selected Stremio links.');
 		} catch (error) {
 			console.error(error);
-			toast.error('Failed to delete selected links');
+			toast.error('Failed to delete selected Stremio links.');
 		}
 	};
 

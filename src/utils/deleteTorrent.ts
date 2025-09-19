@@ -13,7 +13,7 @@ export const handleDeleteRdTorrent = async (
 		console.log('[rdDelete] request', { id, disableToast });
 		await deleteRdTorrent(rdKey, id.substring(3));
 		console.log('[rdDelete] success', { id });
-		if (!disableToast) toast(`Torrent deleted (${id})`, magnetToastOptions);
+		if (!disableToast) toast(`Deleted ${id} from RD.`, magnetToastOptions);
 	} catch (error) {
 		console.error('[rdDelete] failed', {
 			id,
@@ -23,7 +23,7 @@ export const handleDeleteRdTorrent = async (
 			'Error deleting RD torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error(`Error deleting torrent in RD (${id})`);
+		toast.error(`Failed to delete ${id} in RD.`);
 	}
 };
 
@@ -34,13 +34,13 @@ export const handleDeleteAdTorrent = async (
 ) => {
 	try {
 		await deleteAdTorrent(adKey, id.substring(3));
-		if (!disableToast) toast(`Torrent deleted (${id})`, magnetToastOptions);
+		if (!disableToast) toast(`Deleted ${id} from AD.`, magnetToastOptions);
 	} catch (error) {
 		console.error(
 			'Error deleting AD torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error(`Error deleting torrent in AD (${id})`);
+		toast.error(`Failed to delete ${id} in AD.`);
 	}
 };
 
@@ -51,12 +51,12 @@ export const handleDeleteTbTorrent = async (
 ) => {
 	try {
 		await deleteTbTorrent(tbKey, parseInt(id.substring(3)));
-		if (!disableToast) toast(`Torrent deleted (${id})`, magnetToastOptions);
+		if (!disableToast) toast(`Deleted ${id} from TorBox.`, magnetToastOptions);
 	} catch (error) {
 		console.error(
 			'Error deleting TB torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error(`Error deleting torrent in TB (${id})`);
+		toast.error(`Failed to delete ${id} in TorBox.`);
 	}
 };

@@ -28,14 +28,14 @@ export const handleAddAsMagnetInRd = async (
 		await handleSelectFilesInRd(rdKey, `rd:${id}`);
 		const response = await getTorrentInfo(rdKey, id);
 		if (response.status === 'downloaded') {
-			toast.success('Successfully added torrent!', magnetToastOptions);
+			toast.success('Torrent added.', magnetToastOptions);
 		} else {
-			toast.error(`Torrent added but status is ${response.status}`, magnetToastOptions);
+			toast.error(`Torrent added with status ${response.status}.`, magnetToastOptions);
 		}
 		if (callback) await callback(response);
 	} catch (error: unknown) {
 		if (error instanceof AxiosError && error.response?.status === 509) {
-			toast.error('Your RD download slots are full. Retrying in 5 seconds...', {
+			toast.error('RD slots full. Retrying in 5s...', {
 				...magnetToastOptions,
 				duration: 5000,
 			});
@@ -43,7 +43,7 @@ export const handleAddAsMagnetInRd = async (
 			await handleAddAsMagnetInRd(rdKey, hash, callback);
 			return;
 		} else if (error instanceof AxiosError && error.response?.status === 503) {
-			toast.error('Cannot add torrent. Infringing files are blocked by RD.', {
+			toast.error('RD blocked infringing files; cannot add.', {
 				...magnetToastOptions,
 			});
 			return;
@@ -52,7 +52,7 @@ export const handleAddAsMagnetInRd = async (
 			'Error adding hash:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error('There was an error adding hash', magnetToastOptions);
+		toast.error('Failed to add hash.', magnetToastOptions);
 	}
 };
 
@@ -66,14 +66,14 @@ export const handleAddTorrentFileInRd = async (
 		await handleSelectFilesInRd(rdKey, `rd:${id}`);
 		const response = await getTorrentInfo(rdKey, id);
 		if (response.status === 'downloaded') {
-			toast.success('Successfully added torrent file!', magnetToastOptions);
+			toast.success('Torrent file added.', magnetToastOptions);
 		} else {
-			toast.error(`Torrent file added but status is ${response.status}`, magnetToastOptions);
+			toast.error(`Torrent file added with status ${response.status}.`, magnetToastOptions);
 		}
 		if (callback) await callback(response);
 	} catch (error: unknown) {
 		if (error instanceof AxiosError && error.response?.status === 509) {
-			toast.error('Your RD download slots are full. Retrying in 5 seconds...', {
+			toast.error('RD slots full. Retrying in 5s...', {
 				...magnetToastOptions,
 				duration: 5000,
 			});
@@ -81,7 +81,7 @@ export const handleAddTorrentFileInRd = async (
 			await handleAddTorrentFileInRd(rdKey, file, callback);
 			return;
 		} else if (error instanceof AxiosError && error.response?.status === 503) {
-			toast.error('Cannot add torrent. Infringing files are blocked by RD.', {
+			toast.error('RD blocked infringing files; cannot add.', {
 				...magnetToastOptions,
 			});
 			return;
@@ -90,7 +90,7 @@ export const handleAddTorrentFileInRd = async (
 			'Error adding torrent file:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error('There was an error adding torrent file', magnetToastOptions);
+		toast.error('Failed to add torrent file.', magnetToastOptions);
 	}
 };
 
@@ -110,11 +110,11 @@ export const handleAddMultipleTorrentFilesInRd = async (
 				'Error adding torrent file:',
 				error instanceof Error ? error.message : 'Unknown error'
 			);
-			toast.error('There was an error adding torrent file');
+			toast.error('Failed to add torrent file.');
 		}
 	}
 	if (callback) await callback();
-	toast(`Successfully added ${files.length - errorCount} torrent files!`, magnetToastOptions);
+	toast(`Added ${files.length - errorCount} torrent files.`, magnetToastOptions);
 };
 
 export const handleAddMultipleHashesInRd = async (
@@ -133,11 +133,11 @@ export const handleAddMultipleHashesInRd = async (
 				'Error adding hash:',
 				error instanceof Error ? error.message : 'Unknown error'
 			);
-			toast.error('There was an error adding hash');
+			toast.error('Failed to add hash.');
 		}
 	}
 	if (callback) await callback();
-	toast(`Successfully added ${hashes.length - errorCount} hashes!`, magnetToastOptions);
+	toast(`Added ${hashes.length - errorCount} hashes.`, magnetToastOptions);
 };
 
 export const handleSelectFilesInRd = async (rdKey: string, id: string, bare: boolean = false) => {
@@ -155,7 +155,7 @@ export const handleSelectFilesInRd = async (rdKey: string, id: string, bare: boo
 	} catch (error) {
 		if (error instanceof Error && error.message !== 'no_files_for_selection') {
 			// Pass a second string argument to align with test expectations while keeping TS happy
-			toast.error(`Error selecting files (${id}) - ${error}`, 'select-files' as any);
+			toast.error(`File selection failed (${id}) - ${error}`, 'select-files' as any);
 		}
 	}
 };
@@ -208,7 +208,7 @@ export const handleReinsertTorrentinRd = async (
 			const response = await getTorrentInfo(rdKey, newId);
 			if (response.progress != 100) {
 				toast.success(
-					`Torrent reinserted (${newId}) but not yet ready`,
+					`Torrent reinserted (${newId}) but still processing.`,
 					magnetToastOptions
 				);
 				return `rd:${newId}`;
@@ -219,7 +219,7 @@ export const handleReinsertTorrentinRd = async (
 		}
 		await handleDeleteRdTorrent(rdKey, oldId, true);
 		console.log('[rdReinsert] old torrent removed', { oldId, newId: `rd:${newId}` });
-		toast.success(`Torrent reinserted (${oldId}👉${newId})`, magnetToastOptions);
+		toast.success(`Torrent reinserted (${oldId} -> ${newId}).`, magnetToastOptions);
 		return `rd:${newId}`;
 	} catch (error: any) {
 		console.error('[rdReinsert] failed', {
@@ -227,7 +227,7 @@ export const handleReinsertTorrentinRd = async (
 			error: error?.message || error,
 		});
 		toast.error(
-			`Error reinserting torrent (${oldId}) ${error.response?.data?.error || error.message}`,
+			`Failed to reinsert torrent (${oldId}) ${error.response?.data?.error || error.message}`,
 			magnetToastOptions
 		);
 		throw error;
@@ -246,9 +246,9 @@ export const handleAddAsMagnetInAd = async (
 		const resp = await uploadMagnet(adKey, [magnetUri]);
 		if (resp.magnets.length === 0 || resp.magnets[0].error) throw new Error('no_magnets');
 		if (callback) await callback();
-		toast('Successfully added hash!', magnetToastOptions);
+		toast('Hash added.', magnetToastOptions);
 	} catch (error) {
-		toast.error('There was an error adding hash. Please try again.');
+		toast.error('Failed to add hash. Try again.');
 		throw error;
 	}
 };
@@ -262,26 +262,26 @@ export const handleAddMultipleHashesInAd = async (
 		const resp = await uploadMagnet(adKey, hashes);
 		if (resp.magnets.length === 0 || resp.magnets[0].error) throw new Error('no_magnets');
 		if (callback) await callback();
-		toast(`Successfully added ${resp.magnets.length} hashes!`, magnetToastOptions);
+		toast(`Added ${resp.magnets.length} hashes.`, magnetToastOptions);
 	} catch (error) {
 		console.error(
 			'Error adding hash:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error('There was an error adding hash. Please try again.');
+		toast.error('Failed to add hash. Try again.');
 	}
 };
 
 export const handleRestartTorrent = async (adKey: string, id: string) => {
 	try {
 		await restartMagnet(adKey, id.substring(3));
-		toast.success(`Torrent restarted (${id})`, magnetToastOptions);
+		toast.success(`Torrent restarted (${id}).`, magnetToastOptions);
 	} catch (error) {
 		console.error(
 			'Error restarting torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error(`Error restarting torrent (${id})`, magnetToastOptions);
+		toast.error(`Failed to restart torrent (${id}).`, magnetToastOptions);
 		throw error;
 	}
 };
@@ -292,13 +292,13 @@ export const handleRestartTbTorrent = async (tbKey: string, id: string) => {
 			torrent_id: parseInt(id.substring(3)),
 			operation: 'reannounce',
 		});
-		toast.success(`Torrent reannounced (${id})`, magnetToastOptions);
+		toast.success(`Torrent reannounced (${id}).`, magnetToastOptions);
 	} catch (error) {
 		console.error(
 			'Error reannouncing TB torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error(`Error reannouncing torrent (${id})`, magnetToastOptions);
+		toast.error(`Failed to reannounce torrent (${id}).`, magnetToastOptions);
 		throw error;
 	}
 };
@@ -319,16 +319,16 @@ export const handleAddAsMagnetInTb = async (
 			const info = torrentInfo.data as TorBoxTorrentInfo;
 			const userTorrent = convertToTbUserTorrent(info);
 			if (callback) await callback(userTorrent);
-			toast.success('Successfully added torrent!', magnetToastOptions);
+			toast.success('Torrent added.', magnetToastOptions);
 		} else {
-			toast.error('Torrent added but no ID returned', magnetToastOptions);
+			toast.error('Torrent added without an ID.', magnetToastOptions);
 		}
 	} catch (error: any) {
 		console.error(
 			'Error adding torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error('Error adding torrent', magnetToastOptions);
+		toast.error('Failed to add torrent.', magnetToastOptions);
 		throw error;
 	}
 };
@@ -348,14 +348,14 @@ export const handleAddMultipleHashesInTb = async (
 				'Error adding hash in TB:',
 				error instanceof Error ? error.message : 'Unknown error'
 			);
-			toast.error('There was an error adding hash');
+			toast.error('Failed to add hash.');
 		}
 	}
 	if (callback) await callback();
 	toast(
-		`Successfully added ${hashes.length - errorCount} ${
+		`Added ${hashes.length - errorCount} ${
 			hashes.length - errorCount === 1 ? 'hash' : 'hashes'
-		} to TorBox!`,
+		} to TorBox.`,
 		magnetToastOptions
 	);
 };
@@ -390,12 +390,12 @@ export const handleAddMultipleTorrentFilesInTb = async (
 				'Error adding torrent file in TB:',
 				error instanceof Error ? error.message : 'Unknown error'
 			);
-			toast.error('There was an error adding torrent file');
+			toast.error('Failed to add torrent file.');
 		}
 	}
 	if (callback) await callback();
 	toast(
-		`Successfully added ${success} torrent file${success === 1 ? '' : 's'} to TorBox!` +
+		`Added ${success} torrent file${success === 1 ? '' : 's'} to TorBox` +
 			(errors ? ` (${errors} failed)` : ''),
 		magnetToastOptions
 	);

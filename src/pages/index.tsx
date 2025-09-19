@@ -66,20 +66,16 @@ function IndexPage() {
 
 	useEffect(() => {
 		if (rdError) {
-			toast.error(
-				'Real-Debrid get user info failed, try clearing DMM site data and login again'
-			);
+			toast.error('RD load failed. Clear site data and sign in again.');
 		}
 		if (adError) {
-			toast.error(
-				'AllDebrid get user info failed, check your email and confirm the login coming from DMM'
-			);
+			toast.error('AllDebrid fetch failed. Confirm your DMM login email.');
 		}
 		if (tbError) {
-			toast.error('Torbox get user info failed, please check your API key');
+			toast.error('Torbox profile failed. Verify the API key in Settings.');
 		}
 		if (traktError) {
-			toast.error('Trakt get user info failed');
+			toast.error('Trakt profile fetch failed.');
 		}
 		if (localStorage.getItem('next_action') === 'clear_cache') {
 			localStorage.removeItem('next_action');
@@ -88,13 +84,10 @@ function IndexPage() {
 				window.location.assign('/');
 			};
 			request.onerror = function () {
-				toast.error('Database deletion failed', genericToastOptions);
+				toast.error('Failed to delete local cache.', genericToastOptions);
 			};
 			request.onblocked = function () {
-				toast(
-					'Database is still open, refresh the page first and then try deleting again',
-					genericToastOptions
-				);
+				toast('Local DB still open. Refresh and retry.', genericToastOptions);
 			};
 		}
 	}, [rdError, adError, tbError, traktError]);

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as combined from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats, RealDebridOperation } from '@/lib/observability/rdOperationalStats';
 import type { WorkingStreamMetrics } from '@/lib/observability/streamServersHealth';
-import handler from './real-debrid';
+import { getServerSideProps } from '@/pages/is-real-debrid-down-or-just-me';
 
 const operations: RealDebridOperation[] = [
 	'GET /user',
@@ -32,56 +32,56 @@ function buildEmptyByOperation(): Record<RealDebridOperation, OperationStats> {
 	);
 }
 
-describe('Real-Debrid observability API caching', () => {
+describe('Real-Debrid status page caching', () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 	});
 
-	it('emits cache-busting headers on success', async () => {
+	it('marks the SSR response as non-cacheable', async () => {
 		const fakeWorkingStream: WorkingStreamMetrics = {
-			total: 1,
-			working: 1,
-			rate: 1,
-			lastChecked: Date.now(),
+			total: 0,
+			working: 0,
+			rate: 0,
+			lastChecked: null,
 			statuses: [],
 			lastError: null,
 			inProgress: false,
 		};
 		const fakeStats: ReturnType<typeof combined.getRealDebridObservabilityStats> = {
-			totalTracked: 1,
-			successCount: 1,
+			totalTracked: 0,
+			successCount: 0,
 			failureCount: 0,
-			considered: 1,
-			successRate: 1,
-			lastTs: Date.now(),
+			considered: 0,
+			successRate: 0,
+			lastTs: null,
 			isDown: false,
 			monitoredOperations: [],
 			byOperation: buildEmptyByOperation(),
-			windowSize: 10,
+			windowSize: 0,
 			workingStream: fakeWorkingStream,
 		};
 		vi.spyOn(combined, 'getRealDebridObservabilityStats').mockReturnValue(fakeStats);
+		const setHeader = vi.fn();
+		const result = await getServerSideProps({
+			req: {} as any,
+			res: { setHeader } as any,
+			params: {},
+			query: {},
+			resolvedUrl: '/is-real-debrid-down-or-just-me',
+			locales: undefined,
+			locale: undefined,
+			defaultLocale: undefined,
+		} as any);
 
-		const headerStore: Record<string, string> = {};
-		const res = {
-			setHeader: vi.fn((name: string, value: string) => {
-				headerStore[name] = value;
-			}),
-			status: vi.fn(),
-			json: vi.fn(),
-		} as any;
-		res.status.mockReturnValue(res);
-		res.json.mockReturnValue(res);
-
-		await handler({ method: 'GET' } as any, res);
-
-		expect(headerStore['Cache-Control']).toBe('private, no-store, no-cache, must-revalidate');
-		expect(headerStore['CDN-Cache-Control']).toBe('no-store');
-		expect(headerStore['Vercel-CDN-Cache-Control']).toBe('no-store');
-		expect(headerStore['Pragma']).toBe('no-cache');
-		expect(headerStore['Expires']).toBe('0');
-		expect(res.status).toHaveBeenCalledWith(200);
-		expect(res.json).toHaveBeenCalledWith(fakeStats);
+		expect(setHeader).toHaveBeenCalledWith(
+			'Cache-Control',
+			'private, no-store, no-cache, must-revalidate'
+		);
+		expect(setHeader).toHaveBeenCalledWith('CDN-Cache-Control', 'no-store');
+		expect(setHeader).toHaveBeenCalledWith('Vercel-CDN-Cache-Control', 'no-store');
+		expect(setHeader).toHaveBeenCalledWith('Pragma', 'no-cache');
+		expect(setHeader).toHaveBeenCalledWith('Expires', '0');
+		expect(result).toEqual({ props: { stats: fakeStats } });
 		expect(fakeStats.workingStream.inProgress).toBe(false);
 	});
 });

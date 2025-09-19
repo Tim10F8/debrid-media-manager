@@ -338,8 +338,8 @@ export const wrapLoading = async function (debrid: string, checkAvailability: Pr
 		checkAvailability,
 		{
 			loading: `Checking ${debrid} availability...`,
-			success: (num) => `Found ${num} available torrents in ${debrid}`,
-			error: `There was an error checking availability in ${debrid}. Please try again.`,
+			success: (num) => `Found ${num} torrents in ${debrid}.`,
+			error: `Failed to check ${debrid} availability.`,
 		},
 		searchToastOptions
 	);

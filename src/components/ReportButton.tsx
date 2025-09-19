@@ -21,10 +21,10 @@ export default function ReportButton({ hash, imdbId, userId, isShow }: ReportBut
 				userId,
 				type,
 			});
-			toast.success('Content reported successfully');
+			toast.success('Report submitted.');
 		} catch (error) {
 			console.error('Report error:', error);
-			toast.error('Failed to report content');
+			toast.error('Report submission failed.');
 		} finally {
 			setShowDialog(false);
 		}

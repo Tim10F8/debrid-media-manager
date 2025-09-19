@@ -68,10 +68,7 @@ describe('addMagnet utilities', () => {
 			expect(addHashAsMagnet).toHaveBeenCalledWith(rdKey, hash);
 			expect(getTorrentInfo).toHaveBeenCalledWith(rdKey, mockId, false);
 			expect(callback).toHaveBeenCalledWith(mockTorrentInfo);
-			expect(toast.success).toHaveBeenCalledWith(
-				'Successfully added torrent!',
-				expect.any(Object)
-			);
+			expect(toast.success).toHaveBeenCalledWith('Torrent added.', expect.any(Object));
 		});
 
 		it('should handle 509 error and retry after delay', async () => {
@@ -94,7 +91,7 @@ describe('addMagnet utilities', () => {
 			await handleAddAsMagnetInRd(rdKey, hash, callback);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'Your RD download slots are full. Retrying in 5 seconds...',
+				'RD slots full. Retrying in 5s...',
 				expect.objectContaining({ duration: 5000 })
 			);
 			expect(addHashAsMagnet).toHaveBeenCalledTimes(2);
@@ -109,7 +106,7 @@ describe('addMagnet utilities', () => {
 			await handleAddAsMagnetInRd(rdKey, hash);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'Cannot add torrent. Infringing files are blocked by RD.',
+				'RD blocked infringing files; cannot add.',
 				expect.any(Object)
 			);
 		});
@@ -120,10 +117,7 @@ describe('addMagnet utilities', () => {
 
 			await handleAddAsMagnetInRd(rdKey, hash);
 
-			expect(toast.error).toHaveBeenCalledWith(
-				'There was an error adding hash',
-				expect.any(Object)
-			);
+			expect(toast.error).toHaveBeenCalledWith('Failed to add hash.', expect.any(Object));
 		});
 
 		it('should show error when status is not downloaded', async () => {
@@ -140,7 +134,7 @@ describe('addMagnet utilities', () => {
 			await handleAddAsMagnetInRd(rdKey, hash);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'Torrent added but status is downloading',
+				'Torrent added with status downloading.',
 				expect.any(Object)
 			);
 		});
@@ -170,10 +164,7 @@ describe('addMagnet utilities', () => {
 			expect(addTorrentFile).toHaveBeenCalledWith(rdKey, file);
 			expect(getTorrentInfo).toHaveBeenCalledWith(rdKey, mockId, false);
 			expect(callback).toHaveBeenCalledWith(mockTorrentInfo);
-			expect(toast.success).toHaveBeenCalledWith(
-				'Successfully added torrent file!',
-				expect.any(Object)
-			);
+			expect(toast.success).toHaveBeenCalledWith('Torrent file added.', expect.any(Object));
 		});
 
 		it('should handle 509 error and retry', async () => {
@@ -195,7 +186,7 @@ describe('addMagnet utilities', () => {
 			await handleAddTorrentFileInRd(rdKey, file);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'Your RD download slots are full. Retrying in 5 seconds...',
+				'RD slots full. Retrying in 5s...',
 				expect.objectContaining({ duration: 5000 })
 			);
 			expect(addTorrentFile).toHaveBeenCalledTimes(2);
@@ -210,7 +201,7 @@ describe('addMagnet utilities', () => {
 			await handleAddTorrentFileInRd(rdKey, file);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'Cannot add torrent. Infringing files are blocked by RD.',
+				'RD blocked infringing files; cannot add.',
 				expect.any(Object)
 			);
 		});
@@ -240,10 +231,7 @@ describe('addMagnet utilities', () => {
 
 			expect(addTorrentFile).toHaveBeenCalledTimes(3);
 			expect(callback).toHaveBeenCalled();
-			expect(toast).toHaveBeenCalledWith(
-				'Successfully added 3 torrent files!',
-				expect.any(Object)
-			);
+			expect(toast).toHaveBeenCalledWith('Added 3 torrent files.', expect.any(Object));
 		});
 
 		it('should handle partial failures', async () => {
@@ -260,11 +248,8 @@ describe('addMagnet utilities', () => {
 			await handleAddMultipleTorrentFilesInRd(rdKey, files);
 
 			expect(addTorrentFile).toHaveBeenCalledTimes(3);
-			expect(toast.error).toHaveBeenCalledWith('There was an error adding torrent file');
-			expect(toast).toHaveBeenCalledWith(
-				'Successfully added 2 torrent files!',
-				expect.any(Object)
-			);
+			expect(toast.error).toHaveBeenCalledWith('Failed to add torrent file.');
+			expect(toast).toHaveBeenCalledWith('Added 2 torrent files.', expect.any(Object));
 		});
 	});
 
@@ -288,7 +273,7 @@ describe('addMagnet utilities', () => {
 
 			expect(addHashAsMagnet).toHaveBeenCalledTimes(3);
 			expect(callback).toHaveBeenCalled();
-			expect(toast).toHaveBeenCalledWith('Successfully added 3 hashes!', expect.any(Object));
+			expect(toast).toHaveBeenCalledWith('Added 3 hashes.', expect.any(Object));
 		});
 
 		it('should handle partial failures', async () => {
@@ -305,8 +290,8 @@ describe('addMagnet utilities', () => {
 			await handleAddMultipleHashesInRd(rdKey, hashes);
 
 			expect(addHashAsMagnet).toHaveBeenCalledTimes(3);
-			expect(toast.error).toHaveBeenCalledWith('There was an error adding hash');
-			expect(toast).toHaveBeenCalledWith('Successfully added 2 hashes!', expect.any(Object));
+			expect(toast.error).toHaveBeenCalledWith('Failed to add hash.');
+			expect(toast).toHaveBeenCalledWith('Added 2 hashes.', expect.any(Object));
 		});
 	});
 
@@ -368,8 +353,8 @@ describe('addMagnet utilities', () => {
 			await handleSelectFilesInRd(rdKey, torrentId);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				expect.stringContaining('Error selecting files'),
-				expect.any(String)
+				expect.stringContaining('File selection failed'),
+				'select-files'
 			);
 		});
 
@@ -438,7 +423,7 @@ describe('addMagnet utilities', () => {
 			expect(selectFiles).toHaveBeenCalledWith(rdKey, 'new456', ['1', '3']);
 			expect(handleDeleteRdTorrent).toHaveBeenCalledWith(rdKey, 'rd:old123', true);
 			expect(toast.success).toHaveBeenCalledWith(
-				'Torrent reinserted (rd:old123👉new456)',
+				'Torrent reinserted (rd:old123 -> new456).',
 				expect.any(Object)
 			);
 		});
@@ -479,7 +464,7 @@ describe('addMagnet utilities', () => {
 
 			expect(handleDeleteRdTorrent).not.toHaveBeenCalled();
 			expect(toast.success).toHaveBeenCalledWith(
-				'Torrent reinserted (new111) but not yet ready',
+				'Torrent reinserted (new111) but still processing.',
 				expect.any(Object)
 			);
 		});
@@ -514,7 +499,7 @@ describe('addMagnet utilities', () => {
 			);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				expect.stringContaining('Error reinserting torrent'),
+				expect.stringContaining('Failed to reinsert torrent'),
 				expect.any(Object)
 			);
 		});
@@ -534,7 +519,7 @@ describe('addMagnet utilities', () => {
 
 			expect(uploadMagnet).toHaveBeenCalledWith(adKey, [`magnet:?xt=urn:btih:${hash}`]);
 			expect(callback).toHaveBeenCalled();
-			expect(toast).toHaveBeenCalledWith('Successfully added hash!', expect.any(Object));
+			expect(toast).toHaveBeenCalledWith('Hash added.', expect.any(Object));
 		});
 
 		it('should handle empty magnets response', async () => {
@@ -543,9 +528,7 @@ describe('addMagnet utilities', () => {
 			} as any);
 
 			await expect(handleAddAsMagnetInAd(adKey, hash)).rejects.toThrow('no_magnets');
-			expect(toast.error).toHaveBeenCalledWith(
-				'There was an error adding hash. Please try again.'
-			);
+			expect(toast.error).toHaveBeenCalledWith('Failed to add hash. Try again.');
 		});
 
 		it('should handle magnet with error', async () => {
@@ -554,9 +537,7 @@ describe('addMagnet utilities', () => {
 			} as any);
 
 			await expect(handleAddAsMagnetInAd(adKey, hash)).rejects.toThrow('no_magnets');
-			expect(toast.error).toHaveBeenCalledWith(
-				'There was an error adding hash. Please try again.'
-			);
+			expect(toast.error).toHaveBeenCalledWith('Failed to add hash. Try again.');
 		});
 	});
 
@@ -578,7 +559,7 @@ describe('addMagnet utilities', () => {
 
 			expect(uploadMagnet).toHaveBeenCalledWith(adKey, hashes);
 			expect(callback).toHaveBeenCalled();
-			expect(toast).toHaveBeenCalledWith('Successfully added 3 hashes!', expect.any(Object));
+			expect(toast).toHaveBeenCalledWith('Added 3 hashes.', expect.any(Object));
 		});
 
 		it('should handle errors gracefully', async () => {
@@ -586,9 +567,7 @@ describe('addMagnet utilities', () => {
 
 			await handleAddMultipleHashesInAd(adKey, hashes);
 
-			expect(toast.error).toHaveBeenCalledWith(
-				'There was an error adding hash. Please try again.'
-			);
+			expect(toast.error).toHaveBeenCalledWith('Failed to add hash. Try again.');
 		});
 	});
 
@@ -603,7 +582,7 @@ describe('addMagnet utilities', () => {
 
 			expect(restartMagnet).toHaveBeenCalledWith(adKey, '123');
 			expect(toast.success).toHaveBeenCalledWith(
-				'Torrent restarted (ad:123)',
+				'Torrent restarted (ad:123).',
 				expect.any(Object)
 			);
 		});
@@ -615,7 +594,7 @@ describe('addMagnet utilities', () => {
 			await expect(handleRestartTorrent(adKey, torrentId)).rejects.toThrow(error);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'Error restarting torrent (ad:123)',
+				'Failed to restart torrent (ad:123).',
 				expect.any(Object)
 			);
 		});
@@ -672,10 +651,7 @@ describe('addMagnet utilities', () => {
 			});
 			expect(getTorrentList).toHaveBeenCalledWith(tbKey, { id: 123 });
 			expect(callback).toHaveBeenCalledWith(mockUserTorrent);
-			expect(toast.success).toHaveBeenCalledWith(
-				'Successfully added torrent!',
-				expect.any(Object)
-			);
+			expect(toast.success).toHaveBeenCalledWith('Torrent added.', expect.any(Object));
 		});
 
 		it('should handle queued torrents', async () => {
@@ -705,10 +681,7 @@ describe('addMagnet utilities', () => {
 			expect(createTorrent).toHaveBeenCalledWith(tbKey, {
 				magnet: `magnet:?xt=urn:btih:${hash}`,
 			});
-			expect(toast.success).toHaveBeenCalledWith(
-				'Successfully added torrent!',
-				expect.any(Object)
-			);
+			expect(toast.success).toHaveBeenCalledWith('Torrent added.', expect.any(Object));
 		});
 
 		it('should handle no ID returned', async () => {
@@ -719,7 +692,7 @@ describe('addMagnet utilities', () => {
 			await handleAddAsMagnetInTb(tbKey, hash);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'Torrent added but no ID returned',
+				'Torrent added without an ID.',
 				expect.any(Object)
 			);
 		});
@@ -730,7 +703,7 @@ describe('addMagnet utilities', () => {
 
 			await expect(handleAddAsMagnetInTb(tbKey, hash)).rejects.toThrow(error);
 
-			expect(toast.error).toHaveBeenCalledWith('Error adding torrent', expect.any(Object));
+			expect(toast.error).toHaveBeenCalledWith('Failed to add torrent.', expect.any(Object));
 		});
 	});
 });

@@ -5,13 +5,10 @@ import toast from 'react-hot-toast';
 import { libraryToastOptions } from './toastOptions';
 
 export async function generateHashList(title: string, filteredList: UserTorrent[]) {
-	toast(
-		'The hash list will return a 404 for the first 1-2 minutes, refresh the page and try again',
-		{
-			...libraryToastOptions,
-			duration: 60000,
-		}
-	);
+	toast('Hash list may 404 for 1-2 minutes—refresh if needed.', {
+		...libraryToastOptions,
+		duration: 60000,
+	});
 	try {
 		const torrents = filteredList.map((t) => ({
 			filename: t.filename,
@@ -29,7 +26,7 @@ export async function generateHashList(title: string, filteredList: UserTorrent[
 		);
 		window.open(shortUrl);
 	} catch (error) {
-		toast.error(`Error generating hash list, try again later`, libraryToastOptions);
+		toast.error('Failed to generate hash list; try again soon.', libraryToastOptions);
 		console.error(error);
 	}
 }

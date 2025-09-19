@@ -406,7 +406,7 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 
 			setStats((prev) => ({ ...prev, lastSync: syncCompletedAt }));
 
-			toast.success(`${service} library refreshed (${torrents.length} items)`);
+			toast.success(`${service} library refreshed (${torrents.length}).`);
 		} catch (error: any) {
 			const errorTime = Date.now() - startTime;
 			console.error(
@@ -450,7 +450,7 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		} else {
 			await cacheManager.clear();
 		}
-		toast.success('Cache cleared');
+		toast.success('Cache cleared.');
 	};
 
 	// Individual item operations

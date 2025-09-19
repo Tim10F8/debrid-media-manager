@@ -26,11 +26,11 @@ export function useAvailabilityCheck(
 		async (result: SearchResult) => {
 			if (result.rdAvailable || result.tbAvailable) {
 				const service = result.rdAvailable ? 'Real Debrid' : 'TorBox';
-				toast.success(`This torrent is already available in ${service}`);
+				toast.success(`Already cached in ${service}.`);
 				return;
 			}
 
-			const toastId = toast.loading('Checking availability...');
+			const toastId = toast.loading('Checking cached availability...');
 
 			try {
 				// Run checks in parallel for both RD and TorBox
@@ -154,7 +154,7 @@ export function useAvailabilityCheck(
 					console.error('Failed to get tracker stats:', trackerStatsResult.reason);
 				}
 
-				toast.success('Availability check complete', { id: toastId });
+				toast.success('Availability check done.', { id: toastId });
 
 				// Refetch data instead of reloading
 				if (isMounted.current) {
@@ -186,7 +186,7 @@ export function useAvailabilityCheck(
 					}
 				}, 1500);
 			} catch (error) {
-				toast.error('Failed to check availability', { id: toastId });
+				toast.error('Cached availability check failed.', { id: toastId });
 				console.error('Availability check error:', error);
 
 				// Reload the page after a short delay even on error
@@ -224,7 +224,7 @@ export function useAvailabilityCheck(
 
 			// Show initial toast immediately
 			if (nonAvailableResults.length === 0) {
-				toast.error('No torrents to test for availability');
+				toast.error('No torrents left to check.');
 				return;
 			}
 
@@ -238,7 +238,7 @@ export function useAvailabilityCheck(
 			if (availabilityCheckLimit > 0 && nonAvailableResults.length > availabilityCheckLimit) {
 				torrentsToCheck = nonAvailableResults.slice(0, availabilityCheckLimit);
 				toast(
-					`Checking first ${availabilityCheckLimit} torrents out of ${nonAvailableResults.length} (limit set in settings)`,
+					`Checking first ${availabilityCheckLimit} of ${nonAvailableResults.length} (per settings).`,
 					{ duration: 4000 }
 				);
 			}
@@ -507,16 +507,13 @@ export function useAvailabilityCheck(
 				const totalCount = rdCheckResults.length;
 				if (failed.length > 0) {
 					toast.error(
-						`Failed to test ${failed.length} out of ${totalCount} torrents. Successfully tested ${succeeded.length} (${availableCount} found).`,
+						`Failed to check ${failed.length}/${totalCount}; ${availableCount} available.`,
 						{ duration: 5000 }
 					);
 				} else {
-					toast.success(
-						`Successfully tested all ${totalCount} torrents (${availableCount} found)`,
-						{
-							duration: 3000,
-						}
-					);
+					toast.success(`Checked all ${totalCount}; ${availableCount} available.`, {
+						duration: 3000,
+					});
 				}
 
 				// Reload the page after a short delay to show the final result
@@ -530,7 +527,7 @@ export function useAvailabilityCheck(
 					toast.dismiss(progressToast);
 				}
 				if (isMounted.current) {
-					toast.error('Failed to complete availability test');
+					toast.error('Availability test failed.');
 				}
 				console.error('Availability test error:', error);
 

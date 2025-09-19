@@ -296,7 +296,7 @@ export const showInfoForRD = async (
 						const newId = await addHashAsMagnet(rdKey, info.hash);
 						await selectFiles(rdKey, newId, selectedIds);
 						await handleDeleteRdTorrent(rdKey, oldId, true);
-						toast.success('Selection saved and torrent reinserted', magnetToastOptions);
+						toast.success('Selection saved and reinserted.', magnetToastOptions);
 					}
 					logAction('save-selection completed (RD)', {
 						hash: info.hash,
@@ -311,7 +311,7 @@ export const showInfoForRD = async (
 						error: error instanceof Error ? error.message : String(error),
 					});
 					toast.error(
-						'Error saving selection: ' +
+						'Failed to save selection: ' +
 							(error instanceof Error ? error.message : String(error)),
 						magnetToastOptions
 					);
@@ -401,7 +401,7 @@ export const showInfoForRD = async (
 						const newId = await addHashAsMagnet(rdKey, info.hash);
 						await selectFiles(rdKey, newId, selectedIds);
 						await handleDeleteRdTorrent(rdKey, oldId, true);
-						toast.success('Selection saved and torrent reinserted', magnetToastOptions);
+						toast.success('Selection saved and reinserted.', magnetToastOptions);
 					}
 					logAction('reinsert completed (RD)', {
 						hash: info.hash,
@@ -417,7 +417,7 @@ export const showInfoForRD = async (
 						error: error?.message || error,
 					});
 					toast.error(
-						'Error saving selection: ' + (error?.message || error),
+						'Failed to save selection: ' + (error?.message || error),
 						magnetToastOptions
 					);
 				}
@@ -435,7 +435,7 @@ export const showInfoForRD = async (
 					linkCount: info.links.length,
 				});
 				if (!info.links?.length) {
-					toast.error('No links available to export', magnetToastOptions);
+					toast.error('No links to export.', magnetToastOptions);
 					return;
 				}
 				const toastId = toast.loading('Preparing download links...', magnetToastOptions);
@@ -450,7 +450,7 @@ export const showInfoForRD = async (
 						}
 					}
 					if (!lines.length) {
-						toast.error('Unable to fetch unrestricted links', magnetToastOptions);
+						toast.error('Failed to fetch unrestricted links.', magnetToastOptions);
 						return;
 					}
 					const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
@@ -459,7 +459,7 @@ export const showInfoForRD = async (
 					a.download = `${info.original_filename}.txt`;
 					a.click();
 					URL.revokeObjectURL(a.href);
-					toast.success('Links exported', magnetToastOptions);
+					toast.success('Download links exported.', magnetToastOptions);
 					logAction('export-links completed (RD)', {
 						hash: info.hash,
 						linesCount: lines.length,
@@ -470,7 +470,7 @@ export const showInfoForRD = async (
 						hash: info.hash,
 						error: e instanceof Error ? e.message : String(e),
 					});
-					toast.error('Failed to export links', magnetToastOptions);
+					toast.error('Failed to export download links.', magnetToastOptions);
 				} finally {
 					toast.dismiss(toastId);
 				}
@@ -488,7 +488,7 @@ export const showInfoForRD = async (
 					linkCount: info.links.length,
 				});
 				if (!info.links?.length) {
-					toast.error('No files available for STRM generation', magnetToastOptions);
+					toast.error('No links for STRM files.', magnetToastOptions);
 					return;
 				}
 				const toastId = toast.loading('Generating STRM files...', magnetToastOptions);
@@ -517,11 +517,11 @@ export const showInfoForRD = async (
 					}
 					if (generated) {
 						toast.success(
-							`Generated ${generated} STRM file${generated === 1 ? '' : 's'}`,
+							`Generated ${generated} STRM file${generated === 1 ? '' : 's'}.`,
 							magnetToastOptions
 						);
 					} else {
-						toast.error('Failed to generate STRM files', magnetToastOptions);
+						toast.error('Failed to generate STRM files.', magnetToastOptions);
 					}
 					logAction('generate-strm completed (RD)', {
 						hash: info.hash,
@@ -533,7 +533,7 @@ export const showInfoForRD = async (
 						hash: info.hash,
 						error: e instanceof Error ? e.message : String(e),
 					});
-					toast.error('Failed to generate STRM files', magnetToastOptions);
+					toast.error('Failed to generate STRM files.', magnetToastOptions);
 				} finally {
 					toast.dismiss(toastId);
 				}
@@ -713,7 +713,7 @@ export const showInfoForAD = async (
 					linkCount: info.links.length,
 				});
 				if (!info.links?.length) {
-					toast.error('No links available to export', magnetToastOptions);
+					toast.error('No links to export.', magnetToastOptions);
 					return;
 				}
 				try {
@@ -724,7 +724,7 @@ export const showInfoForAD = async (
 					a.download = `${info.filename}.txt`;
 					a.click();
 					URL.revokeObjectURL(a.href);
-					toast.success('Links exported', magnetToastOptions);
+					toast.success('Links exported.', magnetToastOptions);
 					logAction('export-links completed (AD)', {
 						hash: info.hash,
 						linesCount: info.links.length,
@@ -735,7 +735,7 @@ export const showInfoForAD = async (
 						hash: info.hash,
 						error: e instanceof Error ? e.message : String(e),
 					});
-					toast.error('Failed to export links', magnetToastOptions);
+					toast.error('Failed to export links.', magnetToastOptions);
 				}
 			});
 
@@ -751,7 +751,7 @@ export const showInfoForAD = async (
 					linkCount: info.links.length,
 				});
 				if (!info.links?.length) {
-					toast.error('No files available for STRM generation', magnetToastOptions);
+					toast.error('No files for STRM generation.', magnetToastOptions);
 					return;
 				}
 				let generated = 0;
@@ -767,7 +767,7 @@ export const showInfoForAD = async (
 						generated += 1;
 					}
 					toast.success(
-						`Generated ${generated} STRM file${generated === 1 ? '' : 's'}`,
+						`Generated ${generated} STRM file${generated === 1 ? '' : 's'}.`,
 						magnetToastOptions
 					);
 					logAction('generate-strm completed (AD)', {
@@ -780,7 +780,7 @@ export const showInfoForAD = async (
 						hash: info.hash,
 						error: e instanceof Error ? e.message : String(e),
 					});
-					toast.error('Failed to generate STRM files', magnetToastOptions);
+					toast.error('Failed to generate STRM files.', magnetToastOptions);
 				}
 			});
 		},

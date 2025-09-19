@@ -415,10 +415,7 @@ function TorrentsPage() {
 			.map((r) => r.id);
 		setUncachedAdIDs(uncachedIDs);
 		uncachedIDs.length &&
-			toast.success(
-				`Found ${uncachedIDs.length} uncached torrents in AllDebrid`,
-				searchToastOptions
-			);
+			toast.success(`${uncachedIDs.length} uncached AllDebrid torrents`, searchToastOptions);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [adKey, adSyncing]);
 
@@ -630,7 +627,7 @@ function TorrentsPage() {
 		const toReinsert = relevantList.map(wrapReinsertFn);
 
 		if (toReinsert.length === 0) {
-			toast('No torrents to reinsert', magnetToastOptions);
+			toast('No torrents to reinsert.', magnetToastOptions);
 			return;
 		}
 
@@ -654,19 +651,19 @@ function TorrentsPage() {
 
 		// Update the progress toast to show final result
 		if (errors.length && results.length) {
-			toast.error(`Reinserted ${results.length} torrents, failed ${errors.length}`, {
+			toast.error(`Reinserted ${results.length}; ${errors.length} failed.`, {
 				id: progressToast,
 				...magnetToastOptions,
 			});
 			resetSelection(setSelectedTorrents);
 			await refreshLibrary();
 		} else if (errors.length) {
-			toast.error(`Failed to reinsert ${errors.length} torrents`, {
+			toast.error(`Failed to reinsert ${errors.length} torrents.`, {
 				id: progressToast,
 				...magnetToastOptions,
 			});
 		} else if (results.length) {
-			toast.success(`Reinserted ${results.length} torrents`, {
+			toast.success(`Reinserted ${results.length} torrents.`, {
 				id: progressToast,
 				...magnetToastOptions,
 			});
@@ -767,7 +764,7 @@ function TorrentsPage() {
 
 					// Show error message to user
 					toast.error(
-						`Failed to delete torrent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+						`Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
 						libraryToastOptions
 					);
 
@@ -858,7 +855,7 @@ function TorrentsPage() {
 		const toDelete = dupes.map(wrapDeleteFn);
 
 		if (toDelete.length === 0) {
-			toast('No duplicate torrents found', libraryToastOptions);
+			toast('No duplicates found.', libraryToastOptions);
 			return;
 		}
 
@@ -882,17 +879,17 @@ function TorrentsPage() {
 
 		// Update the progress toast to show final result
 		if (errors.length && results.length) {
-			toast.error(`Deleted ${results.length} torrents, failed to delete ${errors.length}`, {
+			toast.error(`Deleted ${results.length}; ${errors.length} duplicates failed.`, {
 				id: progressToast,
 				...libraryToastOptions,
 			});
 		} else if (errors.length) {
-			toast.error(`Failed to delete ${errors.length} torrents`, {
+			toast.error(`Failed to delete ${errors.length} duplicates.`, {
 				id: progressToast,
 				...libraryToastOptions,
 			});
 		} else if (results.length) {
-			toast.success(`Deleted ${results.length} torrents`, {
+			toast.success(`Deleted ${results.length} duplicates.`, {
 				id: progressToast,
 				...libraryToastOptions,
 			});
@@ -955,7 +952,7 @@ function TorrentsPage() {
 		const toDelete = dupes.map(wrapDeleteFn);
 
 		if (toDelete.length === 0) {
-			toast('No duplicate torrents found', libraryToastOptions);
+			toast('No duplicates found.', libraryToastOptions);
 			return;
 		}
 
@@ -979,17 +976,17 @@ function TorrentsPage() {
 
 		// Update the progress toast to show final result
 		if (errors.length && results.length) {
-			toast.error(`Deleted ${results.length} torrents, failed to delete ${errors.length}`, {
+			toast.error(`Deleted ${results.length}; ${errors.length} duplicates failed.`, {
 				id: progressToast,
 				...libraryToastOptions,
 			});
 		} else if (errors.length) {
-			toast.error(`Failed to delete ${errors.length} torrents`, {
+			toast.error(`Failed to delete ${errors.length} duplicates.`, {
 				id: progressToast,
 				...libraryToastOptions,
 			});
 		} else if (results.length) {
-			toast.success(`Deleted ${results.length} torrents`, {
+			toast.success(`Deleted ${results.length} duplicates.`, {
 				id: progressToast,
 				...libraryToastOptions,
 			});
@@ -1049,7 +1046,7 @@ function TorrentsPage() {
 			}
 		});
 		if (toReinsertAndDelete.length === 0) {
-			toast('No torrents to merge', libraryToastOptions);
+			toast('No matching hashes to merge.', libraryToastOptions);
 			return;
 		}
 
@@ -1073,18 +1070,18 @@ function TorrentsPage() {
 
 		// Update the progress toast to show final result
 		if (errors.length && results.length) {
-			toast.error(`Merged ${results.length} torrents, failed ${errors.length} operations`, {
+			toast.error(`Merged ${results.length}; ${errors.length} hash merges failed.`, {
 				id: progressToast,
 				...libraryToastOptions,
 			});
 			await refreshLibrary();
 		} else if (errors.length) {
-			toast.error(`Failed to merge ${errors.length} torrents`, {
+			toast.error(`Failed to merge ${errors.length} hash operations.`, {
 				id: progressToast,
 				...libraryToastOptions,
 			});
 		} else if (results.length) {
-			toast.success(`Merged ${results.length} torrents`, {
+			toast.success(`Merged ${results.length} hash duplicates.`, {
 				id: progressToast,
 				...libraryToastOptions,
 			});
@@ -1147,7 +1144,7 @@ function TorrentsPage() {
 			: sortedData;
 		const backupType = backupChoice.isConfirmed ? 'full' : 'filtered';
 
-		toast('Generating a local backup file', libraryToastOptions);
+		toast('Creating local backup...', libraryToastOptions);
 		try {
 			const hashList = listToBackup.map((t) => ({
 				filename: t.filename,
@@ -1158,7 +1155,7 @@ function TorrentsPage() {
 			});
 			saveAs(blob, `backup-${backupType}-${Date.now()}.dmm.json`);
 		} catch (error) {
-			toast.error(`Error creating a backup file`, libraryToastOptions);
+			toast.error('Failed to create local backup.', libraryToastOptions);
 			console.error(error);
 		}
 	}
@@ -1188,7 +1185,7 @@ function TorrentsPage() {
 				const hasAnyData = allTablesData.some(({ torrents }) => torrents.length > 0);
 
 				if (!hasAnyData) {
-					toast('No data found in any table', libraryToastOptions);
+					toast('No torrents found to back up.', libraryToastOptions);
 					return;
 				}
 
@@ -1220,10 +1217,7 @@ function TorrentsPage() {
 				});
 
 				saveAs(blob, `backup-current-week-${Date.now()}.dmm.json`);
-				toast(
-					`Generated backup for current week (${allData.length} torrents)`,
-					libraryToastOptions
-				);
+				toast(`Current-week backup saved (${allData.length}).`, libraryToastOptions);
 				return;
 			}
 
@@ -1240,12 +1234,9 @@ function TorrentsPage() {
 			});
 
 			saveAs(blob, `backup-oldweek-${Date.now()}.dmm.json`);
-			toast(
-				`Generated backup for old week table (${backupData.length} torrents)`,
-				libraryToastOptions
-			);
+			toast(`Old-week backup saved (${backupData.length}).`, libraryToastOptions);
 		} catch (error) {
-			toast.error('Error creating backup from old week data', libraryToastOptions);
+			toast.error('Old-week backup failed.', libraryToastOptions);
 			console.error(error);
 		}
 	}
@@ -1265,11 +1256,11 @@ function TorrentsPage() {
 
 			const processingPromise = new Promise<{ success: number; error: number }>(
 				async (resolve) => {
-					toast.loading(`DO NOT REFRESH THE PAGE`, libraryToastOptions);
+					toast.loading('Restoring... do not refresh.', libraryToastOptions);
 					const notAddingCount = files.filter((f) => allHashes.has(f.hash)).length;
 					if (notAddingCount > 0)
 						toast.error(
-							`${notAddingCount} torrents are already in your library`,
+							`${notAddingCount} already in your library`,
 							libraryToastOptions
 						);
 
@@ -1341,13 +1332,13 @@ function TorrentsPage() {
 							toast.dismiss('availability-check');
 							if (availableHashes.length > 0) {
 								toast.success(
-									`Found ${availableHashes.length} cached torrents to restore first`,
+									`${availableHashes.length} cached torrents queued first.`,
 									libraryToastOptions
 								);
 							}
 							if (unavailableHashes.length > 0) {
 								toast(
-									`${unavailableHashes.length} torrents need to be downloaded`,
+									`${unavailableHashes.length} torrents must download before restore.`,
 									libraryToastOptions
 								);
 							}
@@ -1422,10 +1413,10 @@ function TorrentsPage() {
 			toast.promise(
 				processingPromise,
 				{
-					loading: `Restoring ${files.length} downloads in your library.`,
+					loading: `Restoring ${files.length} downloads...`,
 					success: ({ success, error }) => {
 						setTimeout(() => location.reload(), 10000);
-						return `Restored ${success} torrents but failed on ${error} others in your ${debridService.toUpperCase()} library. Refreshing the page in 10 seconds.`;
+						return `Restored ${success}; ${error} failed in ${debridService.toUpperCase()} library. Refreshing in 10s.`;
 					},
 					error: '',
 				},
@@ -1535,7 +1526,7 @@ function TorrentsPage() {
 					);
 					allHashes.push(...(fileHashes.filter((h) => h !== undefined) as string[]));
 				} catch (error) {
-					toast.error(`Failed to process torrent files: ${error}`);
+					toast.error(`Hash extraction failed: ${error}`);
 					return;
 				}
 			}

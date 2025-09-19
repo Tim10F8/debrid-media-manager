@@ -53,7 +53,7 @@ export default function RelatedMedia({ imdbId, mediaType }: RelatedMediaProps) {
 			setRelatedMedia(response.data);
 		} catch (error) {
 			console.error(`Failed to fetch related ${mediaType}s:`, error);
-			toast.error(`Failed to load related ${mediaType}s`);
+			toast.error(`Failed to load related ${mediaType}s.`);
 		}
 	};
 

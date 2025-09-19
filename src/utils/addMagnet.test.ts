@@ -164,7 +164,7 @@ describe('handleReinsertTorrentinRd', () => {
 			);
 
 			expect(mockToast.error).toHaveBeenCalledWith(
-				expect.stringContaining('Error reinserting torrent'),
+				expect.stringContaining('Failed to reinsert torrent'),
 				expect.any(Object)
 			);
 		});
@@ -237,7 +237,7 @@ describe('handleReinsertTorrentinRd', () => {
 
 			// Should show "not ready" message
 			expect(mockToast.success).toHaveBeenCalledWith(
-				expect.stringContaining('but not yet ready'),
+				expect.stringContaining('but still processing.'),
 				expect.any(Object)
 			);
 		});

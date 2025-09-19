@@ -9,13 +9,13 @@ export const handleCastMovie = async (imdbId: string, rdKey: string, hash: strin
 		const resp = await axios.get(
 			`/api/stremio/cast/movie/${imdbId}?token=${rdKey}&hash=${hash}`
 		);
-		toast(`Successfully casted movie ${resp.data.filename}`, castToastOptions);
+		toast(`Casted ${resp.data.filename} to Stremio.`, castToastOptions);
 	} catch (error) {
 		console.error(
 			'Error casting movie:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error('There was an error casting the movie');
+		toast.error('Failed to cast movie to Stremio.');
 	}
 };
 
@@ -34,24 +34,28 @@ export const handleCastTvShow = async (
 			const errorEpisodes = resp.data.errorEpisodes;
 			if (errorEpisodes.length) {
 				toast.error(
-					`Error casting ${errorEpisodes[0]}${
-						errorEpisodes.length > 1
-							? ` and ${errorEpisodes.length - 1} other episodes`
-							: ''
-					}`,
+					`Cast failed for ${errorEpisodes[0]}${
+						errorEpisodes.length > 1 ? ` and ${errorEpisodes.length - 1} more` : ''
+					}.`,
 					castToastOptions
 				);
 			} else {
-				toast.success(`Successfully casted ${batch.length} episodes`, castToastOptions);
+				toast.success(
+					`Casted ${batch.length} episode${batch.length === 1 ? '' : 's'} to Stremio.`,
+					castToastOptions
+				);
 			}
 		} catch (error) {
-			toast.error(`Error casting ${batch.length} episodes`, castToastOptions);
+			toast.error(
+				`Failed to cast ${batch.length} episode${batch.length === 1 ? '' : 's'}.`,
+				castToastOptions
+			);
 		}
 	});
 
 	const [results] = await runConcurrentFunctions(yetToCast, 4, 0);
 	if (results.length) {
-		toast.success(`Finished casting all episodes in TV series torrent`, castToastOptions);
+		toast.success(`Finished casting all episodes to Stremio.`, castToastOptions);
 	}
 };
 

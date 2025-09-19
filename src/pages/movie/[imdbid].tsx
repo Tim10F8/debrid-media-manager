@@ -506,9 +506,9 @@ const MovieSearch: FunctionComponent = () => {
 		// Show search results toast (only if this is not an availability-only update)
 		if (!isAvailabilityOnly) {
 			if (finalResults === 0) {
-				toast('No results found', searchToastOptions);
+				toast('No torrents found', searchToastOptions);
 			} else {
-				toast(`Found ${finalResults} unique results`, searchToastOptions);
+				toast(`${finalResults} unique torrents found`, searchToastOptions);
 			}
 		}
 
@@ -519,7 +519,7 @@ const MovieSearch: FunctionComponent = () => {
 			rdKey &&
 			totalAvailableCount > 0
 		) {
-			toast(`Found ${totalAvailableCount} available torrents in RD`, searchToastOptions);
+			toast(`${totalAvailableCount} RD torrents available`, searchToastOptions);
 		}
 
 		// Clear the info after handling
@@ -563,9 +563,9 @@ const MovieSearch: FunctionComponent = () => {
 		await toast.promise(
 			handleCastMovie(imdbid as string, rdKey!, hash),
 			{
-				loading: 'Casting...',
-				success: 'Casting successful',
-				error: 'Casting failed',
+				loading: 'Starting RD cast in Stremio...',
+				success: 'Cast started in Stremio',
+				error: 'RD cast failed in Stremio',
 			},
 			castToastOptions
 		);
@@ -614,9 +614,7 @@ const MovieSearch: FunctionComponent = () => {
 								onClick={() => {
 									const firstAvailable = getFirstAvailableRdTorrent()!;
 									if (`rd:${firstAvailable.hash}` in hashAndProgress) {
-										toast.success(
-											'This torrent is already in your Real-Debrid library'
-										);
+										toast.success('Already in your Real-Debrid library');
 										return;
 									}
 									addRd(firstAvailable.hash);

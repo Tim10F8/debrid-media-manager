@@ -34,7 +34,7 @@ export function useCastToken() {
 					// Migration endpoint removed; no action needed here
 				}
 			} catch (error) {
-				toast.error('failed to fetch DMM Cast token');
+				toast.error('Failed to fetch DMM Cast token.');
 			}
 		};
 

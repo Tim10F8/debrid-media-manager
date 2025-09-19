@@ -40,7 +40,7 @@ export const handleCopyOrDownloadMagnet = async (
 	if (shouldDownloadMagnets) {
 		console.log('[copyMagnet] downloading .magnet file');
 		downloadMagnetFile(hash);
-		toast.success('Magnet file downloaded', magnetToastOptions);
+		toast.success('Magnet file downloaded.', magnetToastOptions);
 		return;
 	}
 
@@ -52,24 +52,24 @@ export const handleCopyOrDownloadMagnet = async (
 		}
 		await navigator.clipboard.writeText(magnetLink);
 		console.log('[copyMagnet] copied via Clipboard API');
-		toast.success('Magnet link copied to clipboard', magnetToastOptions);
+		toast.success('Magnet link copied.', magnetToastOptions);
 		return;
 	} catch (error) {
 		console.warn('[copyMagnet] clipboard API failed, falling back', error);
 		const copied = copyWithFallback(magnetLink);
 		if (copied) {
 			console.log('[copyMagnet] copied via execCommand fallback');
-			toast.success('Magnet link copied to clipboard', magnetToastOptions);
+			toast.success('Magnet link copied.', magnetToastOptions);
 			return;
 		}
 		if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
 			window.prompt('Copy magnet link', magnetLink);
 			console.log('[copyMagnet] displayed manual copy prompt');
-			toast('Copy the magnet link shown in the prompt.', magnetToastOptions);
+			toast('Copy the link from the prompt.', magnetToastOptions);
 			return;
 		}
 	}
 
 	console.error('[copyMagnet] unable to copy magnet link');
-	toast.error('Unable to copy magnet link', magnetToastOptions);
+	toast.error('Failed to copy magnet link.', magnetToastOptions);
 };

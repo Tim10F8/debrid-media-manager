@@ -147,7 +147,7 @@ describe('fetchTorrents utilities', () => {
 
 			expect(callback).toHaveBeenCalledWith([]);
 			expect(toast.error).toHaveBeenCalledWith(
-				'Error fetching Real-Debrid torrents list',
+				'Failed to fetch Real-Debrid torrents.',
 				expect.any(Object)
 			);
 		});
@@ -395,7 +395,7 @@ describe('fetchTorrents utilities', () => {
 
 			expect(callback).toHaveBeenCalledWith([]);
 			expect(toast.error).toHaveBeenCalledWith(
-				'Error fetching AllDebrid torrents list',
+				'Failed to fetch AllDebrid torrents.',
 				expect.any(Object)
 			);
 		});
@@ -793,7 +793,7 @@ describe('fetchTorrents utilities', () => {
 			await fetchTorBox(tbKey, callback);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'Error fetching TorBox torrents list',
+				'Failed to fetch TorBox torrents.',
 				expect.any(Object)
 			);
 			expect(callback).toHaveBeenCalledWith([]);

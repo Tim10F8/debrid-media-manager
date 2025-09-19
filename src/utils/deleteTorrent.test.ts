@@ -34,7 +34,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteRdTorrent(rdKey, torrentId);
 
 			expect(deleteRdTorrent).toHaveBeenCalledWith(rdKey, '123456');
-			expect(toast).toHaveBeenCalledWith('Torrent deleted (rd:123456)', expect.any(Object));
+			expect(toast).toHaveBeenCalledWith('Deleted rd:123456 from RD.', expect.any(Object));
 			expect(toast.error).not.toHaveBeenCalled();
 		});
 
@@ -55,7 +55,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteRdTorrent(rdKey, torrentId);
 
 			expect(deleteRdTorrent).toHaveBeenCalledWith(rdKey, '123456');
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in RD (rd:123456)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete rd:123456 in RD.');
 		});
 
 		it('should handle errors with disableToast true', async () => {
@@ -65,7 +65,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteRdTorrent(rdKey, torrentId, true);
 
 			expect(deleteRdTorrent).toHaveBeenCalledWith(rdKey, '123456');
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in RD (rd:123456)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete rd:123456 in RD.');
 			expect(toast).not.toHaveBeenCalled();
 		});
 
@@ -88,7 +88,7 @@ describe('deleteTorrent utilities', () => {
 
 			await handleDeleteRdTorrent(rdKey, torrentId);
 
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in RD (rd:123456)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete rd:123456 in RD.');
 		});
 
 		it('should handle non-Error objects', async () => {
@@ -96,7 +96,7 @@ describe('deleteTorrent utilities', () => {
 
 			await handleDeleteRdTorrent(rdKey, torrentId);
 
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in RD (rd:123456)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete rd:123456 in RD.');
 		});
 	});
 
@@ -110,7 +110,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteAdTorrent(adKey, torrentId);
 
 			expect(deleteAdTorrent).toHaveBeenCalledWith(adKey, '987654');
-			expect(toast).toHaveBeenCalledWith('Torrent deleted (ad:987654)', expect.any(Object));
+			expect(toast).toHaveBeenCalledWith('Deleted ad:987654 from AD.', expect.any(Object));
 			expect(toast.error).not.toHaveBeenCalled();
 		});
 
@@ -131,7 +131,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteAdTorrent(adKey, torrentId);
 
 			expect(deleteAdTorrent).toHaveBeenCalledWith(adKey, '987654');
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in AD (ad:987654)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete ad:987654 in AD.');
 		});
 
 		it('should handle errors with disableToast true', async () => {
@@ -141,7 +141,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteAdTorrent(adKey, torrentId, true);
 
 			expect(deleteAdTorrent).toHaveBeenCalledWith(adKey, '987654');
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in AD (ad:987654)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete ad:987654 in AD.');
 			expect(toast).not.toHaveBeenCalled();
 		});
 
@@ -164,7 +164,7 @@ describe('deleteTorrent utilities', () => {
 
 			await handleDeleteAdTorrent(adKey, torrentId);
 
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in AD (ad:987654)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete ad:987654 in AD.');
 		});
 
 		it('should handle non-Error objects', async () => {
@@ -172,7 +172,7 @@ describe('deleteTorrent utilities', () => {
 
 			await handleDeleteAdTorrent(adKey, torrentId);
 
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in AD (ad:987654)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete ad:987654 in AD.');
 		});
 	});
 
@@ -186,7 +186,10 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteTbTorrent(tbKey, torrentId);
 
 			expect(deleteTbTorrent).toHaveBeenCalledWith(tbKey, 456789);
-			expect(toast).toHaveBeenCalledWith('Torrent deleted (tb:456789)', expect.any(Object));
+			expect(toast).toHaveBeenCalledWith(
+				'Deleted tb:456789 from TorBox.',
+				expect.any(Object)
+			);
 			expect(toast.error).not.toHaveBeenCalled();
 		});
 
@@ -207,7 +210,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteTbTorrent(tbKey, torrentId);
 
 			expect(deleteTbTorrent).toHaveBeenCalledWith(tbKey, 456789);
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in TB (tb:456789)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete tb:456789 in TorBox.');
 		});
 
 		it('should handle errors with disableToast true', async () => {
@@ -217,7 +220,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteTbTorrent(tbKey, torrentId, true);
 
 			expect(deleteTbTorrent).toHaveBeenCalledWith(tbKey, 456789);
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in TB (tb:456789)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete tb:456789 in TorBox.');
 			expect(toast).not.toHaveBeenCalled();
 		});
 
@@ -254,7 +257,7 @@ describe('deleteTorrent utilities', () => {
 
 			await handleDeleteTbTorrent(tbKey, torrentId);
 
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in TB (tb:456789)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete tb:456789 in TorBox.');
 		});
 
 		it('should handle non-Error objects', async () => {
@@ -262,7 +265,7 @@ describe('deleteTorrent utilities', () => {
 
 			await handleDeleteTbTorrent(tbKey, torrentId);
 
-			expect(toast.error).toHaveBeenCalledWith('Error deleting torrent in TB (tb:456789)');
+			expect(toast.error).toHaveBeenCalledWith('Failed to delete tb:456789 in TorBox.');
 		});
 	});
 

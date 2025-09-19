@@ -127,7 +127,7 @@ function HashlistPage() {
 		} catch (error) {
 			console.error('Error fetching user torrents list:', error);
 			setUserTorrentsList([]);
-			toast.error('Error fetching user torrents list');
+			toast.error('Failed to fetch user torrents.');
 		}
 	}
 
@@ -294,7 +294,7 @@ function HashlistPage() {
 				(t) => (
 					<div className="flex items-center rounded-lg bg-gray-800 px-4 py-3 text-white shadow-lg">
 						<CheckCircle className="mr-2 h-5 w-5 text-green-500" />
-						<span>Everything has been downloaded</span>
+						<span>Everything already downloaded</span>
 					</div>
 				),
 				genericToastOptions
@@ -322,17 +322,17 @@ function HashlistPage() {
 
 		// Update the progress toast to show final result
 		if (errors.length && results.length) {
-			toast.error(`Downloaded ${results.length} torrents, failed ${errors.length}`, {
+			toast.error(`Downloaded ${results.length}; ${errors.length} failed.`, {
 				id: progressToast,
 				...genericToastOptions,
 			});
 		} else if (errors.length) {
-			toast.error(`Failed to download ${errors.length} torrents`, {
+			toast.error(`Failed to download ${errors.length} torrents.`, {
 				id: progressToast,
 				...genericToastOptions,
 			});
 		} else if (results.length) {
-			toast.success(`Started downloading ${results.length} torrents`, {
+			toast.success(`Started ${results.length} downloads.`, {
 				id: progressToast,
 				...genericToastOptions,
 			});
@@ -354,7 +354,7 @@ function HashlistPage() {
 				(t) => (
 					<div className="flex items-center rounded-lg bg-gray-800 px-4 py-3 text-white shadow-lg">
 						<CheckCircle className="mr-2 h-5 w-5 text-green-500" />
-						<span>Everything has been downloaded</span>
+						<span>Everything already downloaded</span>
 					</div>
 				),
 				genericToastOptions
@@ -379,13 +379,13 @@ function HashlistPage() {
 
 		// Update the progress toast to show final result
 		if (errors.length && results.length) {
-			toast.error(`Downloaded ${results.length} torrents, failed ${errors.length}`, {
+			toast.error(`Downloaded ${results.length}; ${errors.length} failed.`, {
 				id: progressToast,
 			});
 		} else if (errors.length) {
-			toast.error(`Failed to download ${errors.length} torrents`, { id: progressToast });
+			toast.error(`Failed to download ${errors.length} torrents.`, { id: progressToast });
 		} else if (results.length) {
-			toast.success(`Started downloading ${results.length} torrents`, { id: progressToast });
+			toast.success(`Started ${results.length} downloads.`, { id: progressToast });
 		} else {
 			toast.dismiss(progressToast);
 		}

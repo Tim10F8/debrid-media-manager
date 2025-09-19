@@ -111,7 +111,7 @@ export const fetchRealDebrid = async (
 		await callback(torrents);
 	} catch (error) {
 		await callback([]);
-		toast.error('Error fetching Real-Debrid torrents list', genericToastOptions);
+		toast.error('Failed to fetch Real-Debrid torrents.', genericToastOptions);
 		console.error(error);
 	}
 };
@@ -200,7 +200,7 @@ export const fetchAllDebrid = async (
 		await callback(torrents);
 	} catch (error) {
 		await callback([]);
-		toast.error('Error fetching AllDebrid torrents list', genericToastOptions);
+		toast.error('Failed to fetch AllDebrid torrents.', genericToastOptions);
 		console.error(error);
 	}
 };
@@ -477,7 +477,7 @@ export const fetchTorBox = async (
 		await callback(torrents);
 	} catch (error) {
 		await callback([]);
-		toast.error('Error fetching TorBox torrents list', genericToastOptions);
+		toast.error('Failed to fetch TorBox torrents.', genericToastOptions);
 		console.error(error);
 	}
 };

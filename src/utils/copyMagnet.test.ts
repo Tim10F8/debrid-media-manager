@@ -59,10 +59,7 @@ describe('copyMagnet', () => {
 			'Copy magnet link',
 			'magnet:?xt=urn:btih:prompt-test'
 		);
-		expect(toast).toHaveBeenCalledWith(
-			'Copy the magnet link shown in the prompt.',
-			expect.any(Object)
-		);
+		expect(toast).toHaveBeenCalledWith('Copy the link from the prompt.', expect.any(Object));
 		promptSpy.mockRestore();
 		Object.assign(document, { execCommand: originalExec });
 	});

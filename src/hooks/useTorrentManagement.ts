@@ -79,7 +79,7 @@ export function useTorrentManagement(
 							prev.map((r) => (r.hash === hash ? { ...r, rdAvailable: false } : r))
 						);
 
-						toast.error('This torrent was incorrectly marked as available.');
+						toast.error('Torrent misflagged as RD available.');
 					}
 				}
 

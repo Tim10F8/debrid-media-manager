@@ -12,12 +12,12 @@ export function useMassReport(
 	const handleMassReport = useCallback(
 		async (type: 'porn' | 'wrong_imdb' | 'wrong_season', filteredResults: SearchResult[]) => {
 			if (!rdKey && !adKey && !torboxKey) {
-				toast.error('Please login to a debrid service first');
+				toast.error('Sign in to a debrid service before reporting.');
 				return;
 			}
 
 			if (filteredResults.length === 0) {
-				toast.error('No torrents to report');
+				toast.error('Select torrents before reporting.');
 				return;
 			}
 
@@ -50,14 +50,14 @@ export function useMassReport(
 				});
 
 				if (response.data.success) {
-					toast.success(`Successfully reported ${response.data.reported} torrents`, {
+					toast.success(`Reported ${response.data.reported} torrents.`, {
 						id: toastId,
 					});
 					if (response.data.failed > 0) {
-						toast.error(`Failed to report ${response.data.failed} torrents`);
+						toast.error(`Failed to report ${response.data.failed} torrents.`);
 					}
 				} else {
-					toast.error('Failed to report torrents', { id: toastId });
+					toast.error('Failed to submit reports.', { id: toastId });
 				}
 
 				// Reload the page after a short delay to refresh the results
@@ -66,7 +66,7 @@ export function useMassReport(
 				}, 1500);
 			} catch (error) {
 				console.error('Mass report error:', error);
-				toast.error('Failed to report torrents', { id: toastId });
+				toast.error('Failed to submit reports.', { id: toastId });
 
 				// Reload the page after a short delay even on error
 				setTimeout(() => {

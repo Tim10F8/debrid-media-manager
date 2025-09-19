@@ -519,9 +519,9 @@ const TvSearch: FunctionComponent = () => {
 		// Show search results toast (only if this is not an availability-only update)
 		if (!isAvailabilityOnly) {
 			if (finalResults === 0) {
-				toast('No results found', searchToastOptions);
+				toast('No torrents found', searchToastOptions);
 			} else {
-				toast(`Found ${finalResults} unique results`, searchToastOptions);
+				toast(`${finalResults} unique torrents found`, searchToastOptions);
 			}
 		}
 
@@ -532,7 +532,7 @@ const TvSearch: FunctionComponent = () => {
 			rdKey &&
 			totalAvailableCount > 0
 		) {
-			toast(`Found ${totalAvailableCount} available torrents in RD`, searchToastOptions);
+			toast(`${totalAvailableCount} RD torrents available`, searchToastOptions);
 		}
 
 		// Clear the info after handling
@@ -638,9 +638,9 @@ const TvSearch: FunctionComponent = () => {
 		await toast.promise(
 			handleCastTvShow(imdbid as string, rdKey!, hash, fileIds),
 			{
-				loading: `Casting ${fileIds.length} episodes`,
-				success: 'Casting successful',
-				error: 'Casting failed',
+				loading: `Casting ${fileIds.length} episodes...`,
+				success: 'Casting succeeded.',
+				error: 'Casting failed.',
 			},
 			castToastOptions
 		);
@@ -680,13 +680,13 @@ const TvSearch: FunctionComponent = () => {
 	async function handleInstantRdWholeSeason() {
 		const completeSeasonTorrent = getFirstCompleteSeasonTorrent();
 		if (!completeSeasonTorrent) {
-			toast.error('No complete season torrents available');
+			toast.error('No complete season torrents found.');
 			return;
 		}
 
 		// Check if torrent is already in library
 		if (`rd:${completeSeasonTorrent.hash}` in hashAndProgress) {
-			toast.success('This season torrent is already in your Real-Debrid library');
+			toast.success('Season already in your Real-Debrid library.');
 			return;
 		}
 
@@ -696,7 +696,7 @@ const TvSearch: FunctionComponent = () => {
 	async function handleInstantRdEveryEpisode() {
 		const individualEpisodes = getIndividualEpisodeTorrents();
 		if (individualEpisodes.length === 0) {
-			toast.error('No individual episode torrents available');
+			toast.error('No individual episode torrents found.');
 			return;
 		}
 
@@ -792,7 +792,7 @@ const TvSearch: FunctionComponent = () => {
 				// Add to RD
 				await addRd(episode.hash);
 				addedCount++;
-				toast.success(`Episode ${epNum}: Added successfully`, { duration: 2000 });
+				toast.success(`Episode ${epNum}: Added`, { duration: 2000 });
 			}
 
 			// Final summary
@@ -818,7 +818,7 @@ const TvSearch: FunctionComponent = () => {
 				toast.error(summaryMessage, { duration: 5000 });
 			}
 		} catch (error) {
-			toast.error('Failed to add some episodes', { id: toastId });
+			toast.error('Failed to add some episodes.', { id: toastId });
 			console.error('Error adding episodes:', error);
 		}
 	}
