@@ -14,9 +14,6 @@ export type RealDebridOperation =
 export interface RdOperationalEvent {
 	ts: number; // epoch ms
 	status: number; // HTTP status
-	method: string; // HTTP method
-	host: string; // upstream hostname
-	path: string; // upstream pathname
 	operation: RealDebridOperation; // logical operation bucket
 }
 
@@ -78,7 +75,7 @@ const OPERATION_DEFINITIONS: Array<{
 ];
 
 const GLOBAL_KEY = '__DMM_RD_EVENTS_V2__';
-const MAX_EVENTS = 100; // keep the last 100 matching events
+const MAX_EVENTS = 10_000; // keep the last 10k matching events
 
 function getStore(): RdOperationalEvent[] {
 	const g = globalThis as any;
@@ -184,5 +181,6 @@ export function getStats() {
 		isDown,
 		monitoredOperations: OPERATION_DEFINITIONS.map(({ operation }) => operation),
 		byOperation,
+		windowSize: MAX_EVENTS,
 	};
 }

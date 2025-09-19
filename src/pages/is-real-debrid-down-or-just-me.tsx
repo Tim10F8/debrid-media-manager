@@ -23,6 +23,7 @@ export default function RealDebridStatusPage({ stats }: Props) {
 	const operationStats = stats.monitoredOperations
 		.map((operation) => stats.byOperation[operation])
 		.filter((entry): entry is OperationStats => Boolean(entry));
+	const trackingWindowLabel = stats.windowSize.toLocaleString();
 
 	const statusMeta: Record<
 		StatusState,
@@ -76,7 +77,7 @@ export default function RealDebridStatusPage({ stats }: Props) {
 		{
 			label: 'Tracked Real-Debrid responses',
 			value: stats.totalTracked.toLocaleString(),
-			helper: 'Last 100 recorded calls across monitored endpoints.',
+			helper: `Last ${trackingWindowLabel} recorded calls across monitored endpoints.`,
 			icon: History,
 		},
 		{
@@ -137,7 +138,7 @@ export default function RealDebridStatusPage({ stats }: Props) {
 				<title>Is Real-Debrid Down Or Just Me?</title>
 				<meta
 					name="description"
-					content="Checks the last 100 Real-Debrid proxy calls across /unrestrict/link, /user, and torrent endpoints (2xx vs 5xx)."
+					content={`Checks the last ${trackingWindowLabel} Real-Debrid proxy calls across /unrestrict/link, /user, and torrent endpoints (2xx vs 5xx).`}
 				/>
 			</Head>
 			<div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
@@ -160,9 +161,9 @@ export default function RealDebridStatusPage({ stats }: Props) {
 									Is Real-Debrid Down Or Just Me?
 								</h1>
 								<p className="mt-3 max-w-xl text-sm text-slate-300 md:text-base">
-									Based on the last 100 tracked Real-Debrid proxy calls:
-									/unrestrict/link, /user, and key torrent management endpoints.
-									Only 2xx and 5xx responses are considered.
+									Based on the last {trackingWindowLabel} tracked Real-Debrid
+									proxy calls: /unrestrict/link, /user, and key torrent management
+									endpoints. Only 2xx and 5xx responses are considered.
 								</p>
 								<p className="mt-4 text-sm text-slate-400">
 									{statusMeta[state].description}
@@ -324,8 +325,8 @@ export default function RealDebridStatusPage({ stats }: Props) {
 								</span>
 							</div>
 							<div className="text-xs text-slate-400">
-								Sliding window scoped to the most recent 100 tracked Real-Debrid
-								requests handled by this pod.
+								Sliding window scoped to the most recent {trackingWindowLabel}{' '}
+								tracked Real-Debrid requests handled by this pod.
 							</div>
 						</div>
 					</section>

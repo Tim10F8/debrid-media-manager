@@ -3,17 +3,15 @@ export const buttonStyles = {
 		'border-2 border-blue-500 bg-blue-900/30 text-blue-100 hover:bg-blue-800/50 transition-colors',
 	watch: 'border-2 border-teal-500 bg-teal-900/30 text-teal-100 hover:bg-teal-800/50 transition-colors',
 	cast: 'border-2 border-gray-500 bg-gray-900/30 text-gray-100 hover:bg-gray-800/50 transition-colors',
-	castAll: 'border-2 border-gray-500 bg-gray-900/30 text-gray-100 hover:bg-gray-800/50 p-3 m-1',
-	share: 'border-2 border-indigo-500 bg-indigo-900/30 text-indigo-100 hover:bg-indigo-800/50 p-3 m-1',
-	delete: 'border-2 border-red-500 bg-red-900/30 text-red-100 hover:bg-red-800/50 p-3 m-1',
-	magnet: 'border-2 border-pink-500 bg-pink-900/30 text-pink-100 hover:bg-pink-800/50 p-3 m-1',
-	reinsert:
-		'border-2 border-green-500 bg-green-900/30 text-green-100 hover:bg-green-800/50 p-3 m-1',
-	downloadAll:
-		'border-2 border-blue-500 bg-blue-900/30 text-blue-100 hover:bg-blue-800/50 p-3 m-1',
-	exportLinks: 'border-2 border-sky-500 bg-sky-900/30 text-sky-100 hover:bg-sky-800/50 p-3 m-1',
+	castAll: 'border-2 border-gray-500 bg-gray-900/30 text-gray-100 hover:bg-gray-800/50',
+	share: 'border-2 border-indigo-500 bg-indigo-900/30 text-indigo-100 hover:bg-indigo-800/50',
+	delete: 'border-2 border-red-500 bg-red-900/30 text-red-100 hover:bg-red-800/50',
+	magnet: 'border-2 border-pink-500 bg-pink-900/30 text-pink-100 hover:bg-pink-800/50',
+	reinsert: 'border-2 border-green-500 bg-green-900/30 text-green-100 hover:bg-green-800/50',
+	downloadAll: 'border-2 border-blue-500 bg-blue-900/30 text-blue-100 hover:bg-blue-800/50',
+	exportLinks: 'border-2 border-sky-500 bg-sky-900/30 text-sky-100 hover:bg-sky-800/50',
 	generateStrm:
-		'border-2 border-purple-500 bg-purple-900/30 text-purple-100 hover:bg-purple-800/50 p-3 m-1',
+		'border-2 border-purple-500 bg-purple-900/30 text-purple-100 hover:bg-purple-800/50',
 };
 
 // These are inline SVG strings because this component generates HTML for Swal popups

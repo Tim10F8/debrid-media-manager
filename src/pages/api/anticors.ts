@@ -216,9 +216,6 @@ const handler: NextApiHandler = async (req: NextApiRequest, res: NextApiResponse
 			recordRdUnrestrictEvent({
 				ts: Date.now(),
 				status: upstreamResponse.status,
-				method: (req.method || 'GET').toUpperCase(),
-				host: parsedProxyUrl.hostname,
-				path: parsedProxyUrl.pathname,
 				operation,
 			});
 		}
@@ -242,9 +239,6 @@ const handler: NextApiHandler = async (req: NextApiRequest, res: NextApiResponse
 						recordRdUnrestrictEvent({
 							ts: Date.now(),
 							status: 500,
-							method: (req.method || 'GET').toUpperCase(),
-							host: attempted.hostname,
-							path: attempted.pathname,
 							operation: failedOperation,
 						});
 					}

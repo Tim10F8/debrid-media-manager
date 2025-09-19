@@ -1,3 +1,3 @@
-make sure the same datadog observability is present in initial-offer-pages/src/app/api/heatpump-photos
-
-they have the same execution context situation (inside a k8s pod)
+always conform to KISS, DRY, YAGNI, and SOLID principles.
+less is more. intuition and convention over configuration.
+always make sure test lint tsc typecheck and build works.
