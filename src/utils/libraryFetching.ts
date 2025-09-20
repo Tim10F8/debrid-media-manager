@@ -190,6 +190,10 @@ export async function fetchLatestADTorrents(
 	customLimit?: number,
 	forceRefresh?: boolean
 ) {
+	const startTime = Date.now();
+	console.log(
+		`[${new Date().toISOString()}] fetchLatestADTorrents start (customLimit=${customLimit ?? 'none'}, forceRefresh=${!!forceRefresh})`
+	);
 	const oldTorrents = await torrentDB.all();
 	const oldIds = new Set(
 		oldTorrents.map((torrent) => torrent.id).filter((id) => id.startsWith('ad:'))
@@ -207,14 +211,21 @@ export async function fetchLatestADTorrents(
 	const newIds = new Set();
 
 	if (!adKey) {
+		console.log(`[${new Date().toISOString()}] fetchLatestADTorrents skip - missing api key`);
 		setLoading(false);
 		setAdSyncing(false);
 	} else {
 		// Note: forceRefresh doesn't affect AllDebrid since it doesn't use caching yet
 		// but we keep the parameter for consistency and future implementation
+		console.log(
+			`[${new Date().toISOString()}] fetchLatestADTorrents invoking fetchAllDebrid (customLimit=${customLimit ?? 'none'})`
+		);
 		await fetchAllDebrid(
 			adKey,
 			async (torrents: UserTorrent[]) => {
+				console.log(
+					`[${new Date().toISOString()}] fetchLatestADTorrents callback received ${torrents.length} torrents`
+				);
 				// add all new torrents to the database
 				torrents.forEach((torrent) => newIds.add(torrent.id));
 				const newTorrents = torrents.filter((torrent) => !oldIds.has(torrent.id));
@@ -244,6 +255,9 @@ export async function fetchLatestADTorrents(
 				await torrentDB.addAll(inProgressTorrents);
 
 				setLoading(false);
+				console.log(
+					`[${new Date().toISOString()}] fetchLatestADTorrents callback done (new=${newTorrents.length}, inProgress=${inProgressTorrents.length})`
+				);
 			},
 			customLimit
 		);
@@ -272,6 +286,9 @@ export async function fetchLatestADTorrents(
 			await torrentDB.deleteMany(toDelete);
 		}
 	}
+	console.log(
+		`[${new Date().toISOString()}] fetchLatestADTorrents end - Total: ${Date.now() - startTime}ms`
+	);
 }
 
 export async function fetchLatestTBTorrents(
@@ -284,6 +301,10 @@ export async function fetchLatestTBTorrents(
 	customLimit?: number,
 	forceRefresh?: boolean
 ) {
+	const startTime = Date.now();
+	console.log(
+		`[${new Date().toISOString()}] fetchLatestTBTorrents start (customLimit=${customLimit ?? 'none'}, forceRefresh=${!!forceRefresh})`
+	);
 	const oldTorrents = await torrentDB.all();
 	const oldIds = new Set(
 		oldTorrents.map((torrent) => torrent.id).filter((id) => id.startsWith('tb:'))
@@ -301,14 +322,21 @@ export async function fetchLatestTBTorrents(
 	const newIds = new Set();
 
 	if (!tbKey) {
+		console.log(`[${new Date().toISOString()}] fetchLatestTBTorrents skip - missing api key`);
 		setLoading(false);
 		setTbSyncing(false);
 	} else {
 		// Note: forceRefresh doesn't affect TorBox since it doesn't use caching yet
 		// but we keep the parameter for consistency and future implementation
+		console.log(
+			`[${new Date().toISOString()}] fetchLatestTBTorrents invoking fetchTorBox (customLimit=${customLimit ?? 'none'})`
+		);
 		await fetchTorBox(
 			tbKey,
 			async (torrents: UserTorrent[]) => {
+				console.log(
+					`[${new Date().toISOString()}] fetchLatestTBTorrents callback received ${torrents.length} torrents`
+				);
 				// add all new torrents to the database
 				torrents.forEach((torrent) => newIds.add(torrent.id));
 				const newTorrents = torrents.filter((torrent) => !oldIds.has(torrent.id));
@@ -338,6 +366,9 @@ export async function fetchLatestTBTorrents(
 				await torrentDB.addAll(inProgressTorrents);
 
 				setLoading(false);
+				console.log(
+					`[${new Date().toISOString()}] fetchLatestTBTorrents callback done (new=${newTorrents.length}, inProgress=${inProgressTorrents.length})`
+				);
 			},
 			customLimit
 		);
@@ -366,4 +397,7 @@ export async function fetchLatestTBTorrents(
 			await torrentDB.deleteMany(toDelete);
 		}
 	}
+	console.log(
+		`[${new Date().toISOString()}] fetchLatestTBTorrents end - Total: ${Date.now() - startTime}ms`
+	);
 }

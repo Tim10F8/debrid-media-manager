@@ -550,10 +550,18 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		const shouldRefresh = tokenChanged || (!hasFetched && rdLibrary.length === 0);
 
 		if (!shouldRefresh) {
+			console.log('[LibraryCache] Auto refresh skipped for RealDebrid', {
+				tokenChanged,
+				hasFetched,
+				librarySize: rdLibrary.length,
+			});
 			return;
 		}
 
 		initialRefreshDoneRef.current.rd = true;
+		console.log('[LibraryCache] Auto refresh triggered for RealDebrid', {
+			reason: tokenChanged ? 'tokenChanged' : 'initialEmpty',
+		});
 		void scheduleServiceRefresh('realdebrid', tokenChanged ? 'tokenChanged' : 'initialEmpty');
 	}, [rdKey, rdLoading, rdLibrary.length, scheduleServiceRefresh]);
 
@@ -582,10 +590,18 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		const shouldRefresh = tokenChanged || (!hasFetched && adLibrary.length === 0);
 
 		if (!shouldRefresh) {
+			console.log('[LibraryCache] Auto refresh skipped for AllDebrid', {
+				tokenChanged,
+				hasFetched,
+				librarySize: adLibrary.length,
+			});
 			return;
 		}
 
 		initialRefreshDoneRef.current.ad = true;
+		console.log('[LibraryCache] Auto refresh triggered for AllDebrid', {
+			reason: tokenChanged ? 'tokenChanged' : 'initialEmpty',
+		});
 		void scheduleServiceRefresh('alldebrid', tokenChanged ? 'tokenChanged' : 'initialEmpty');
 	}, [adKey, adLibrary.length, scheduleServiceRefresh]);
 
@@ -614,10 +630,18 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		const shouldRefresh = tokenChanged || (!hasFetched && tbLibrary.length === 0);
 
 		if (!shouldRefresh) {
+			console.log('[LibraryCache] Auto refresh skipped for TorBox', {
+				tokenChanged,
+				hasFetched,
+				librarySize: tbLibrary.length,
+			});
 			return;
 		}
 
 		initialRefreshDoneRef.current.tb = true;
+		console.log('[LibraryCache] Auto refresh triggered for TorBox', {
+			reason: tokenChanged ? 'tokenChanged' : 'initialEmpty',
+		});
 		void scheduleServiceRefresh('torbox', tokenChanged ? 'tokenChanged' : 'initialEmpty');
 	}, [tbKey, tbLibrary.length, scheduleServiceRefresh]);
 

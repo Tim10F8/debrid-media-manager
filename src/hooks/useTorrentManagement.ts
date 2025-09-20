@@ -110,8 +110,14 @@ export function useTorrentManagement(
 		async (hash: string) => {
 			if (!adKey) return;
 
+			console.log('[TorrentManagement] addAd start', { hash });
 			await handleAddAsMagnetInAd(adKey, hash);
+			console.log('[TorrentManagement] addAd queued refresh via fetchAllDebrid', { hash });
 			await fetchAllDebrid(adKey, async (torrents: UserTorrent[]) => {
+				console.log('[TorrentManagement] addAd fetchAllDebrid callback', {
+					hash,
+					count: torrents.length,
+				});
 				await torrentDB.addAll(torrents);
 				// Update global cache with new torrents
 				torrents.forEach((torrent) => {
@@ -126,6 +132,7 @@ export function useTorrentManagement(
 				});
 			});
 			await fetchHashAndProgress();
+			console.log('[TorrentManagement] addAd end', { hash });
 		},
 		[adKey, fetchHashAndProgress, addToCache]
 	);

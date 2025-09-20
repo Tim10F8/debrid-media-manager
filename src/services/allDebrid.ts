@@ -327,6 +327,15 @@ export const getMagnetStatus = async (
 		_fresh: Date.now(), // Add cache-busting parameter for fresh uncached results
 	};
 
+	const requestMeta = {
+		hasMagnetId: Boolean(magnetId),
+		hasStatusFilter: Boolean(statusFilter),
+		session,
+		counter,
+	};
+	const requestStartedAt = Date.now();
+	console.log('[AllDebridAPI] getMagnetStatus start', requestMeta);
+
 	if (magnetId) {
 		params.id = magnetId;
 	} else if (statusFilter) {
@@ -354,6 +363,13 @@ export const getMagnetStatus = async (
 
 		// Get files for ready magnets if needed (for backward compatibility)
 		const magnets = response.data.data!.magnets;
+		const durationMs = Date.now() - requestStartedAt;
+		console.log('[AllDebridAPI] getMagnetStatus success', {
+			...requestMeta,
+			magnetCount: magnets.length,
+			fullSync: Boolean(response.data.data?.fullsync),
+			elapsedMs: durationMs,
+		});
 
 		// Initialize empty links array for all magnets first
 		magnets.forEach((m) => {
@@ -401,6 +417,15 @@ export const getMagnetStatus = async (
 			},
 		};
 	} catch (error) {
+		console.error(
+			'[AllDebridAPI] getMagnetStatus error after',
+			Date.now() - requestStartedAt,
+			'ms',
+			{
+				...requestMeta,
+				error: (error as any)?.message,
+			}
+		);
 		console.error('Error fetching magnet status:', (error as any).message);
 		throw error;
 	}

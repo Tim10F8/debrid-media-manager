@@ -182,13 +182,28 @@ export const fetchAllDebrid = async (
 	callback: (torrents: UserTorrent[]) => Promise<void>,
 	customLimit?: number
 ) => {
+	const startedAt = Date.now();
+	console.log('[AllDebridFetch] start', {
+		customLimit: customLimit ?? null,
+	});
 	try {
 		// Step 1: Get all magnets from AllDebrid
+		const apiStart = Date.now();
 		const response = await getMagnetStatus(adKey);
+		const magnetsCount = response.data?.magnets?.length ?? 0;
+		console.log('[AllDebridFetch] apiSuccess', {
+			magnetsCount,
+			elapsedMs: Date.now() - apiStart,
+		});
 		const magnetInfos = response.data?.magnets || [];
 
 		if (!magnetInfos.length) {
+			console.log('[AllDebridFetch] noMagnets');
 			await callback([]);
+			console.log('[AllDebridFetch] end', {
+				elapsedMs: Date.now() - startedAt,
+				returned: 0,
+			});
 			return;
 		}
 
@@ -198,10 +213,19 @@ export const fetchAllDebrid = async (
 		// Step 3: Process the magnets
 		const torrents = await processAllDebridTorrents(limitedMagnets);
 		await callback(torrents);
+		console.log('[AllDebridFetch] end', {
+			elapsedMs: Date.now() - startedAt,
+			returned: torrents.length,
+			customLimit: customLimit ?? null,
+		});
 	} catch (error) {
 		await callback([]);
 		toast.error('Failed to fetch AllDebrid torrents.', genericToastOptions);
 		console.error(error);
+		console.error('[AllDebridFetch] error', {
+			elapsedMs: Date.now() - startedAt,
+			error,
+		});
 	}
 };
 
@@ -452,12 +476,29 @@ export const fetchTorBox = async (
 	callback: (torrents: UserTorrent[]) => Promise<void>,
 	customLimit?: number
 ) => {
+	const startedAt = Date.now();
+	console.log('[TorBoxFetch] start', {
+		customLimit: customLimit ?? null,
+	});
 	try {
 		// Get all torrents from TorBox
+		const apiStart = Date.now();
 		const response = await getTorrentList(tbKey);
+		console.log('[TorBoxFetch] apiSuccess', {
+			success: response.success,
+			elapsedMs: Date.now() - apiStart,
+			dataShape: Array.isArray(response.data) ? 'array' : response.data ? 'object' : 'empty',
+		});
 
 		if (!response.success || !response.data) {
+			console.log('[TorBoxFetch] noData', {
+				success: response.success,
+			});
 			await callback([]);
+			console.log('[TorBoxFetch] end', {
+				elapsedMs: Date.now() - startedAt,
+				returned: 0,
+			});
 			return;
 		}
 
@@ -465,7 +506,12 @@ export const fetchTorBox = async (
 		const torrentInfos = Array.isArray(response.data) ? response.data : [response.data];
 
 		if (!torrentInfos.length) {
+			console.log('[TorBoxFetch] emptyList');
 			await callback([]);
+			console.log('[TorBoxFetch] end', {
+				elapsedMs: Date.now() - startedAt,
+				returned: 0,
+			});
 			return;
 		}
 
@@ -475,10 +521,19 @@ export const fetchTorBox = async (
 		// Process the torrents
 		const torrents = await processTorBoxTorrents(limitedTorrents);
 		await callback(torrents);
+		console.log('[TorBoxFetch] end', {
+			elapsedMs: Date.now() - startedAt,
+			returned: torrents.length,
+			customLimit: customLimit ?? null,
+		});
 	} catch (error) {
 		await callback([]);
 		toast.error('Failed to fetch TorBox torrents.', genericToastOptions);
 		console.error(error);
+		console.error('[TorBoxFetch] error', {
+			elapsedMs: Date.now() - startedAt,
+			error,
+		});
 	}
 };
 

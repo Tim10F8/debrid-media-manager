@@ -313,6 +313,38 @@ describe('fetchTorrents utilities', () => {
 			callback.mockClear();
 		});
 
+		it('logs lifecycle details during fetch', async () => {
+			const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+			const mockMagnets: MagnetStatus[] = [
+				{
+					id: 1,
+					filename: 'Movie.mkv',
+					hash: 'hash',
+					size: 1,
+					statusCode: 4,
+					uploadDate: 1704067200,
+					links: [],
+					seeders: 1,
+					downloadSpeed: 0,
+				} as any,
+			];
+
+			vi.mocked(getMagnetStatus).mockResolvedValueOnce({
+				data: { magnets: mockMagnets },
+			} as any);
+
+			await fetchAllDebrid(adKey, callback);
+
+			expect(logSpy).toHaveBeenCalledWith('[AllDebridFetch] start', {
+				customLimit: null,
+			});
+			expect(logSpy).toHaveBeenCalledWith(
+				'[AllDebridFetch] end',
+				expect.objectContaining({ returned: 1 })
+			);
+			logSpy.mockRestore();
+		});
+
 		it('should fetch AD torrents successfully', async () => {
 			const mockMagnets: MagnetStatus[] = [
 				{
@@ -737,6 +769,40 @@ describe('fetchTorrents utilities', () => {
 	});
 
 	describe('fetchTorBox', () => {
+		it('logs lifecycle details during fetch', async () => {
+			const tbKey = 'test-tb-key';
+			const callback = vi.fn();
+			const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+			const mockTorrentInfo: TorBoxTorrentInfo = {
+				id: 1,
+				name: 'Movie',
+				size: 1,
+				progress: 0,
+				download_state: 'downloading',
+				seeds: 1,
+				download_speed: 0,
+				created_at: '2024-01-01T00:00:00Z',
+				hash: 'hash',
+				files: [],
+			} as any;
+
+			vi.mocked(getTorrentList).mockResolvedValueOnce({
+				success: true,
+				data: [mockTorrentInfo],
+			} as any);
+
+			await fetchTorBox(tbKey, callback);
+
+			expect(logSpy).toHaveBeenCalledWith('[TorBoxFetch] start', {
+				customLimit: null,
+			});
+			expect(logSpy).toHaveBeenCalledWith(
+				'[TorBoxFetch] end',
+				expect.objectContaining({ returned: 1 })
+			);
+			logSpy.mockRestore();
+		});
+
 		it('should fetch torrents successfully', async () => {
 			const tbKey = 'test-tb-key';
 			const callback = vi.fn();

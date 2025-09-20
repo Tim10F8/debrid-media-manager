@@ -406,13 +406,20 @@ function HashlistPage() {
 	}
 
 	async function addAd(hash: string) {
+		console.log('[Hashlist] addAd start', { hash });
 		await handleAddAsMagnetInAd(adKey!, hash);
+		console.log('[Hashlist] addAd queued fetchAllDebrid', { hash });
 		await fetchAllDebrid(adKey!, async (torrents) => {
+			console.log('[Hashlist] fetchAllDebrid callback', {
+				hash,
+				count: torrents.length,
+			});
 			await torrentDB.addAll(torrents);
 			// Update global cache with new torrents
 			torrents.forEach((torrent) => addToCache(torrent));
 			await fetchHashAndProgress(hash);
 		});
+		console.log('[Hashlist] addAd end', { hash });
 	}
 
 	async function deleteRd(hash: string) {

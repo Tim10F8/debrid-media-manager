@@ -163,6 +163,13 @@ export const getTorrentList = async (
 		limit?: number;
 	}
 ): Promise<TorBoxResponse<TorBoxTorrentInfo[] | TorBoxTorrentInfo>> => {
+	const requestMeta = {
+		hasId: Boolean(params?.id),
+		offset: params?.offset ?? 0,
+		limit: params?.limit ?? 'default',
+	};
+	const requestStartedAt = Date.now();
+	console.log('[TorboxAPI] getTorrentList start', requestMeta);
 	try {
 		const client = createAxiosClient(accessToken);
 		// Add fresh query parameter to get uncached results
@@ -175,8 +182,26 @@ export const getTorrentList = async (
 			`/${API_VERSION}/api/torrents/mylist`,
 			{ params: queryParams }
 		);
-		return response.data;
+		const result = response.data;
+		const itemCount = Array.isArray(result.data) ? result.data.length : result.data ? 1 : 0;
+		const durationMs = Date.now() - requestStartedAt;
+		console.log('[TorboxAPI] getTorrentList success', {
+			...requestMeta,
+			success: result.success,
+			itemCount,
+			elapsedMs: durationMs,
+		});
+		return result;
 	} catch (error: any) {
+		console.error(
+			'[TorboxAPI] getTorrentList error after',
+			Date.now() - requestStartedAt,
+			'ms',
+			{
+				...requestMeta,
+				error: error?.message,
+			}
+		);
 		console.error('Error getting torrent list:', error.message);
 		throw error;
 	}

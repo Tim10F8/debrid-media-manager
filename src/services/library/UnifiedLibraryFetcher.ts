@@ -207,27 +207,44 @@ export class UnifiedLibraryFetcher {
 	 * Fetch AllDebrid library with optimized batching
 	 */
 	private async fetchAllDebrid(token: string, options: FetchOptions): Promise<UserTorrent[]> {
+		console.log(`[Fetcher] AllDebrid fetch starting, forceRefresh: ${options.forceRefresh}`);
+		const adStart = Date.now();
 		const cacheKey = `ad:library:${token}`;
 
 		// Check cache first
 		if (!options.forceRefresh) {
+			console.log('[Fetcher] Checking cache for AllDebrid...');
 			const cached = await this.cache.get<UserTorrent[]>(cacheKey);
 			if (cached) {
+				console.log(`[Fetcher] Using cached AllDebrid data: ${cached.length} items`);
 				return cached;
 			}
+			console.log('[Fetcher] No cached data found for AllDebrid');
 		}
 
 		// AllDebrid doesn't support pagination, fetch all at once
+		const apiStart = Date.now();
 		const result = await this.rateLimiter.execute('alldebrid', 'ad-fetch-all', () =>
 			getMagnetStatus(token)
 		);
+		console.log(
+			`[Fetcher] AllDebrid API responded in ${Date.now() - apiStart}ms with ${
+				result.data?.magnets?.length ?? 0
+			} magnets`
+		);
 
 		if (!result.data?.magnets) {
+			console.log('[Fetcher] AllDebrid API returned no magnets');
 			await this.cache.set(cacheKey, [], undefined, 5 * 60 * 1000);
+			console.log('[Fetcher] Cached empty AllDebrid result for 5 minutes');
+			console.log(
+				`[Fetcher] AllDebrid fetch completed in ${Date.now() - adStart}ms - 0 items`
+			);
 			return [];
 		}
 
 		const magnets = result.data.magnets;
+		console.log(`[Fetcher] Processing ${magnets.length} AllDebrid magnets (batch size 50)`);
 		options.onProgress?.(0, magnets.length);
 
 		// Process magnets in batches for better performance
@@ -240,14 +257,28 @@ export class UnifiedLibraryFetcher {
 			}
 
 			const batch = magnets.slice(i, i + batchSize);
+			const batchStart = Date.now();
 			const torrents = await this.processAllDebridMagnets(batch);
 			allTorrents.push(...torrents);
 			options.onBatchComplete?.(torrents);
 			options.onProgress?.(allTorrents.length, magnets.length);
+			console.log(
+				`[Fetcher] AllDebrid batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(
+					magnets.length / batchSize
+				)} processed in ${Date.now() - batchStart}ms - ${torrents.length} items (total ${
+					allTorrents.length
+				}/${magnets.length})`
+			);
 		}
 
 		// Cache the results
+		const cacheStart = Date.now();
+		console.log(`[Fetcher] Caching AllDebrid results (${allTorrents.length} items)`);
 		await this.cache.set(cacheKey, allTorrents, undefined, 5 * 60 * 1000);
+		console.log(`[Fetcher] AllDebrid cache write completed in ${Date.now() - cacheStart}ms`);
+		console.log(
+			`[Fetcher] AllDebrid fetch completed in ${Date.now() - adStart}ms - ${allTorrents.length} items`
+		);
 
 		return allTorrents;
 	}
@@ -256,14 +287,19 @@ export class UnifiedLibraryFetcher {
 	 * Fetch Torbox library with pagination support
 	 */
 	private async fetchTorbox(token: string, options: FetchOptions): Promise<UserTorrent[]> {
+		console.log(`[Fetcher] Torbox fetch starting, forceRefresh: ${options.forceRefresh}`);
+		const tbStart = Date.now();
 		const cacheKey = `tb:library:${token}`;
 
 		// Check cache first
 		if (!options.forceRefresh) {
+			console.log('[Fetcher] Checking cache for Torbox...');
 			const cached = await this.cache.get<UserTorrent[]>(cacheKey);
 			if (cached) {
+				console.log(`[Fetcher] Using cached Torbox data: ${cached.length} items`);
 				return cached;
 			}
+			console.log('[Fetcher] No cached data found for Torbox');
 		}
 
 		// Torbox supports pagination but doesn't return total count reliably
@@ -272,12 +308,19 @@ export class UnifiedLibraryFetcher {
 		const allTorrents: UserTorrent[] = [];
 		let offset = 0;
 		let hasMore = true;
+		let loop = 0;
 
 		while (hasMore && (!options.maxItems || allTorrents.length < options.maxItems)) {
 			if (options.signal?.aborted) {
 				throw new Error('Fetch aborted');
 			}
 
+			console.log('[Fetcher] Torbox requesting page', {
+				offset,
+				pageSize,
+				iteration: ++loop,
+			});
+			const apiStart = Date.now();
 			const result = await this.rateLimiter.execute('torbox', `tb-page-${offset}`, () =>
 				getTorrentList(token, {
 					bypass_cache: true,
@@ -285,14 +328,22 @@ export class UnifiedLibraryFetcher {
 					limit: pageSize,
 				})
 			);
+			console.log(
+				`[Fetcher] Torbox page received in ${Date.now() - apiStart}ms (success=${result.success})`
+			);
 
 			if (!result.success || !result.data) {
+				console.log('[Fetcher] Torbox response indicated completion', {
+					success: result.success,
+					hasData: Boolean(result.data),
+				});
 				hasMore = false;
 				break;
 			}
 
 			const torrentsData = Array.isArray(result.data) ? result.data : [result.data];
 			if (torrentsData.length === 0) {
+				console.log('[Fetcher] Torbox returned empty page');
 				hasMore = false;
 				break;
 			}
@@ -301,13 +352,24 @@ export class UnifiedLibraryFetcher {
 			allTorrents.push(...torrents);
 			options.onBatchComplete?.(torrents);
 			options.onProgress?.(allTorrents.length, allTorrents.length + pageSize);
+			console.log('[Fetcher] Torbox page processed', {
+				iteration: loop,
+				pageCount: torrentsData.length,
+				totalItems: allTorrents.length,
+			});
 
 			offset += pageSize;
 			hasMore = torrentsData.length === pageSize;
 		}
 
 		// Cache the results
+		const cacheStart = Date.now();
+		console.log(`[Fetcher] Caching Torbox results (${allTorrents.length} items)`);
 		await this.cache.set(cacheKey, allTorrents, undefined, 5 * 60 * 1000);
+		console.log(`[Fetcher] Torbox cache write completed in ${Date.now() - cacheStart}ms`);
+		console.log(
+			`[Fetcher] Torbox fetch completed in ${Date.now() - tbStart}ms - ${allTorrents.length} items`
+		);
 
 		return allTorrents;
 	}
