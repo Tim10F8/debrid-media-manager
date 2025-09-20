@@ -66,3 +66,5 @@ public/workbox-*.js.map
 **/.claude/settings.local.json
 
 credentials.txt
+
+.data/

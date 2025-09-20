@@ -1,5 +1,5 @@
-import { render, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { render, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RealDebridObservabilityStats } from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats, RealDebridOperation } from '@/lib/observability/rdOperationalStats';
@@ -72,6 +72,14 @@ function setMockFetch(mockImpl: ReturnType<typeof vi.fn>) {
 }
 
 describe('RealDebridStatusPage client refresh', () => {
+	beforeEach(() => {
+		const defaultFetch = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve(baseStats),
+		});
+		setMockFetch(defaultFetch);
+	});
+
 	afterEach(() => {
 		vi.restoreAllMocks();
 		if (originalFetch) {
@@ -79,6 +87,35 @@ describe('RealDebridStatusPage client refresh', () => {
 		} else {
 			Reflect.deleteProperty(globalWithFetch, 'fetch');
 		}
+	});
+
+	it('renders working stream outside of the success rate card', () => {
+		const { getByTestId } = render(<RealDebridStatusPage stats={baseStats} />);
+		const successCard = getByTestId('success-rate-card');
+		expect(successCard).toBeTruthy();
+		expect(within(successCard).queryByText('Working Stream')).toBeNull();
+		const workingStreamCard = getByTestId('working-stream-card');
+		expect(workingStreamCard).toBeTruthy();
+		expect(within(workingStreamCard).getByText('Working Stream')).toBeTruthy();
+		expect(getByTestId('status-answer-mobile').textContent).toBe('Waiting for data');
+		expect(getByTestId('status-freshness').textContent).toBe('As of —');
+	});
+
+	it('promotes Debrid Media Manager with an external CTA link', () => {
+		const { getByRole, getByTestId } = render(<RealDebridStatusPage stats={baseStats} />);
+		const marketingCopy = getByTestId('dmm-marketing-copy');
+		expect(marketingCopy.textContent).toContain(
+			'Debrid Media Manager is a free, open source dashboard for Real-Debrid, AllDebrid, and TorBox.'
+		);
+		expect(marketingCopy.textContent).toContain(
+			'to search, download, and manage your library.'
+		);
+		expect(getByTestId('dmm-marketing-separator')).toBeTruthy();
+		const ctaLink = getByRole('link', { name: 'debridmediamanager.com' });
+		expect(ctaLink).toBeTruthy();
+		expect(ctaLink).toHaveAttribute('href', 'https://debridmediamanager.com/');
+		expect(ctaLink).toHaveAttribute('target', '_blank');
+		expect(ctaLink).toHaveAttribute('rel', 'noreferrer noopener');
 	});
 
 	it('requests verbose stats during client refresh', async () => {
@@ -95,7 +132,8 @@ describe('RealDebridStatusPage client refresh', () => {
 
 		const requestUrl = mockFetch.mock.calls[0][0];
 		expect(typeof requestUrl).toBe('string');
-		const parsedUrl = new URL(requestUrl as string, 'https://example.com');
+		const parsedUrl = new URL(requestUrl as string);
+		expect(parsedUrl.origin).toBe(window.location.origin);
 		expect(parsedUrl.searchParams.get('verbose')).toBe('true');
 		expect(parsedUrl.searchParams.get('_t')).not.toBeNull();
 	});

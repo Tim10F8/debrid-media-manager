@@ -60,14 +60,22 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 
 		const loadFreshStats = async () => {
 			try {
-				const cacheBuster = Date.now() + Math.random().toString(36).substring(7);
-				const params = new URLSearchParams({ _t: String(cacheBuster), verbose: 'true' });
-				const response = await fetch(
-					`/api/observability/real-debrid?${params.toString()}`,
-					{
-						cache: 'no-store',
-					}
-				);
+				const fetchImpl = globalThis.fetch;
+				if (typeof fetchImpl !== 'function') {
+					console.error('Fetch API unavailable for Real-Debrid stats refresh');
+					return;
+				}
+				const cacheBuster = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+				const params = new URLSearchParams({ _t: cacheBuster, verbose: 'true' });
+				const origin =
+					typeof window !== 'undefined' && window.location?.origin
+						? window.location.origin
+						: (process.env.DMM_ORIGIN ?? 'http://localhost:3000');
+				const requestUrl = new URL('/api/observability/real-debrid', origin);
+				requestUrl.search = params.toString();
+				const response = await fetchImpl(requestUrl.toString(), {
+					cache: 'no-store',
+				});
 				if (!response.ok) {
 					console.error('Real-Debrid stats refresh failed with status', response.status);
 					return;
@@ -161,6 +169,12 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 			meter: 'bg-rose-500',
 			icon: AlertTriangle,
 		},
+	};
+
+	const statusTextClass: Record<StatusState, string> = {
+		idle: 'text-slate-200',
+		up: 'text-emerald-300',
+		down: 'text-rose-300',
 	};
 
 	const StatusIcon = statusMeta[state].icon;
@@ -271,6 +285,15 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 	const workingStreamMeterClass = workingStream?.lastError
 		? 'bg-rose-500'
 		: (workingStreamHealth?.meter ?? 'bg-slate-500');
+	const formattedLastUpdated = lastUpdated
+		? lastUpdated.toLocaleString(undefined, {
+				month: 'short',
+				day: 'numeric',
+				hour: '2-digit',
+				minute: '2-digit',
+			})
+		: null;
+	const statusAsOfCopy = formattedLastUpdated ? `As of ${formattedLastUpdated}` : 'As of —';
 
 	return (
 		<>
@@ -294,39 +317,80 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 					dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
 				/>
 			</Head>
-			<div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-				<div className="pointer-events-none absolute inset-0">
-					<div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-emerald-500/20 blur-3xl" />
-					<div className="absolute bottom-[-120px] right-[-80px] h-80 w-80 rounded-full bg-sky-500/10 blur-3xl" />
-					<div className="absolute inset-x-0 bottom-[-240px] mx-auto h-96 w-[600px] rounded-full bg-purple-500/10 blur-3xl" />
-				</div>
-				<main className="relative z-10 mx-auto flex min-h-screen w-full max-w-4xl flex-col justify-center px-6 py-16">
-					<section className="w-full rounded-3xl border border-white/10 bg-white/5 p-8 shadow-[0_30px_60px_-40px_rgba(0,0,0,0.8)] backdrop-blur">
-						<div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
-							<div>
+			<main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
+				<div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
+					<header className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+						<div className="flex-1 space-y-4">
+							<div className="flex flex-col gap-3">
+								<h1 className="text-3xl font-semibold text-white md:text-4xl">
+									Is Real-Debrid Down Or Just Me?
+								</h1>
+								<div className="md:hidden">
+									<p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+										Current status
+									</p>
+									<p
+										data-testid="status-answer-mobile"
+										className={`mt-2 text-3xl font-semibold ${statusTextClass[state]}`}
+									>
+										{statusMeta[state].label}
+									</p>
+								</div>
 								<span
-									className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider ${statusMeta[state].badge}`}
+									className={`hidden items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider md:inline-flex ${statusMeta[state].badge}`}
 								>
 									<StatusIcon className="h-4 w-4" />
 									{statusMeta[state].label}
 								</span>
-								<h1 className="mt-5 text-3xl font-semibold text-white md:text-4xl">
-									Is Real-Debrid Down Or Just Me?
-								</h1>
-								<p className="mt-3 max-w-xl text-sm text-slate-300 md:text-base">
+								<p
+									className="text-xs text-slate-500"
+									data-testid="status-freshness"
+								>
+									{statusAsOfCopy}
+								</p>
+								<p className="max-w-xl text-sm text-slate-300 md:text-base">
 									We track the last {trackingWindowLabel} Real-Debrid proxy
 									responses across {monitoredSummary}. Only 2xx and 5xx status
 									codes count toward the availability score.
 								</p>
-								<p className="mt-4 text-sm text-slate-400">
+								<p className="text-sm text-slate-400">
 									{statusMeta[state].description}
 								</p>
 							</div>
-							<div className="w-full max-w-xs rounded-2xl border border-white/10 bg-black/40 p-5 shadow-inner">
+							<div className="h-px w-full bg-slate-800/40 md:hidden" />
+							<div className="flex max-w-xl flex-col gap-4">
+								<div
+									className="h-px w-full bg-slate-800/40"
+									data-testid="dmm-marketing-separator"
+								/>
+								<p
+									className="text-xs text-slate-400 md:text-sm"
+									data-testid="dmm-marketing-copy"
+								>
+									Debrid Media Manager is a free, open source dashboard for
+									Real-Debrid, AllDebrid, and TorBox. Visit{' '}
+									<a
+										className="font-semibold text-sky-300 hover:text-white"
+										href="https://debridmediamanager.com/"
+										rel="noreferrer noopener"
+										target="_blank"
+										data-testid="dmm-marketing-link"
+									>
+										debridmediamanager.com
+									</a>{' '}
+									to search, download, and manage your library.
+								</p>
+							</div>
+						</div>
+						<div className="grid w-full max-w-sm gap-4 md:pl-8">
+							<div
+								data-testid="success-rate-card"
+								className="rounded-xl border border-white/15 bg-black/30 p-4"
+							>
 								<div className="text-xs font-medium uppercase tracking-wider text-slate-400">
 									Success rate
 								</div>
-								<div className="mt-3 flex items-baseline gap-2">
+								<div className="mt-2 flex items-baseline gap-2">
 									<span className="text-4xl font-semibold text-white">
 										{stats.considered ? `${successPct}%` : '—'}
 									</span>
@@ -340,189 +404,186 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 										</span>
 									)}
 								</div>
-								<div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-700/60">
+								<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-700/60">
 									<div
 										className={`h-full rounded-full ${statusMeta[state].meter}`}
 										style={{
-											width: stats.considered ? `${successPct}%` : '10%',
+											width: stats.considered ? `${successPct}%` : '12%',
 										}}
 									/>
 								</div>
 								<div className="mt-3 text-xs text-slate-400">{successCopy}</div>
-								<div className="mt-5 rounded-xl border border-white/10 bg-black/30 p-4">
-									<div className="flex items-center justify-between">
-										<div className="text-xs font-medium uppercase tracking-wider text-slate-400">
-											Working Stream
-										</div>
-										{workingStreamHealth && !workingStream?.lastError ? (
-											<span
-												className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${workingStreamHealth.badge}`}
-											>
-												{workingStreamHealth.label}
-											</span>
-										) : null}
+							</div>
+							<div
+								data-testid="working-stream-card"
+								className="rounded-xl border border-white/15 bg-black/30 p-4"
+							>
+								<div className="flex items-center justify-between">
+									<div className="text-xs font-medium uppercase tracking-wider text-slate-400">
+										Working Stream
 									</div>
-									<div className="mt-3 flex items-baseline justify-between gap-2">
-										<span className="text-3xl font-semibold text-white">
-											{workingStreamValue}
+									{workingStreamHealth && !workingStream?.lastError ? (
+										<span
+											className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${workingStreamHealth.badge}`}
+										>
+											{workingStreamHealth.label}
 										</span>
-										<span className="text-xs text-slate-400">
-											{workingStreamCounts}
-										</span>
-									</div>
-									<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-800/60">
-										<div
-											className={`h-full rounded-full ${workingStreamMeterClass}`}
-											style={{ width: workingStreamMeterWidth }}
-										/>
-									</div>
-									<div
-										className={`mt-3 text-xs ${workingStream?.lastError ? 'text-rose-300' : 'text-slate-400'}`}
-									>
-										{workingStreamHelper}
-									</div>
-									{workingStreamLastCheckedLabel ? (
-										<div className="mt-1 text-[11px] text-slate-500">
-											Last check {workingStreamLastCheckedLabel}
-										</div>
 									) : null}
 								</div>
-							</div>
-						</div>
-
-						<div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
-							{summaryMetrics.map(({ label, value, helper, icon: Icon }) => (
+								<div className="mt-2 flex items-baseline justify-between gap-2">
+									<span className="text-3xl font-semibold text-white">
+										{workingStreamValue}
+									</span>
+									<span className="text-xs text-slate-400">
+										{workingStreamCounts}
+									</span>
+								</div>
+								<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-800/60">
+									<div
+										className={`h-full rounded-full ${workingStreamMeterClass}`}
+										style={{ width: workingStreamMeterWidth }}
+									/>
+								</div>
 								<div
-									key={label}
-									className="group rounded-2xl border border-white/10 bg-black/40 p-5 transition hover:border-white/25 hover:shadow-lg"
+									className={`mt-3 text-xs ${workingStream?.lastError ? 'text-rose-300' : 'text-slate-400'}`}
 								>
-									<div className="flex items-center justify-between">
-										<span className="text-sm font-medium text-slate-300">
-											{label}
-										</span>
-										<Icon className="h-5 w-5 text-slate-500 transition group-hover:text-white" />
+									{workingStreamHelper}
+								</div>
+								{workingStreamLastCheckedLabel ? (
+									<div className="mt-1 text-[11px] text-slate-500">
+										Last check {workingStreamLastCheckedLabel}
 									</div>
-									<div className="mt-3 text-2xl font-semibold text-white">
-										{value}
-									</div>
-									<div className="mt-2 text-xs text-slate-400">{helper}</div>
-								</div>
-							))}
-						</div>
-
-						<div className="mt-12 rounded-2xl border border-white/5 bg-white/5 p-6">
-							<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-								<div>
-									<h2 className="text-lg font-semibold text-white">
-										Operation breakdown
-									</h2>
-									<p className="mt-1 text-xs text-slate-400">
-										{stats.monitoredOperations.length} endpoints monitored via
-										this proxy instance.
-									</p>
-								</div>
-								<div className="text-xs text-slate-400">
-									Success rate thresholds · Healthy ≥ 90% · Watchlist ≥ 60%
-								</div>
-							</div>
-
-							<div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-								{operationStats.map((operationStat) => {
-									const successRatePct = operationStat.considered
-										? Math.round(operationStat.successRate * 100)
-										: null;
-									const health = operationHealthMeta(
-										operationStat.successRate,
-										operationStat.considered
-									);
-									return (
-										<div
-											key={operationStat.operation}
-											className="rounded-2xl border border-white/10 bg-black/40 p-5"
-										>
-											<div className="flex items-start justify-between">
-												<div>
-													<p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-														Operation
-													</p>
-													<h3 className="mt-1 text-sm font-semibold text-white">
-														{operationStat.operation}
-													</h3>
-												</div>
-												<span
-													className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${health.badge}`}
-												>
-													{health.label}
-												</span>
-											</div>
-											<div className="mt-4 flex items-center justify-between text-xs text-slate-400">
-												<span>
-													{successRatePct !== null
-														? `${successRatePct}% success`
-														: 'No samples yet'}
-												</span>
-												{successRatePct !== null ? (
-													<span>
-														{operationStat.successCount.toLocaleString()}{' '}
-														/{' '}
-														{operationStat.considered.toLocaleString()}{' '}
-														(2xx)
-													</span>
-												) : (
-													<span>
-														{operationStat.totalTracked.toLocaleString()}{' '}
-														tracked
-													</span>
-												)}
-											</div>
-											<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-700/60">
-												<div
-													className={`h-full rounded-full ${health.meter}`}
-													style={{
-														width:
-															successRatePct !== null
-																? `${successRatePct}%`
-																: '12%',
-													}}
-												/>
-											</div>
-											<div className="mt-3 text-xs text-slate-400">
-												2xx: {operationStat.successCount.toLocaleString()} ·
-												5xx: {operationStat.failureCount.toLocaleString()} ·
-												Total tracked:{' '}
-												{operationStat.totalTracked.toLocaleString()}
-											</div>
-										</div>
-									);
-								})}
+								) : null}
 							</div>
 						</div>
+					</header>
 
-						<div className="mt-10 flex flex-col gap-4 rounded-2xl border border-white/5 bg-white/5 p-5 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
-							<div className="flex items-center gap-2">
-								<Clock className="h-4 w-4 text-slate-400" />
-								<span>
-									{lastUpdated
-										? `Last event captured ${lastUpdated.toLocaleString(
-												undefined,
-												{
-													month: 'short',
-													day: 'numeric',
-													hour: '2-digit',
-													minute: '2-digit',
-												}
-											)}`
-										: 'No events captured yet'}
-								</span>
+					<section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						{summaryMetrics.map(({ label, value, helper, icon: Icon }) => (
+							<div
+								key={label}
+								className="rounded-xl border border-white/10 bg-black/20 p-4"
+							>
+								<div className="flex items-center justify-between">
+									<span className="text-sm font-medium text-slate-200">
+										{label}
+									</span>
+									<Icon className="h-5 w-5 text-slate-500" />
+								</div>
+								<div className="mt-2 text-2xl font-semibold text-white">
+									{value}
+								</div>
+								<div className="mt-2 text-xs text-slate-400">{helper}</div>
+							</div>
+						))}
+					</section>
+
+					<section className="space-y-6 rounded-xl border border-white/10 bg-black/25 p-5">
+						<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+							<div>
+								<h2 className="text-lg font-semibold text-white">
+									Operation breakdown
+								</h2>
+								<p className="text-xs text-slate-400">
+									{stats.monitoredOperations.length} endpoints monitored via this
+									proxy instance.
+								</p>
 							</div>
 							<div className="text-xs text-slate-400">
-								Sliding window scoped to the most recent {trackingWindowLabel}{' '}
-								tracked Real-Debrid requests handled by this pod.
+								Success rate thresholds · Healthy ≥ 90% · Watchlist ≥ 60%
 							</div>
 						</div>
+						<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+							{operationStats.map((operationStat) => {
+								const successRatePct = operationStat.considered
+									? Math.round(operationStat.successRate * 100)
+									: null;
+								const health = operationHealthMeta(
+									operationStat.successRate,
+									operationStat.considered
+								);
+								return (
+									<div
+										key={operationStat.operation}
+										className="rounded-2xl border border-white/10 bg-black/40 p-5"
+									>
+										<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+											<div>
+												<p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+													Operation
+												</p>
+												<h3 className="mt-1 break-words text-sm font-semibold text-white">
+													{operationStat.operation}
+												</h3>
+											</div>
+											<span
+												className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${health.badge}`}
+											>
+												{health.label}
+											</span>
+										</div>
+										<div className="mt-4 flex flex-col gap-2 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+											<span className="text-slate-300">
+												{successRatePct !== null
+													? `${successRatePct}% success`
+													: 'No samples yet'}
+											</span>
+											<span className="text-slate-400">
+												{successRatePct !== null
+													? `${operationStat.successCount.toLocaleString()} / ${operationStat.considered.toLocaleString()} (2xx)`
+													: `${operationStat.totalTracked.toLocaleString()} tracked`}
+											</span>
+										</div>
+										<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-700/60">
+											<div
+												className={`h-full rounded-full ${health.meter}`}
+												style={{
+													width:
+														successRatePct !== null
+															? `${successRatePct}%`
+															: '12%',
+												}}
+											/>
+										</div>
+										<div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-400">
+											<span>
+												2xx: {operationStat.successCount.toLocaleString()}
+											</span>
+											<span>
+												5xx: {operationStat.failureCount.toLocaleString()}
+											</span>
+											<span>
+												Total tracked:{' '}
+												{operationStat.totalTracked.toLocaleString()}
+											</span>
+										</div>
+									</div>
+								);
+							})}
+						</div>
 					</section>
-				</main>
-			</div>
+
+					<section className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
+						<div className="flex items-center gap-2 text-slate-200">
+							<Clock className="h-4 w-4 text-slate-400" />
+							<span>
+								{lastUpdated
+									? `Last event captured ${lastUpdated.toLocaleString(undefined, {
+											month: 'short',
+											day: 'numeric',
+											hour: '2-digit',
+											minute: '2-digit',
+										})}`
+									: 'No events captured yet'}
+							</span>
+						</div>
+						<div className="text-xs text-slate-400">
+							Sliding window scoped to the most recent {trackingWindowLabel} tracked
+							Real-Debrid requests handled by this pod.
+						</div>
+					</section>
+				</div>
+			</main>
 		</>
 	);
 };
