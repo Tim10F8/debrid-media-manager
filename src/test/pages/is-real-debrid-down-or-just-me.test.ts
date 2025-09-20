@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import * as combined from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats, RealDebridOperation } from '@/lib/observability/rdOperationalStats';
-import type { WorkingStreamMetrics } from '@/lib/observability/streamServersHealth';
+import type { CompactWorkingStreamMetrics } from '@/lib/observability/streamServersHealth';
 import { getServerSideProps } from '@/pages/is-real-debrid-down-or-just-me';
 
 const operations: RealDebridOperation[] = [
@@ -38,12 +38,12 @@ describe('Real-Debrid status page caching', () => {
 	});
 
 	it('marks the SSR response as non-cacheable', async () => {
-		const fakeWorkingStream: WorkingStreamMetrics = {
+		const fakeWorkingStream: CompactWorkingStreamMetrics = {
 			total: 0,
 			working: 0,
 			rate: 0,
 			lastChecked: null,
-			statuses: [],
+			failedServers: [],
 			lastError: null,
 			inProgress: false,
 		};

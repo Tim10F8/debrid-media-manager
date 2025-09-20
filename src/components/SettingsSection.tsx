@@ -37,11 +37,11 @@ export const SettingsSection = () => {
 	const [enableMediaFusion, setEnableMediaFusion] = useState(true);
 	const [enablePeerflix, setEnablePeerflix] = useState(true);
 	const [enableTorrentsDB, setEnableTorrentsDB] = useState(true);
-	const [enableTorrentioTor, setEnableTorrentioTor] = useState(true);
-	const [enableCometTor, setEnableCometTor] = useState(true);
-	const [enableMediaFusionTor, setEnableMediaFusionTor] = useState(true);
-	const [enablePeerflixTor, setEnablePeerflixTor] = useState(true);
-	const [enableTorrentsDBTor, setEnableTorrentsDBTor] = useState(true);
+	const [enableTorrentioTor, setEnableTorrentioTor] = useState(false);
+	const [enableCometTor, setEnableCometTor] = useState(false);
+	const [enableMediaFusionTor, setEnableMediaFusionTor] = useState(false);
+	const [enablePeerflixTor, setEnablePeerflixTor] = useState(false);
+	const [enableTorrentsDBTor, setEnableTorrentsDBTor] = useState(false);
 
 	useEffect(() => {
 		if (typeof localStorage === 'undefined') return;
@@ -74,11 +74,11 @@ export const SettingsSection = () => {
 		setEnableMediaFusion(localStorage.getItem('settings:enableMediaFusion') !== 'false');
 		setEnablePeerflix(localStorage.getItem('settings:enablePeerflix') !== 'false');
 		setEnableTorrentsDB(localStorage.getItem('settings:enableTorrentsDB') !== 'false');
-		setEnableTorrentioTor(localStorage.getItem('settings:enableTorrentioTor') !== 'false');
-		setEnableCometTor(localStorage.getItem('settings:enableCometTor') !== 'false');
-		setEnableMediaFusionTor(localStorage.getItem('settings:enableMediaFusionTor') !== 'false');
-		setEnablePeerflixTor(localStorage.getItem('settings:enablePeerflixTor') !== 'false');
-		setEnableTorrentsDBTor(localStorage.getItem('settings:enableTorrentsDBTor') !== 'false');
+		setEnableTorrentioTor(localStorage.getItem('settings:enableTorrentioTor') === 'true');
+		setEnableCometTor(localStorage.getItem('settings:enableCometTor') === 'true');
+		setEnableMediaFusionTor(localStorage.getItem('settings:enableMediaFusionTor') === 'true');
+		setEnablePeerflixTor(localStorage.getItem('settings:enablePeerflixTor') === 'true');
+		setEnableTorrentsDBTor(localStorage.getItem('settings:enableTorrentsDBTor') === 'true');
 	}, []);
 
 	const handlePlayerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

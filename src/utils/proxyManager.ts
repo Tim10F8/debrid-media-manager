@@ -30,9 +30,12 @@ class ProxyManager {
 	}
 
 	getTorProxy(): SocksProxyAgent {
-		return new SocksProxyAgent('socks5h://any_username:any_password@localhost:9050', {
-			timeout: parseInt(process.env.REQUEST_TIMEOUT!) || 30000,
-		});
+		return new SocksProxyAgent(
+			`socks5h://any_username:any_password@${process.env.PROXY || 'localhost:9050'}`,
+			{
+				timeout: parseInt(process.env.REQUEST_TIMEOUT!) || 30000,
+			}
+		);
 	}
 
 	rerollProxy() {
