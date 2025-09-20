@@ -272,7 +272,19 @@ export function useExternalSources(rdKey: string | null) {
 			if (!rdKey) return [];
 
 			try {
-				const response = await axios.get(url, { timeout: 3000 });
+				let response;
+				const isTorService = source.includes('-tor');
+
+				if (isTorService) {
+					// Use our proxy endpoint for Tor services
+					response = await axios.get('/api/proxy/stream', {
+						params: { url, service: source },
+						timeout: 30000,
+					});
+				} else {
+					// Direct request for non-Tor services
+					response = await axios.get(url, { timeout: 3000 });
+				}
 
 				if (response.data?.streams && response.data.streams.length > 0) {
 					const transformedResults: SearchResult[] = response.data.streams
@@ -299,7 +311,17 @@ export function useExternalSources(rdKey: string | null) {
 	const fetchMovieFromExternalSource = useCallback(
 		async (
 			imdbId: string,
-			source: 'torrentio' | 'comet' | 'mediafusion' | 'peerflix' | 'torrentsdb'
+			source:
+				| 'torrentio'
+				| 'comet'
+				| 'mediafusion'
+				| 'peerflix'
+				| 'torrentsdb'
+				| 'torrentio-tor'
+				| 'comet-tor'
+				| 'mediafusion-tor'
+				| 'peerflix-tor'
+				| 'torrentsdb-tor'
 		): Promise<SearchResult[]> => {
 			let url = '';
 
@@ -307,17 +329,34 @@ export function useExternalSources(rdKey: string | null) {
 				case 'torrentio':
 					url = `https://torrentio.strem.fun/realdebrid=real-debrid-key/stream/movie/${imdbId}.json`;
 					break;
+				case 'torrentio-tor':
+					url = `https://torrentio.strem.fun/realdebrid=real-debrid-key/stream/movie/${imdbId}.json`;
+					break;
 				case 'comet':
+					url = `https://comet.elfhosted.com/realdebrid=real-debrid-key/stream/movie/${imdbId}.json`;
+					break;
+				case 'comet-tor':
 					url = `https://comet.elfhosted.com/realdebrid=real-debrid-key/stream/movie/${imdbId}.json`;
 					break;
 				case 'mediafusion':
 					if (!mediafusionHash) return [];
 					url = `https://mediafusion.elfhosted.com/${mediafusionHash}/stream/movie/${imdbId}.json`;
 					break;
+				case 'mediafusion-tor':
+					if (!mediafusionHash) return [];
+					url = `https://mediafusion.elfhosted.com/${mediafusionHash}/stream/movie/${imdbId}.json`;
+					break;
 				case 'peerflix':
 					url = `https://addon.peerflix.mov/realdebrid=real-debrid-key/stream/movie/${imdbId}.json`;
 					break;
+				case 'peerflix-tor':
+					url = `https://addon.peerflix.mov/realdebrid=real-debrid-key/stream/movie/${imdbId}.json`;
+					break;
 				case 'torrentsdb':
+					if (!rdKey) return [];
+					url = `https://torrentsdb.com/${rdKey}/stream/movie/${imdbId}.json`;
+					break;
+				case 'torrentsdb-tor':
 					if (!rdKey) return [];
 					url = `https://torrentsdb.com/${rdKey}/stream/movie/${imdbId}.json`;
 					break;
@@ -333,7 +372,17 @@ export function useExternalSources(rdKey: string | null) {
 			imdbId: string,
 			seasonNum: number,
 			episodeNum: number,
-			source: 'torrentio' | 'comet' | 'mediafusion' | 'peerflix' | 'torrentsdb'
+			source:
+				| 'torrentio'
+				| 'comet'
+				| 'mediafusion'
+				| 'peerflix'
+				| 'torrentsdb'
+				| 'torrentio-tor'
+				| 'comet-tor'
+				| 'mediafusion-tor'
+				| 'peerflix-tor'
+				| 'torrentsdb-tor'
 		): Promise<SearchResult[]> => {
 			let url = '';
 
@@ -341,17 +390,34 @@ export function useExternalSources(rdKey: string | null) {
 				case 'torrentio':
 					url = `https://torrentio.strem.fun/realdebrid=real-debrid-key/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
 					break;
+				case 'torrentio-tor':
+					url = `https://torrentio.strem.fun/realdebrid=real-debrid-key/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
+					break;
 				case 'comet':
+					url = `https://comet.elfhosted.com/realdebrid=real-debrid-key/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
+					break;
+				case 'comet-tor':
 					url = `https://comet.elfhosted.com/realdebrid=real-debrid-key/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
 					break;
 				case 'mediafusion':
 					if (!mediafusionHash) return [];
 					url = `https://mediafusion.elfhosted.com/${mediafusionHash}/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
 					break;
+				case 'mediafusion-tor':
+					if (!mediafusionHash) return [];
+					url = `https://mediafusion.elfhosted.com/${mediafusionHash}/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
+					break;
 				case 'peerflix':
 					url = `https://addon.peerflix.mov/realdebrid=real-debrid-key/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
 					break;
+				case 'peerflix-tor':
+					url = `https://addon.peerflix.mov/realdebrid=real-debrid-key/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
+					break;
 				case 'torrentsdb':
+					if (!rdKey) return [];
+					url = `https://torrentsdb.com/${rdKey}/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
+					break;
+				case 'torrentsdb-tor':
 					if (!rdKey) return [];
 					url = `https://torrentsdb.com/${rdKey}/stream/series/${imdbId}:${seasonNum}:${episodeNum}.json`;
 					break;
@@ -363,8 +429,18 @@ export function useExternalSources(rdKey: string | null) {
 	);
 
 	const getEnabledSources = useCallback(() => {
-		const sources: Array<'torrentio' | 'comet' | 'mediafusion' | 'peerflix' | 'torrentsdb'> =
-			[];
+		const sources: Array<
+			| 'torrentio'
+			| 'comet'
+			| 'mediafusion'
+			| 'peerflix'
+			| 'torrentsdb'
+			| 'torrentio-tor'
+			| 'comet-tor'
+			| 'mediafusion-tor'
+			| 'peerflix-tor'
+			| 'torrentsdb-tor'
+		> = [];
 
 		if (window.localStorage.getItem('settings:enableTorrentio') !== 'false') {
 			sources.push('torrentio');
@@ -380,6 +456,23 @@ export function useExternalSources(rdKey: string | null) {
 		}
 		if (window.localStorage.getItem('settings:enableTorrentsDB') !== 'false') {
 			sources.push('torrentsdb');
+		}
+
+		// Add Tor variants
+		if (window.localStorage.getItem('settings:enableTorrentioTor') !== 'false') {
+			sources.push('torrentio-tor');
+		}
+		if (window.localStorage.getItem('settings:enableCometTor') !== 'false') {
+			sources.push('comet-tor');
+		}
+		if (window.localStorage.getItem('settings:enableMediaFusionTor') !== 'false') {
+			sources.push('mediafusion-tor');
+		}
+		if (window.localStorage.getItem('settings:enablePeerflixTor') !== 'false') {
+			sources.push('peerflix-tor');
+		}
+		if (window.localStorage.getItem('settings:enableTorrentsDBTor') !== 'false') {
+			sources.push('torrentsdb-tor');
 		}
 
 		return sources;

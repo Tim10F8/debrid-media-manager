@@ -1,9 +1,8 @@
 import { getStats, type OperationStats, type RealDebridOperation } from './rdOperationalStats';
 import { loadRealDebridSnapshot, saveRealDebridSnapshot } from './realDebridSnapshot';
 import {
-	getWorkingStreamMetrics,
+	getCompactWorkingStreamMetrics,
 	type CompactWorkingStreamMetrics,
-	type WorkingStreamMetrics,
 } from './streamServersHealth';
 
 export interface RealDebridObservabilityStats {
@@ -17,14 +16,6 @@ export interface RealDebridObservabilityStats {
 	monitoredOperations: RealDebridOperation[];
 	byOperation: Record<RealDebridOperation, OperationStats>;
 	windowSize: number;
-	workingStream: WorkingStreamMetrics;
-}
-
-export interface CompactRealDebridObservabilityStats {
-	successRate: number;
-	lastTs: number | null;
-	isDown: boolean;
-	byOperation: Record<string, { successRate: number; lastTs: number | null }>;
 	workingStream: CompactWorkingStreamMetrics;
 }
 
@@ -47,8 +38,6 @@ function signatureFor(stats: RealDebridObservabilityStats): string {
 		];
 	});
 
-	const workingStream = stats.workingStream;
-
 	return JSON.stringify({
 		totalTracked: stats.totalTracked,
 		successCount: stats.successCount,
@@ -58,14 +47,7 @@ function signatureFor(stats: RealDebridObservabilityStats): string {
 		lastTs: stats.lastTs,
 		isDown: stats.isDown,
 		operations,
-		workingStream: {
-			total: workingStream.total,
-			working: workingStream.working,
-			rate: workingStream.rate,
-			lastChecked: workingStream.lastChecked,
-			lastError: workingStream.lastError,
-			inProgress: workingStream.inProgress,
-		},
+		workingStream: stats.workingStream,
 	});
 }
 
@@ -80,7 +62,7 @@ function persistSnapshot(stats: RealDebridObservabilityStats) {
 
 function computeFullStats(): RealDebridObservabilityStats {
 	const core = getStats();
-	const workingStream = getWorkingStreamMetrics();
+	const workingStream = getCompactWorkingStreamMetrics();
 
 	return {
 		totalTracked: core.totalTracked,
@@ -106,47 +88,10 @@ function hasMeaningfulStats(stats: RealDebridObservabilityStats): boolean {
 	return Boolean(
 		stream &&
 			(stream.lastChecked !== null ||
-				stream.statuses.length > 0 ||
+				stream.failedServers.length > 0 ||
 				stream.lastError ||
 				stream.inProgress)
 	);
-}
-
-function toCompactWorkingStream(metrics: WorkingStreamMetrics): CompactWorkingStreamMetrics {
-	const failedServers = metrics.statuses
-		.filter((status) => !status.ok)
-		.map((status) => status.id);
-
-	return {
-		total: metrics.total,
-		working: metrics.working,
-		rate: metrics.rate,
-		lastChecked: metrics.lastChecked,
-		failedServers,
-		lastError: metrics.lastError,
-		inProgress: metrics.inProgress,
-	};
-}
-
-function toCompactStats(stats: RealDebridObservabilityStats): CompactRealDebridObservabilityStats {
-	const compactByOperation = Object.entries(stats.byOperation).reduce(
-		(acc, [key, value]) => {
-			acc[key] = {
-				successRate: value.successRate,
-				lastTs: value.lastTs,
-			};
-			return acc;
-		},
-		{} as Record<string, { successRate: number; lastTs: number | null }>
-	);
-
-	return {
-		successRate: stats.successRate,
-		lastTs: stats.lastTs,
-		isDown: stats.isDown,
-		byOperation: compactByOperation,
-		workingStream: toCompactWorkingStream(stats.workingStream),
-	};
 }
 
 function ensureSnapshotScheduler() {
@@ -190,24 +135,6 @@ export function getRealDebridObservabilityStats(): RealDebridObservabilityStats 
 	}
 
 	return computed;
-}
-
-export function getCompactRealDebridObservabilityStats(): CompactRealDebridObservabilityStats {
-	ensureSnapshotScheduler();
-	const computed = computeFullStats();
-	if (hasMeaningfulStats(computed)) {
-		persistSnapshot(computed);
-		return toCompactStats(computed);
-	}
-
-	const persisted = loadRealDebridSnapshot();
-	if (persisted) {
-		lastPersistedSignature = signatureFor(persisted);
-		console.info('Serving compact Real-Debrid observability stats from persisted snapshot');
-		return toCompactStats(persisted);
-	}
-
-	return toCompactStats(computed);
 }
 
 export const __testing = {

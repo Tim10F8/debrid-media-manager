@@ -37,6 +37,11 @@ export const SettingsSection = () => {
 	const [enableMediaFusion, setEnableMediaFusion] = useState(true);
 	const [enablePeerflix, setEnablePeerflix] = useState(true);
 	const [enableTorrentsDB, setEnableTorrentsDB] = useState(true);
+	const [enableTorrentioTor, setEnableTorrentioTor] = useState(true);
+	const [enableCometTor, setEnableCometTor] = useState(true);
+	const [enableMediaFusionTor, setEnableMediaFusionTor] = useState(true);
+	const [enablePeerflixTor, setEnablePeerflixTor] = useState(true);
+	const [enableTorrentsDBTor, setEnableTorrentsDBTor] = useState(true);
 
 	useEffect(() => {
 		if (typeof localStorage === 'undefined') return;
@@ -69,6 +74,11 @@ export const SettingsSection = () => {
 		setEnableMediaFusion(localStorage.getItem('settings:enableMediaFusion') !== 'false');
 		setEnablePeerflix(localStorage.getItem('settings:enablePeerflix') !== 'false');
 		setEnableTorrentsDB(localStorage.getItem('settings:enableTorrentsDB') !== 'false');
+		setEnableTorrentioTor(localStorage.getItem('settings:enableTorrentioTor') !== 'false');
+		setEnableCometTor(localStorage.getItem('settings:enableCometTor') !== 'false');
+		setEnableMediaFusionTor(localStorage.getItem('settings:enableMediaFusionTor') !== 'false');
+		setEnablePeerflixTor(localStorage.getItem('settings:enablePeerflixTor') !== 'false');
+		setEnableTorrentsDBTor(localStorage.getItem('settings:enableTorrentsDBTor') !== 'false');
 	}, []);
 
 	const handlePlayerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -169,6 +179,41 @@ export const SettingsSection = () => {
 		setEnableTorrentsDB(checked);
 		if (typeof localStorage !== 'undefined')
 			localStorage.setItem('settings:enableTorrentsDB', String(checked));
+	};
+
+	const handleEnableCometTorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const checked = e.target.checked;
+		setEnableCometTor(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:enableCometTor', String(checked));
+	};
+
+	const handleEnableMediaFusionTorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const checked = e.target.checked;
+		setEnableMediaFusionTor(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:enableMediaFusionTor', String(checked));
+	};
+
+	const handleEnablePeerflixTorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const checked = e.target.checked;
+		setEnablePeerflixTor(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:enablePeerflixTor', String(checked));
+	};
+
+	const handleEnableTorrentsDBTorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const checked = e.target.checked;
+		setEnableTorrentsDBTor(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:enableTorrentsDBTor', String(checked));
+	};
+
+	const handleEnableTorrentioTorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const checked = e.target.checked;
+		setEnableTorrentioTor(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:enableTorrentioTor', String(checked));
 	};
 
 	const handleHideInstructions = () => {
@@ -495,6 +540,67 @@ export const SettingsSection = () => {
 								Real-Debrid. Disable if you want to use only DMM&apos;s own search
 								results.
 							</span>
+						</div>
+
+						<div className="flex flex-col gap-2 rounded border-2 border-orange-500/30 p-3">
+							<div className="text-sm font-semibold text-orange-200">
+								Tor Proxy Options (bypasses rate limits)
+							</div>
+
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-enable-torrentio-tor"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									checked={enableTorrentioTor}
+									onChange={handleEnableTorrentioTorChange}
+								/>
+								<label className="font-semibold">Enable Torrentio (Tor)</label>
+							</div>
+
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-enable-comet-tor"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									checked={enableCometTor}
+									onChange={handleEnableCometTorChange}
+								/>
+								<label className="font-semibold">Enable Comet (Tor)</label>
+							</div>
+
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-enable-mediafusion-tor"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									checked={enableMediaFusionTor}
+									onChange={handleEnableMediaFusionTorChange}
+								/>
+								<label className="font-semibold">Enable MediaFusion (Tor)</label>
+							</div>
+
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-enable-peerflix-tor"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									checked={enablePeerflixTor}
+									onChange={handleEnablePeerflixTorChange}
+								/>
+								<label className="font-semibold">Enable Peerflix (Tor)</label>
+							</div>
+
+							<div className="flex items-center gap-2">
+								<input
+									id="dmm-enable-torrentsdb-tor"
+									type="checkbox"
+									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+									checked={enableTorrentsDBTor}
+									onChange={handleEnableTorrentsDBTorChange}
+								/>
+								<label className="font-semibold">Enable TorrentsDB (Tor)</label>
+							</div>
 						</div>
 					</div>
 				</div>

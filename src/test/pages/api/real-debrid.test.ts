@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import * as combined from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats, RealDebridOperation } from '@/lib/observability/rdOperationalStats';
-import type { WorkingStreamMetrics } from '@/lib/observability/streamServersHealth';
+import type { CompactWorkingStreamMetrics } from '@/lib/observability/streamServersHealth';
 import handler from '@/pages/api/observability/real-debrid';
 
 const operations: RealDebridOperation[] = [
@@ -38,12 +38,12 @@ describe('Real-Debrid observability API caching', () => {
 	});
 
 	it('emits cache-busting headers on success', async () => {
-		const fakeWorkingStream: WorkingStreamMetrics = {
+		const fakeWorkingStream: CompactWorkingStreamMetrics = {
 			total: 1,
 			working: 1,
 			rate: 1,
 			lastChecked: Date.now(),
-			statuses: [],
+			failedServers: [],
 			lastError: null,
 			inProgress: false,
 		};
@@ -83,5 +83,47 @@ describe('Real-Debrid observability API caching', () => {
 		expect(res.status).toHaveBeenCalledWith(200);
 		expect(res.json).toHaveBeenCalledWith(fakeStats);
 		expect(fakeStats.workingStream.inProgress).toBe(false);
+	});
+
+	it('returns observability stats for default requests', async () => {
+		const fakeWorkingStream: CompactWorkingStreamMetrics = {
+			total: 6,
+			working: 4,
+			rate: 4 / 6,
+			lastChecked: Date.now(),
+			failedServers: ['21-4', '22-4'],
+			lastError: null,
+			inProgress: false,
+		};
+		const fakeStats: ReturnType<typeof combined.getRealDebridObservabilityStats> = {
+			totalTracked: 12,
+			successCount: 10,
+			failureCount: 2,
+			considered: 12,
+			successRate: 10 / 12,
+			lastTs: Date.now(),
+			isDown: false,
+			monitoredOperations: operations,
+			byOperation: buildEmptyByOperation(),
+			windowSize: 10,
+			workingStream: fakeWorkingStream,
+		};
+		const statsSpy = vi
+			.spyOn(combined, 'getRealDebridObservabilityStats')
+			.mockReturnValue(fakeStats);
+
+		const res = {
+			setHeader: vi.fn(),
+			status: vi.fn(),
+			json: vi.fn(),
+		} as any;
+		res.status.mockReturnValue(res);
+		res.json.mockReturnValue(res);
+
+		await handler({ method: 'GET', query: {} } as any, res);
+
+		expect(res.status).toHaveBeenCalledWith(200);
+		expect(res.json).toHaveBeenCalledWith(fakeStats);
+		expect(statsSpy).toHaveBeenCalledTimes(1);
 	});
 });

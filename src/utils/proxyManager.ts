@@ -11,7 +11,7 @@ class ProxyManager {
 	}
 
 	getWorkingProxy(): SocksProxyAgent {
-		if (ProxyManager.workingProxies.length > 5) {
+		if (ProxyManager.workingProxies.length > 10) {
 			const randomProxy =
 				ProxyManager.workingProxies[
 					Math.floor(Math.random() * ProxyManager.workingProxies.length)
@@ -27,6 +27,12 @@ class ProxyManager {
 				timeout: parseInt(process.env.REQUEST_TIMEOUT!),
 			});
 		}
+	}
+
+	getTorProxy(): SocksProxyAgent {
+		return new SocksProxyAgent('socks5h://any_username:any_password@localhost:9050', {
+			timeout: parseInt(process.env.REQUEST_TIMEOUT!) || 30000,
+		});
 	}
 
 	rerollProxy() {

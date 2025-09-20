@@ -5,7 +5,6 @@ import path from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-	getCompactRealDebridObservabilityStats,
 	getRealDebridObservabilityStats,
 	__testing as observabilityTesting,
 	type RealDebridObservabilityStats,
@@ -13,7 +12,7 @@ import {
 import type { OperationStats, RealDebridOperation } from '@/lib/observability/rdOperationalStats';
 import * as rdOperationalStats from '@/lib/observability/rdOperationalStats';
 import * as snapshotModule from '@/lib/observability/realDebridSnapshot';
-import type { WorkingStreamMetrics } from '@/lib/observability/streamServersHealth';
+import type { CompactWorkingStreamMetrics } from '@/lib/observability/streamServersHealth';
 import * as streamServersHealth from '@/lib/observability/streamServersHealth';
 
 const operations: RealDebridOperation[] = [
@@ -46,13 +45,15 @@ function buildByOperation(
 	);
 }
 
-function buildWorkingStream(overrides: Partial<WorkingStreamMetrics> = {}): WorkingStreamMetrics {
+function buildWorkingStream(
+	overrides: Partial<CompactWorkingStreamMetrics> = {}
+): CompactWorkingStreamMetrics {
 	return {
 		total: 0,
 		working: 0,
 		rate: 0,
 		lastChecked: null,
-		statuses: [],
+		failedServers: [],
 		lastError: null,
 		inProgress: false,
 		...overrides,
@@ -116,30 +117,14 @@ describe('Real-Debrid observability persistence', () => {
 			working: 1,
 			rate: 0.5,
 			lastChecked: 1700000000100,
-			statuses: [
-				{
-					id: '20-1',
-					url: 'https://20-1.download.real-debrid.com/test',
-					status: 200,
-					contentLength: 1024,
-					ok: true,
-					checkedAt: 1700000000200,
-					error: null,
-				},
-				{
-					id: '20-2',
-					url: 'https://20-2.download.real-debrid.com/test',
-					status: 503,
-					contentLength: null,
-					ok: false,
-					checkedAt: 1700000000200,
-					error: 'Upstream failure',
-				},
-			],
+			failedServers: ['20-2'],
+			lastError: 'Upstream failure',
 		});
 
 		vi.spyOn(rdOperationalStats, 'getStats').mockReturnValue(core);
-		vi.spyOn(streamServersHealth, 'getWorkingStreamMetrics').mockReturnValue(workingStream);
+		vi.spyOn(streamServersHealth, 'getCompactWorkingStreamMetrics').mockReturnValue(
+			workingStream
+		);
 
 		const result = getRealDebridObservabilityStats();
 
@@ -148,7 +133,7 @@ describe('Real-Debrid observability persistence', () => {
 			fs.readFileSync(snapshotPath, 'utf8')
 		) as RealDebridObservabilityStats;
 		expect(parsed.totalTracked).toBe(result.totalTracked);
-		expect(parsed.workingStream.statuses.length).toBe(2);
+		expect(parsed.workingStream.failedServers).toEqual(['20-2']);
 		expect(parsed.byOperation['GET /user'].successRate).toBeCloseTo(0.8);
 	});
 
@@ -178,26 +163,8 @@ describe('Real-Debrid observability persistence', () => {
 				working: 2,
 				rate: 2 / 3,
 				lastChecked: 1700001000200,
-				statuses: [
-					{
-						id: '21-1',
-						url: 'https://21-1.download.real-debrid.com',
-						status: 200,
-						contentLength: 2048,
-						ok: true,
-						checkedAt: 1700001000200,
-						error: null,
-					},
-					{
-						id: '21-2',
-						url: 'https://21-2.download.real-debrid.com',
-						status: 500,
-						contentLength: null,
-						ok: false,
-						checkedAt: 1700001000200,
-						error: 'Server error',
-					},
-				],
+				failedServers: ['21-2'],
+				lastError: 'Server error',
 			}),
 		};
 
@@ -219,7 +186,7 @@ describe('Real-Debrid observability persistence', () => {
 		const emptyWorkingStream = buildWorkingStream();
 
 		vi.spyOn(rdOperationalStats, 'getStats').mockReturnValue(emptyCore);
-		vi.spyOn(streamServersHealth, 'getWorkingStreamMetrics').mockReturnValue(
+		vi.spyOn(streamServersHealth, 'getCompactWorkingStreamMetrics').mockReturnValue(
 			emptyWorkingStream
 		);
 		const saveSpy = vi.spyOn(snapshotModule, 'saveRealDebridSnapshot');
@@ -227,86 +194,6 @@ describe('Real-Debrid observability persistence', () => {
 		const result = getRealDebridObservabilityStats();
 
 		expect(result).toEqual(persisted);
-		expect(saveSpy).not.toHaveBeenCalled();
-	});
-
-	it('uses persisted snapshot for compact stats fallback', () => {
-		const persisted: RealDebridObservabilityStats = {
-			totalTracked: 8,
-			successCount: 6,
-			failureCount: 2,
-			considered: 8,
-			successRate: 0.75,
-			lastTs: 1700002000000,
-			isDown: false,
-			monitoredOperations: operations,
-			byOperation: buildByOperation({
-				'GET /user': {
-					totalTracked: 8,
-					successCount: 6,
-					failureCount: 2,
-					considered: 8,
-					successRate: 0.75,
-					lastTs: 1700002000000,
-				},
-			}),
-			windowSize: 10000,
-			workingStream: buildWorkingStream({
-				total: 4,
-				working: 3,
-				rate: 0.75,
-				lastChecked: 1700002000200,
-				statuses: [
-					{
-						id: '22-1',
-						url: 'https://22-1.download.real-debrid.com',
-						status: 200,
-						contentLength: 1024,
-						ok: true,
-						checkedAt: 1700002000200,
-						error: null,
-					},
-					{
-						id: '22-2',
-						url: 'https://22-2.download.real-debrid.com',
-						status: 503,
-						contentLength: null,
-						ok: false,
-						checkedAt: 1700002000200,
-						error: 'Unavailable',
-					},
-				],
-			}),
-		};
-
-		fs.writeFileSync(snapshotPath, JSON.stringify(persisted));
-
-		const emptyCore = {
-			totalTracked: 0,
-			successCount: 0,
-			failureCount: 0,
-			considered: 0,
-			successRate: 0,
-			lastTs: null,
-			isDown: false,
-			monitoredOperations: operations,
-			byOperation: buildByOperation(),
-			windowSize: 10000,
-		} satisfies ReturnType<typeof rdOperationalStats.getStats>;
-
-		const emptyWorkingStream = buildWorkingStream();
-
-		vi.spyOn(rdOperationalStats, 'getStats').mockReturnValue(emptyCore);
-		vi.spyOn(streamServersHealth, 'getWorkingStreamMetrics').mockReturnValue(
-			emptyWorkingStream
-		);
-		const saveSpy = vi.spyOn(snapshotModule, 'saveRealDebridSnapshot');
-
-		const compact = getCompactRealDebridObservabilityStats();
-
-		expect(compact.successRate).toBeCloseTo(persisted.successRate);
-		expect(compact.byOperation['GET /user'].successRate).toBeCloseTo(0.75);
-		expect(compact.workingStream.failedServers).toEqual(['22-2']);
 		expect(saveSpy).not.toHaveBeenCalled();
 	});
 });
