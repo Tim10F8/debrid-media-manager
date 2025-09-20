@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import Sqlite from 'better-sqlite3';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -60,37 +61,95 @@ function buildWorkingStream(
 	};
 }
 
-function createSnapshotPath(): string {
+function createTempPath(extension: string): string {
 	return path.join(
 		os.tmpdir(),
-		`rd-observability-${Date.now()}-${Math.random().toString(36).slice(2)}.json`
+		`rd-observability-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
 	);
 }
 
-const originalSnapshotEnv = process.env.REAL_DEBRID_OBSERVABILITY_SNAPSHOT_PATH;
-let snapshotPath: string;
+const originalSqliteEnv = process.env.REAL_DEBRID_OBSERVABILITY_SQLITE_PATH;
+const originalJsonEnv = process.env.REAL_DEBRID_OBSERVABILITY_SNAPSHOT_PATH;
+let sqlitePath: string;
+let cleanupTargets: string[];
+
+function readSnapshotFromSqlite(filePath: string): RealDebridObservabilityStats | null {
+	if (!fs.existsSync(filePath)) {
+		return null;
+	}
+	const db = new Sqlite(filePath, { readonly: true, fileMustExist: true });
+	try {
+		const row = db.prepare('SELECT payload FROM snapshot WHERE id = 1').get() as
+			| { payload: string }
+			| undefined;
+		if (!row || !row.payload) {
+			return null;
+		}
+		return JSON.parse(row.payload) as RealDebridObservabilityStats;
+	} finally {
+		db.close();
+	}
+}
+
+function seedSqliteSnapshot(filePath: string, snapshot: RealDebridObservabilityStats) {
+	const directory = path.dirname(filePath);
+	if (!fs.existsSync(directory)) {
+		fs.mkdirSync(directory, { recursive: true });
+	}
+	const db = new Sqlite(filePath);
+	try {
+		db.exec(
+			`CREATE TABLE IF NOT EXISTS snapshot (
+				id INTEGER PRIMARY KEY CHECK (id = 1),
+				payload TEXT NOT NULL,
+				updated_at INTEGER NOT NULL
+			)`
+		);
+		db.prepare(
+			`INSERT INTO snapshot (id, payload, updated_at)
+			 VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`
+		).run(JSON.stringify(snapshot), Date.now());
+	} finally {
+		db.close();
+	}
+}
 
 beforeEach(() => {
 	observabilityTesting.resetState();
-	snapshotPath = createSnapshotPath();
-	process.env.REAL_DEBRID_OBSERVABILITY_SNAPSHOT_PATH = snapshotPath;
+	sqlitePath = createTempPath('sqlite');
+	cleanupTargets = [sqlitePath];
+	process.env.REAL_DEBRID_OBSERVABILITY_SQLITE_PATH = sqlitePath;
+	delete process.env.REAL_DEBRID_OBSERVABILITY_SNAPSHOT_PATH;
 });
 
 afterEach(() => {
 	vi.restoreAllMocks();
 	observabilityTesting.resetState();
-	if (snapshotPath && fs.existsSync(snapshotPath)) {
-		fs.unlinkSync(snapshotPath);
+	for (const target of cleanupTargets) {
+		try {
+			fs.rmSync(target, { force: true });
+		} catch (error) {
+			console.error('Failed cleaning up snapshot test artifact', target, error);
+		}
 	}
+	cleanupTargets = [];
 });
 
 afterAll(() => {
-	process.env.REAL_DEBRID_OBSERVABILITY_SNAPSHOT_PATH = originalSnapshotEnv;
+	if (originalSqliteEnv) {
+		process.env.REAL_DEBRID_OBSERVABILITY_SQLITE_PATH = originalSqliteEnv;
+	} else {
+		delete process.env.REAL_DEBRID_OBSERVABILITY_SQLITE_PATH;
+	}
+	if (originalJsonEnv) {
+		process.env.REAL_DEBRID_OBSERVABILITY_SNAPSHOT_PATH = originalJsonEnv;
+	} else {
+		delete process.env.REAL_DEBRID_OBSERVABILITY_SNAPSHOT_PATH;
+	}
 });
 
 describe('Real-Debrid observability persistence', () => {
 	it('persists snapshots when live stats have data', () => {
-		const renameSpy = vi.spyOn(fs, 'renameSync');
 		const core = {
 			totalTracked: 5,
 			successCount: 4,
@@ -129,14 +188,12 @@ describe('Real-Debrid observability persistence', () => {
 
 		const result = getRealDebridObservabilityStats();
 
-		expect(fs.existsSync(snapshotPath)).toBe(true);
-		const parsed = JSON.parse(
-			fs.readFileSync(snapshotPath, 'utf8')
-		) as RealDebridObservabilityStats;
-		expect(parsed.totalTracked).toBe(result.totalTracked);
-		expect(parsed.workingStream.failedServers).toEqual(['20-2']);
-		expect(parsed.byOperation['GET /user'].successRate).toBeCloseTo(0.8);
-		expect(renameSpy).toHaveBeenCalledWith(expect.stringContaining('.tmp'), snapshotPath);
+		expect(fs.existsSync(sqlitePath)).toBe(true);
+		const parsed = readSnapshotFromSqlite(sqlitePath);
+		expect(parsed).not.toBeNull();
+		expect(parsed?.totalTracked).toBe(result.totalTracked);
+		expect(parsed?.workingStream.failedServers).toEqual(['20-2']);
+		expect(parsed?.byOperation['GET /user'].successRate).toBeCloseTo(0.8);
 	});
 
 	it('serves persisted snapshot when live stats are empty', () => {
@@ -170,7 +227,7 @@ describe('Real-Debrid observability persistence', () => {
 			}),
 		};
 
-		fs.writeFileSync(snapshotPath, JSON.stringify(persisted));
+		seedSqliteSnapshot(sqlitePath, persisted);
 
 		const emptyCore = {
 			totalTracked: 0,
@@ -199,58 +256,71 @@ describe('Real-Debrid observability persistence', () => {
 		expect(saveSpy).not.toHaveBeenCalled();
 	});
 
-	it('cleans up temporary snapshot files and surfaces errors when persistence fails', () => {
-		const core = {
-			totalTracked: 3,
-			successCount: 3,
-			failureCount: 0,
-			considered: 3,
-			successRate: 1,
-			lastTs: 1700000000200,
+	it('migrates legacy JSON snapshot into sqlite when configured', () => {
+		const jsonPath = createTempPath('json');
+		cleanupTargets.push(jsonPath);
+		const legacySnapshot: RealDebridObservabilityStats = {
+			totalTracked: 12,
+			successCount: 11,
+			failureCount: 1,
+			considered: 12,
+			successRate: 11 / 12,
+			lastTs: 1700002000000,
 			isDown: false,
 			monitoredOperations: operations,
 			byOperation: buildByOperation({
 				'GET /user': {
-					totalTracked: 3,
-					successCount: 3,
-					failureCount: 0,
-					considered: 3,
-					successRate: 1,
-					lastTs: 1700000000200,
+					totalTracked: 12,
+					successCount: 11,
+					failureCount: 1,
+					considered: 12,
+					successRate: 11 / 12,
+					lastTs: 1700002000000,
 				},
 			}),
 			windowSize: 10000,
+			workingStream: buildWorkingStream({
+				total: 1,
+				working: 1,
+				rate: 1,
+				lastChecked: 1700002000100,
+			}),
+		};
+
+		fs.writeFileSync(jsonPath, JSON.stringify(legacySnapshot));
+
+		observabilityTesting.resetState();
+		delete process.env.REAL_DEBRID_OBSERVABILITY_SQLITE_PATH;
+		process.env.REAL_DEBRID_OBSERVABILITY_SNAPSHOT_PATH = jsonPath;
+
+		const expectedSqlitePath = jsonPath.replace(/\.json$/i, '.sqlite');
+		cleanupTargets.push(expectedSqlitePath);
+
+		const emptyCore = {
+			totalTracked: 0,
+			successCount: 0,
+			failureCount: 0,
+			considered: 0,
+			successRate: 0,
+			lastTs: null,
+			isDown: false,
+			monitoredOperations: operations,
+			byOperation: buildByOperation(),
+			windowSize: 10000,
 		} satisfies ReturnType<typeof rdOperationalStats.getStats>;
 
-		const workingStream = buildWorkingStream({
-			total: 1,
-			working: 1,
-			rate: 1,
-			lastChecked: 1700000000300,
-		});
+		const emptyWorkingStream = buildWorkingStream();
 
-		const renameError = new Error('rename failed');
-		vi.spyOn(rdOperationalStats, 'getStats').mockReturnValue(core);
+		vi.spyOn(rdOperationalStats, 'getStats').mockReturnValue(emptyCore);
 		vi.spyOn(streamServersHealth, 'getCompactWorkingStreamMetrics').mockReturnValue(
-			workingStream
+			emptyWorkingStream
 		);
-		vi.spyOn(fs, 'renameSync').mockImplementation(() => {
-			throw renameError;
-		});
-		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-		getRealDebridObservabilityStats();
+		const result = getRealDebridObservabilityStats();
 
-		const directoryEntries = fs.readdirSync(path.dirname(snapshotPath));
-		const snapshotBase = path.basename(snapshotPath);
-		const tempEntries = directoryEntries.filter(
-			(entry) => entry.startsWith(snapshotBase) && entry.endsWith('.tmp')
-		);
-		expect(tempEntries).toHaveLength(0);
-		expect(fs.existsSync(snapshotPath)).toBe(false);
-		expect(consoleErrorSpy).toHaveBeenCalledWith(
-			expect.stringContaining('Failed to persist Real-Debrid observability snapshot'),
-			renameError
-		);
+		expect(result).toEqual(legacySnapshot);
+		expect(fs.existsSync(expectedSqlitePath)).toBe(true);
+		const hydrated = readSnapshotFromSqlite(expectedSqlitePath);
+		expect(hydrated).toEqual(legacySnapshot);
 	});
 });
