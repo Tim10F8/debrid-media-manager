@@ -37,7 +37,8 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 
 		const loadFreshStats = async () => {
 			try {
-				const response = await fetch('/api/observability/real-debrid', {
+				const cacheBuster = Date.now() + Math.random().toString(36).substring(7);
+				const response = await fetch(`/api/observability/real-debrid?_t=${cacheBuster}`, {
 					cache: 'no-store',
 				});
 				if (!response.ok) {

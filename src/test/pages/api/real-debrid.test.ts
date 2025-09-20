@@ -73,7 +73,7 @@ describe('Real-Debrid observability API caching', () => {
 		res.status.mockReturnValue(res);
 		res.json.mockReturnValue(res);
 
-		await handler({ method: 'GET' } as any, res);
+		await handler({ method: 'GET', query: { verbose: 'true' } } as any, res);
 
 		expect(headerStore['Cache-Control']).toBe('private, no-store, no-cache, must-revalidate');
 		expect(headerStore['CDN-Cache-Control']).toBe('no-store');

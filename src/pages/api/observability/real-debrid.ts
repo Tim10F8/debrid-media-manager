@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { getRealDebridObservabilityStats } from '@/lib/observability/getRealDebridObservabilityStats';
+import {
+	getCompactRealDebridObservabilityStats,
+	getRealDebridObservabilityStats,
+} from '@/lib/observability/getRealDebridObservabilityStats';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
 	if (req.method !== 'GET') {
@@ -14,5 +17,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 	res.setHeader('Pragma', 'no-cache');
 	res.setHeader('Expires', '0');
 
-	return res.status(200).json(getRealDebridObservabilityStats());
+	const verbose = req.query.verbose === 'true';
+
+	if (verbose) {
+		return res.status(200).json(getRealDebridObservabilityStats());
+	}
+
+	return res.status(200).json(getCompactRealDebridObservabilityStats());
 }

@@ -31,6 +31,28 @@ const torrentSnapshotReplacer = (_key: string, value: unknown) => {
 const buildTorrentSignature = (torrent: UserTorrent): string =>
 	JSON.stringify(torrent, torrentSnapshotReplacer);
 
+const normalizeToken = (token: string | null | undefined): string | null => {
+	if (typeof token !== 'string') {
+		return null;
+	}
+	const trimmed = token.trim();
+	return trimmed.length > 0 ? trimmed : null;
+};
+
+const logTokenTransition = (
+	label: string,
+	current: string | null,
+	previous: string | null,
+	meta: Record<string, unknown> = {}
+) => {
+	console.log(`[LibraryCache] ${label} token transition`, {
+		current,
+		previous,
+		changed: current !== previous,
+		...meta,
+	});
+};
+
 interface LibraryStats {
 	totalItems: number;
 	rdItems: number;
@@ -138,9 +160,14 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	const dbSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const lastPersistedSnapshotRef = useRef<Map<string, string>>(new Map());
 	const previousTokenStateRef = useRef({
-		rd: typeof rdKey === 'string' && rdKey.trim().length > 0,
-		ad: typeof adKey === 'string' && adKey.trim().length > 0,
-		tb: typeof tbKey === 'string' && tbKey.trim().length > 0,
+		rd: normalizeToken(rdKey),
+		ad: normalizeToken(adKey),
+		tb: normalizeToken(tbKey),
+	});
+	const initialRefreshDoneRef = useRef({
+		rd: false,
+		ad: false,
+		tb: false,
 	});
 
 	// Update statistics
@@ -233,44 +260,6 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		if (!tbKey) {
 			setTbLibrary([]);
 		}
-	}, [tbKey]);
-
-	useEffect(() => {
-		const hasAd = typeof adKey === 'string' && adKey.trim().length > 0;
-		const wasAd = previousTokenStateRef.current.ad;
-		console.log('[LibraryCache] AllDebrid token check', { hasAd, wasAd });
-		previousTokenStateRef.current.ad = hasAd;
-		if (!hasAd || wasAd) {
-			return;
-		}
-
-		console.log('[LibraryCache] New AllDebrid token detected, triggering refresh');
-		void (async () => {
-			try {
-				await refreshLibraryRef.current?.('alldebrid', true);
-			} catch (error) {
-				console.error('[LibraryCache] Auto refresh for AllDebrid failed', error);
-			}
-		})();
-	}, [adKey]);
-
-	useEffect(() => {
-		const hasTb = typeof tbKey === 'string' && tbKey.trim().length > 0;
-		const wasTb = previousTokenStateRef.current.tb;
-		console.log('[LibraryCache] TorBox token check', { hasTb, wasTb });
-		previousTokenStateRef.current.tb = hasTb;
-		if (!hasTb || wasTb) {
-			return;
-		}
-
-		console.log('[LibraryCache] New TorBox token detected, triggering refresh');
-		void (async () => {
-			try {
-				await refreshLibraryRef.current?.('torbox', true);
-			} catch (error) {
-				console.error('[LibraryCache] Auto refresh for TorBox failed', error);
-			}
-		})();
 	}, [tbKey]);
 
 	// Update combined library
@@ -386,6 +375,12 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 
 				console.log(`[LibraryCache] Starting refresh for ${target}, force: ${force}`);
 
+				console.log('[LibraryCache] runSingle sync starting', {
+					target,
+					force,
+					tokenPresent: Boolean(token),
+				});
+
 				setSyncStatus({
 					isLoading: false,
 					isSyncing: true,
@@ -401,6 +396,11 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 					const options: FetchOptions = {
 						forceRefresh: force,
 						onProgress: (progress, total) => {
+							console.log('[LibraryCache] runSingle onProgress', {
+								target,
+								progress,
+								total,
+							});
 							setSyncStatus((prev) => ({
 								...prev,
 								progress,
@@ -413,6 +413,12 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 					const syncCompletedAt = new Date();
 
 					const fetchTime = Date.now() - startTime;
+					console.log('[LibraryCache] runSingle completed', {
+						target,
+						count: torrents.length,
+						fetchTime,
+						force,
+					});
 					fetchTimesRef.current.push(fetchTime);
 					if (fetchTimesRef.current.length > 100) {
 						fetchTimesRef.current.shift();
@@ -462,8 +468,16 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 
 			if (!service) {
 				const services: Service[] = ['realdebrid', 'alldebrid', 'torbox'];
+				console.log('[LibraryCache] refreshLibrary multi-service start', {
+					force,
+					services,
+				});
 				for (const target of services) {
 					const token = tokens[target];
+					console.log('[LibraryCache] refreshLibrary evaluating service', {
+						target,
+						hasToken: Boolean(token),
+					});
 					if (token) {
 						await runSingle(target, token);
 					}
@@ -471,6 +485,11 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 				return;
 			}
 
+			console.log('[LibraryCache] refreshLibrary single-service start', {
+				service,
+				force,
+				tokenPresent: Boolean(tokens[service]),
+			});
 			await runSingle(service, tokens[service]);
 		},
 		[rdKey, adKey, tbKey]
@@ -483,10 +502,124 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		[refreshLibrary]
 	);
 
-	const refreshLibraryRef = useRef(refreshLibrary);
+	const scheduleServiceRefresh = useCallback(
+		async (
+			target: 'realdebrid' | 'alldebrid' | 'torbox',
+			reason: 'tokenChanged' | 'initialEmpty'
+		) => {
+			console.log('[LibraryCache] scheduling service refresh', { target, reason });
+			try {
+				await refreshLibrary(target, true);
+			} catch (error) {
+				console.error('[LibraryCache] Auto refresh failed', { target, error });
+				initialRefreshDoneRef.current[
+					target === 'realdebrid' ? 'rd' : target === 'alldebrid' ? 'ad' : 'tb'
+				] = false;
+			}
+		},
+		[refreshLibrary]
+	);
+
 	useEffect(() => {
-		refreshLibraryRef.current = refreshLibrary;
-	}, [refreshLibrary]);
+		const currentToken = normalizeToken(rdKey);
+		const previousToken = previousTokenStateRef.current.rd;
+		const tokenChanged = currentToken !== previousToken;
+		logTokenTransition('RealDebrid', currentToken, previousToken, {
+			rdLoading,
+			librarySize: rdLibrary.length,
+			hasFetched: initialRefreshDoneRef.current.rd,
+		});
+
+		if (rdLoading) {
+			return;
+		}
+
+		if (!currentToken) {
+			previousTokenStateRef.current.rd = null;
+			initialRefreshDoneRef.current.rd = false;
+			return;
+		}
+
+		if (tokenChanged) {
+			initialRefreshDoneRef.current.rd = false;
+		}
+
+		previousTokenStateRef.current.rd = currentToken;
+
+		const hasFetched = initialRefreshDoneRef.current.rd;
+		const shouldRefresh = tokenChanged || (!hasFetched && rdLibrary.length === 0);
+
+		if (!shouldRefresh) {
+			return;
+		}
+
+		initialRefreshDoneRef.current.rd = true;
+		void scheduleServiceRefresh('realdebrid', tokenChanged ? 'tokenChanged' : 'initialEmpty');
+	}, [rdKey, rdLoading, rdLibrary.length, scheduleServiceRefresh]);
+
+	useEffect(() => {
+		const currentToken = normalizeToken(adKey);
+		const previousToken = previousTokenStateRef.current.ad;
+		const tokenChanged = currentToken !== previousToken;
+		logTokenTransition('AllDebrid', currentToken, previousToken, {
+			librarySize: adLibrary.length,
+			hasFetched: initialRefreshDoneRef.current.ad,
+		});
+
+		if (!currentToken) {
+			previousTokenStateRef.current.ad = null;
+			initialRefreshDoneRef.current.ad = false;
+			return;
+		}
+
+		if (tokenChanged) {
+			initialRefreshDoneRef.current.ad = false;
+		}
+
+		previousTokenStateRef.current.ad = currentToken;
+
+		const hasFetched = initialRefreshDoneRef.current.ad;
+		const shouldRefresh = tokenChanged || (!hasFetched && adLibrary.length === 0);
+
+		if (!shouldRefresh) {
+			return;
+		}
+
+		initialRefreshDoneRef.current.ad = true;
+		void scheduleServiceRefresh('alldebrid', tokenChanged ? 'tokenChanged' : 'initialEmpty');
+	}, [adKey, adLibrary.length, scheduleServiceRefresh]);
+
+	useEffect(() => {
+		const currentToken = normalizeToken(tbKey);
+		const previousToken = previousTokenStateRef.current.tb;
+		const tokenChanged = currentToken !== previousToken;
+		logTokenTransition('TorBox', currentToken, previousToken, {
+			librarySize: tbLibrary.length,
+			hasFetched: initialRefreshDoneRef.current.tb,
+		});
+
+		if (!currentToken) {
+			previousTokenStateRef.current.tb = null;
+			initialRefreshDoneRef.current.tb = false;
+			return;
+		}
+
+		if (tokenChanged) {
+			initialRefreshDoneRef.current.tb = false;
+		}
+
+		previousTokenStateRef.current.tb = currentToken;
+
+		const hasFetched = initialRefreshDoneRef.current.tb;
+		const shouldRefresh = tokenChanged || (!hasFetched && tbLibrary.length === 0);
+
+		if (!shouldRefresh) {
+			return;
+		}
+
+		initialRefreshDoneRef.current.tb = true;
+		void scheduleServiceRefresh('torbox', tokenChanged ? 'tokenChanged' : 'initialEmpty');
+	}, [tbKey, tbLibrary.length, scheduleServiceRefresh]);
 
 	// Clear cache
 	const clearCache = async (service?: string) => {

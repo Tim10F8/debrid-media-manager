@@ -274,6 +274,33 @@ export function getWorkingStreamMetrics(): WorkingStreamMetrics {
 	};
 }
 
+export interface CompactWorkingStreamMetrics {
+	total: number;
+	working: number;
+	rate: number;
+	lastChecked: number | null;
+	failedServers: string[];
+	lastError: string | null;
+	inProgress: boolean;
+}
+
+export function getCompactWorkingStreamMetrics(): CompactWorkingStreamMetrics {
+	const state = getStore();
+	const failedServers = state.metrics.statuses
+		.filter((status) => !status.ok)
+		.map((status) => status.id);
+
+	return {
+		total: state.metrics.total,
+		working: state.metrics.working,
+		rate: state.metrics.rate,
+		lastChecked: state.metrics.lastChecked,
+		failedServers,
+		lastError: state.metrics.lastError,
+		inProgress: state.metrics.inProgress,
+	};
+}
+
 export const __testing = {
 	reset() {
 		clearState();

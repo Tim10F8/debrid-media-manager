@@ -118,19 +118,26 @@ describe('EnhancedLibraryCacheContext refreshLibrary', () => {
 	it('refreshes every authenticated service when called without an explicit target', async () => {
 		mockedUseRealDebridAccessToken.mockReturnValue(['rd-token', false, false]);
 		mockedUseAllDebridApiKey.mockReturnValue('ad-token');
-		fetchLibraryMock
-			.mockResolvedValueOnce([{ id: 'rd:1' }] as any)
-			.mockResolvedValueOnce([{ id: 'ad:1' }] as any);
+		fetchLibraryMock.mockImplementation((service) => {
+			if (service === 'realdebrid') {
+				return Promise.resolve([{ id: 'rd:1' }] as any);
+			}
+			if (service === 'alldebrid') {
+				return Promise.resolve([{ id: 'ad:1' }] as any);
+			}
+			return Promise.resolve([]);
+		});
 
 		const { result } = renderHook(() => useEnhancedLibraryCache(), { wrapper });
 
 		await waitFor(() => expect(result.current.refreshLibrary).toBeDefined());
+		await waitFor(() => expect(fetchLibraryMock).toHaveBeenCalledTimes(2));
 
 		await act(async () => {
 			await result.current.refreshLibrary(undefined, true);
 		});
 
-		expect(fetchLibraryMock).toHaveBeenCalledTimes(2);
+		expect(fetchLibraryMock).toHaveBeenCalledTimes(4);
 		expect(fetchLibraryMock).toHaveBeenNthCalledWith(
 			1,
 			'realdebrid',
@@ -139,6 +146,18 @@ describe('EnhancedLibraryCacheContext refreshLibrary', () => {
 		);
 		expect(fetchLibraryMock).toHaveBeenNthCalledWith(
 			2,
+			'alldebrid',
+			'ad-token',
+			expect.objectContaining({ forceRefresh: true })
+		);
+		expect(fetchLibraryMock).toHaveBeenNthCalledWith(
+			3,
+			'realdebrid',
+			'rd-token',
+			expect.objectContaining({ forceRefresh: true })
+		);
+		expect(fetchLibraryMock).toHaveBeenNthCalledWith(
+			4,
 			'alldebrid',
 			'ad-token',
 			expect.objectContaining({ forceRefresh: true })
@@ -155,5 +174,98 @@ describe('EnhancedLibraryCacheContext refreshLibrary', () => {
 				await result.current.refreshLibrary('alldebrid', false);
 			})
 		).rejects.toThrow('No token for alldebrid');
+	});
+
+	it('auto refreshes AllDebrid when api key becomes available', async () => {
+		fetchLibraryMock.mockResolvedValue([]);
+		mockedUseAllDebridApiKey.mockReturnValueOnce(null);
+		mockedUseAllDebridApiKey.mockReturnValue('ad-token');
+
+		const { rerender } = renderHook(() => useEnhancedLibraryCache(), { wrapper });
+
+		await act(async () => {
+			rerender();
+		});
+
+		await waitFor(() =>
+			expect(fetchLibraryMock).toHaveBeenCalledWith(
+				'alldebrid',
+				'ad-token',
+				expect.objectContaining({ forceRefresh: true })
+			)
+		);
+	});
+
+	it('auto refreshes RealDebrid when access token becomes available', async () => {
+		fetchLibraryMock.mockResolvedValue([]);
+		mockedUseRealDebridAccessToken
+			.mockReturnValueOnce([null, false, false])
+			.mockReturnValue(['rd-token', false, false]);
+
+		const { rerender } = renderHook(() => useEnhancedLibraryCache(), { wrapper });
+
+		await act(async () => {
+			rerender();
+		});
+
+		await waitFor(() =>
+			expect(fetchLibraryMock).toHaveBeenCalledWith(
+				'realdebrid',
+				'rd-token',
+				expect.objectContaining({ forceRefresh: true })
+			)
+		);
+	});
+
+	it('auto refreshes AllDebrid when api key changes to a different value', async () => {
+		fetchLibraryMock.mockResolvedValue([]);
+		mockedUseAllDebridApiKey.mockReturnValue('first-token');
+
+		const { rerender } = renderHook(() => useEnhancedLibraryCache(), { wrapper });
+
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		fetchLibraryMock.mockClear();
+		mockedUseAllDebridApiKey.mockReturnValue('second-token');
+
+		await act(async () => {
+			rerender();
+		});
+
+		await waitFor(() =>
+			expect(fetchLibraryMock).toHaveBeenCalledWith(
+				'alldebrid',
+				'second-token',
+				expect.objectContaining({ forceRefresh: true })
+			)
+		);
+	});
+
+	it('auto refreshes RealDebrid when access token changes to a different value', async () => {
+		fetchLibraryMock.mockResolvedValue([]);
+		mockedUseRealDebridAccessToken.mockReturnValue(['first-token', false, false]);
+
+		const { rerender } = renderHook(() => useEnhancedLibraryCache(), { wrapper });
+
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		fetchLibraryMock.mockClear();
+		mockedUseRealDebridAccessToken.mockReturnValue(['second-token', false, false]);
+
+		await act(async () => {
+			rerender();
+		});
+
+		await waitFor(() =>
+			expect(fetchLibraryMock).toHaveBeenCalledWith(
+				'realdebrid',
+				'second-token',
+				expect.objectContaining({ forceRefresh: true })
+			)
+		);
 	});
 });
