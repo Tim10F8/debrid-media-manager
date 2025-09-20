@@ -43,7 +43,11 @@ describe('handleReinsertTorrentinRd', () => {
 	};
 
 	beforeEach(() => {
-		vi.clearAllMocks();
+		vi.resetAllMocks();
+		mockToast.success = vi.fn();
+		mockToast.error = vi.fn();
+		(toast as any).success = mockToast.success;
+		(toast as any).error = mockToast.error;
 	});
 
 	describe('File Selection Preservation', () => {
@@ -154,7 +158,7 @@ describe('handleReinsertTorrentinRd', () => {
 		});
 	});
 
-	describe.skip('Error Handling', () => {
+	describe('Error Handling', () => {
 		it('should handle errors when fetching current torrent info fails', async () => {
 			const error = new Error('Failed to fetch torrent info');
 			mockGetTorrentInfo.mockRejectedValueOnce(error);
@@ -184,7 +188,7 @@ describe('handleReinsertTorrentinRd', () => {
 			);
 
 			expect(mockToast.error).toHaveBeenCalledWith(
-				expect.stringContaining('Error reinserting torrent'),
+				expect.stringContaining('Failed to reinsert torrent'),
 				expect.any(Object)
 			);
 		});
@@ -206,7 +210,7 @@ describe('handleReinsertTorrentinRd', () => {
 			);
 
 			expect(mockToast.error).toHaveBeenCalledWith(
-				expect.stringContaining('Error reinserting torrent'),
+				expect.stringContaining('Failed to reinsert torrent'),
 				expect.any(Object)
 			);
 		});
@@ -242,7 +246,7 @@ describe('handleReinsertTorrentinRd', () => {
 			);
 		});
 
-		it.skip('should delete old torrent immediately when forceDeleteOld is true', async () => {
+		it('should delete old torrent immediately when forceDeleteOld is true', async () => {
 			// Mock current info
 			mockGetTorrentInfo.mockResolvedValueOnce({
 				id: '123',
@@ -263,7 +267,7 @@ describe('handleReinsertTorrentinRd', () => {
 		});
 	});
 
-	describe.skip('Empty Selection Edge Cases', () => {
+	describe('Empty Selection Edge Cases', () => {
 		it('should handle empty selectedFileIds array as no selection', async () => {
 			// Mock current torrent info
 			mockGetTorrentInfo.mockResolvedValueOnce({
