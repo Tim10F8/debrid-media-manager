@@ -114,3 +114,52 @@ RealDebrid torrent info sample (GET https://api.real-debrid.com/rest/1.0/torrent
   ],
   "ended": "2025-09-13T04:19:49.000Z"
 }
+
+AllDebrid magnet info sample (POST https://api.alldebrid.com/v4.1/magnet/status with id=<magnetId>)
+{
+  "status": "success",
+  "data": {
+    "magnets": {
+      "id": 397558058,
+      "filename": "Toy.Story.1995.2160p.UHD.BDRemux.TrueHD.Atmos.7.1.HYBRID.DoVi-DVT.mkv",
+      "size": 52948033984,
+      "hash": "8affb12d20a0d8424ec4a5c16a8c9794b13c17a1",
+      "status": "Ready",
+      "statusCode": 4,
+      "uploadDate": 1758063802,
+      "completionDate": 1758063802,
+      "type": "m",
+      "notified": true,
+      "version": 2,
+      "nbLinks": 1,
+      "files": [
+        {
+          "n": "Toy.Story.1995.2160p.UHD.BDRemux.TrueHD.Atmos.7.1.HYBRID.DoVi-DVT.mkv",
+          "s": 52948033984,
+          "l": "https://alldebrid.com/f/kiqBDS99J-IlOwoh6FgzpLiq_cyjjeLtBsx9DiTtBDo"
+        }
+      ]
+    }
+  }
+}
+
+Torbox torrent info sample (GET https://api.torbox.app/v1/api/torrents/torrentinfo?hash=<torrentHash>)
+{
+  "success": true,
+  "error": null,
+  "detail": "Successfully retrieved torrent metadata for the hash.",
+  "data": {
+    "name": "Freakier.Friday.2025.D.TELECINE.1O8Op.mkv",
+    "hash": "7dde6be013572c7d926423050005e4d298352bf4",
+    "size": 5667674304,
+    "trackers": [],
+    "seeds": 1,
+    "peers": 4,
+    "files": [
+      {
+        "name": "Freakier.Friday.2025.D.TELECINE.1O8Op.mkv",
+        "size": 5667674304
+      }
+    ]
+  }
+}
