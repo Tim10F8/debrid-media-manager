@@ -153,6 +153,7 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		cacheHitRate: 0,
 		averageFetchTime: 0,
 	});
+	const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
 
 	// Performance tracking
 	const fetchTimesRef = useRef<number[]>([]);
@@ -215,6 +216,10 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 				setAdLibrary(ad);
 				setTbLibrary(tb);
 
+				initialRefreshDoneRef.current.rd = rd.length > 0;
+				initialRefreshDoneRef.current.ad = ad.length > 0;
+				initialRefreshDoneRef.current.tb = tb.length > 0;
+
 				updateStats(cachedTorrents);
 
 				const snapshot = new Map<string, string>();
@@ -226,6 +231,7 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 		} catch (error) {
 			console.error('Failed to load cached data:', error);
 		} finally {
+			setHasLoadedInitialData(true);
 			setSyncStatus((prev) => ({ ...prev, isLoading: false }));
 		}
 	}, [updateStats]);
@@ -521,6 +527,10 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 	);
 
 	useEffect(() => {
+		if (!hasLoadedInitialData) {
+			return;
+		}
+
 		const currentToken = normalizeToken(rdKey);
 		const previousToken = previousTokenStateRef.current.rd;
 		const tokenChanged = currentToken !== previousToken;
@@ -563,9 +573,13 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 			reason: tokenChanged ? 'tokenChanged' : 'initialEmpty',
 		});
 		void scheduleServiceRefresh('realdebrid', tokenChanged ? 'tokenChanged' : 'initialEmpty');
-	}, [rdKey, rdLoading, rdLibrary.length, scheduleServiceRefresh]);
+	}, [rdKey, rdLoading, rdLibrary.length, scheduleServiceRefresh, hasLoadedInitialData]);
 
 	useEffect(() => {
+		if (!hasLoadedInitialData) {
+			return;
+		}
+
 		const currentToken = normalizeToken(adKey);
 		const previousToken = previousTokenStateRef.current.ad;
 		const tokenChanged = currentToken !== previousToken;
@@ -603,9 +617,13 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 			reason: tokenChanged ? 'tokenChanged' : 'initialEmpty',
 		});
 		void scheduleServiceRefresh('alldebrid', tokenChanged ? 'tokenChanged' : 'initialEmpty');
-	}, [adKey, adLibrary.length, scheduleServiceRefresh]);
+	}, [adKey, adLibrary.length, scheduleServiceRefresh, hasLoadedInitialData]);
 
 	useEffect(() => {
+		if (!hasLoadedInitialData) {
+			return;
+		}
+
 		const currentToken = normalizeToken(tbKey);
 		const previousToken = previousTokenStateRef.current.tb;
 		const tokenChanged = currentToken !== previousToken;
@@ -643,7 +661,7 @@ export function EnhancedLibraryCacheProvider({ children }: { children: ReactNode
 			reason: tokenChanged ? 'tokenChanged' : 'initialEmpty',
 		});
 		void scheduleServiceRefresh('torbox', tokenChanged ? 'tokenChanged' : 'initialEmpty');
-	}, [tbKey, tbLibrary.length, scheduleServiceRefresh]);
+	}, [tbKey, tbLibrary.length, scheduleServiceRefresh, hasLoadedInitialData]);
 
 	// Clear cache
 	const clearCache = async (service?: string) => {

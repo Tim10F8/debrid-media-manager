@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
+import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
 import {
 	EnhancedLibraryCacheProvider,
 	useEnhancedLibraryCache,
@@ -38,6 +39,24 @@ const { fetchLibraryMock, clearLibraryCacheMock, cacheClearMock, torrentDbMocks 
 		};
 	}
 );
+
+const buildTorrent = (id: string): UserTorrent => ({
+	id,
+	filename: `${id}.mkv`,
+	title: id,
+	hash: `${id}-hash`,
+	bytes: 1,
+	progress: 1,
+	status: UserTorrentStatus.finished,
+	serviceStatus: 'done',
+	added: new Date('2023-01-01T00:00:00Z'),
+	mediaType: 'movie',
+	info: undefined,
+	links: [],
+	selectedFiles: [],
+	seeders: 0,
+	speed: 0,
+});
 
 vi.mock('@/services/library/UnifiedLibraryFetcher', () => {
 	class MockUnifiedLibraryFetcher {
@@ -267,5 +286,102 @@ describe('EnhancedLibraryCacheContext refreshLibrary', () => {
 				expect.objectContaining({ forceRefresh: true })
 			)
 		);
+	});
+
+	it('refreshes new services once and skips re-fetching after cache hydration', async () => {
+		const cachedRd = buildTorrent('rd:cached');
+		const cachedAd = buildTorrent('ad:cached');
+		const cachedTb = buildTorrent('tb:cached');
+
+		let rdToken: [string | null, boolean, boolean] = [null, false, false];
+		let adToken: string | null = null;
+		let tbToken: string | null = null;
+
+		mockedUseRealDebridAccessToken.mockImplementation(() => rdToken);
+		mockedUseAllDebridApiKey.mockImplementation(() => adToken);
+		mockedUseTorBoxAccessToken.mockImplementation(() => tbToken);
+
+		const callsFor = (service: 'realdebrid' | 'alldebrid' | 'torbox') =>
+			fetchLibraryMock.mock.calls.filter(([svc]) => svc === service).length;
+
+		fetchLibraryMock.mockImplementation((service) => {
+			if (service === 'realdebrid') {
+				return Promise.resolve([buildTorrent('rd:fetched')] as UserTorrent[]);
+			}
+			if (service === 'alldebrid') {
+				return Promise.resolve([buildTorrent('ad:fetched')] as UserTorrent[]);
+			}
+			return Promise.resolve([buildTorrent('tb:fetched')] as UserTorrent[]);
+		});
+
+		const render = () => renderHook(() => useEnhancedLibraryCache(), { wrapper });
+
+		torrentDbMocks.all.mockResolvedValueOnce([]);
+		let hook = render();
+
+		await waitFor(() => expect(hook.result.current.syncStatus.isLoading).toBe(false));
+		expect(callsFor('realdebrid')).toBe(0);
+		expect(callsFor('alldebrid')).toBe(0);
+		expect(callsFor('torbox')).toBe(0);
+
+		rdToken = ['rd-token', false, false];
+		await act(async () => {
+			hook.rerender();
+		});
+		await waitFor(() => expect(hook.result.current.rdLibrary).toHaveLength(1));
+		expect(callsFor('realdebrid')).toBe(1);
+
+		const rdCallsAfterLogin = callsFor('realdebrid');
+
+		hook.unmount();
+		torrentDbMocks.all.mockResolvedValueOnce([cachedRd]);
+		hook = render();
+		await waitFor(() => expect(hook.result.current.syncStatus.isLoading).toBe(false));
+		expect(hook.result.current.rdLibrary).toHaveLength(1);
+		expect(hook.result.current.rdLibrary[0]?.id).toBe(cachedRd.id);
+		expect(callsFor('realdebrid')).toBe(rdCallsAfterLogin);
+
+		adToken = 'ad-token';
+		await act(async () => {
+			hook.rerender();
+		});
+		await waitFor(() => expect(hook.result.current.adLibrary).toHaveLength(1));
+		expect(callsFor('alldebrid')).toBe(1);
+
+		const rdCallsAfterAdLogin = callsFor('realdebrid');
+		const adCallsAfterLogin = callsFor('alldebrid');
+
+		hook.unmount();
+		torrentDbMocks.all.mockResolvedValueOnce([cachedRd, cachedAd]);
+		hook = render();
+		await waitFor(() => expect(hook.result.current.syncStatus.isLoading).toBe(false));
+		expect(hook.result.current.rdLibrary[0]?.id).toBe(cachedRd.id);
+		expect(hook.result.current.adLibrary[0]?.id).toBe(cachedAd.id);
+		expect(callsFor('realdebrid')).toBe(rdCallsAfterAdLogin);
+		expect(callsFor('alldebrid')).toBe(adCallsAfterLogin);
+
+		tbToken = 'tb-token';
+		await act(async () => {
+			hook.rerender();
+		});
+		await waitFor(() => expect(hook.result.current.tbLibrary).toHaveLength(1));
+		expect(callsFor('torbox')).toBe(1);
+
+		const rdCallsAfterTbLogin = callsFor('realdebrid');
+		const adCallsAfterTbLogin = callsFor('alldebrid');
+		const tbCallsAfterLogin = callsFor('torbox');
+
+		hook.unmount();
+		torrentDbMocks.all.mockResolvedValueOnce([cachedRd, cachedAd, cachedTb]);
+		hook = render();
+		await waitFor(() => expect(hook.result.current.syncStatus.isLoading).toBe(false));
+		expect(hook.result.current.rdLibrary[0]?.id).toBe(cachedRd.id);
+		expect(hook.result.current.adLibrary[0]?.id).toBe(cachedAd.id);
+		expect(hook.result.current.tbLibrary[0]?.id).toBe(cachedTb.id);
+		expect(callsFor('realdebrid')).toBe(rdCallsAfterTbLogin);
+		expect(callsFor('alldebrid')).toBe(adCallsAfterTbLogin);
+		expect(callsFor('torbox')).toBe(tbCallsAfterLogin);
+
+		hook.unmount();
 	});
 });
