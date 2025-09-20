@@ -90,6 +90,7 @@ afterAll(() => {
 
 describe('Real-Debrid observability persistence', () => {
 	it('persists snapshots when live stats have data', () => {
+		const renameSpy = vi.spyOn(fs, 'renameSync');
 		const core = {
 			totalTracked: 5,
 			successCount: 4,
@@ -135,6 +136,7 @@ describe('Real-Debrid observability persistence', () => {
 		expect(parsed.totalTracked).toBe(result.totalTracked);
 		expect(parsed.workingStream.failedServers).toEqual(['20-2']);
 		expect(parsed.byOperation['GET /user'].successRate).toBeCloseTo(0.8);
+		expect(renameSpy).toHaveBeenCalledWith(expect.stringContaining('.tmp'), snapshotPath);
 	});
 
 	it('serves persisted snapshot when live stats are empty', () => {
@@ -195,5 +197,60 @@ describe('Real-Debrid observability persistence', () => {
 
 		expect(result).toEqual(persisted);
 		expect(saveSpy).not.toHaveBeenCalled();
+	});
+
+	it('cleans up temporary snapshot files and surfaces errors when persistence fails', () => {
+		const core = {
+			totalTracked: 3,
+			successCount: 3,
+			failureCount: 0,
+			considered: 3,
+			successRate: 1,
+			lastTs: 1700000000200,
+			isDown: false,
+			monitoredOperations: operations,
+			byOperation: buildByOperation({
+				'GET /user': {
+					totalTracked: 3,
+					successCount: 3,
+					failureCount: 0,
+					considered: 3,
+					successRate: 1,
+					lastTs: 1700000000200,
+				},
+			}),
+			windowSize: 10000,
+		} satisfies ReturnType<typeof rdOperationalStats.getStats>;
+
+		const workingStream = buildWorkingStream({
+			total: 1,
+			working: 1,
+			rate: 1,
+			lastChecked: 1700000000300,
+		});
+
+		const renameError = new Error('rename failed');
+		vi.spyOn(rdOperationalStats, 'getStats').mockReturnValue(core);
+		vi.spyOn(streamServersHealth, 'getCompactWorkingStreamMetrics').mockReturnValue(
+			workingStream
+		);
+		vi.spyOn(fs, 'renameSync').mockImplementation(() => {
+			throw renameError;
+		});
+		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		getRealDebridObservabilityStats();
+
+		const directoryEntries = fs.readdirSync(path.dirname(snapshotPath));
+		const snapshotBase = path.basename(snapshotPath);
+		const tempEntries = directoryEntries.filter(
+			(entry) => entry.startsWith(snapshotBase) && entry.endsWith('.tmp')
+		);
+		expect(tempEntries).toHaveLength(0);
+		expect(fs.existsSync(snapshotPath)).toBe(false);
+		expect(consoleErrorSpy).toHaveBeenCalledWith(
+			expect.stringContaining('Failed to persist Real-Debrid observability snapshot'),
+			renameError
+		);
 	});
 });

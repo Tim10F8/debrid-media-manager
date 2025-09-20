@@ -1,10 +1,48 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+
+type PwaConfig = {
+	buildExcludes?: unknown[];
+	cacheOnFrontEndNav?: boolean;
+	fallbacks?: Record<string, unknown>;
+	runtimeCaching?: Array<Record<string, any>>;
+};
+
+const loadConfig = async (): Promise<PwaConfig> => {
+	const configModule = await import('../../../pwa.config.js');
+	return (configModule as any).default ?? configModule;
+};
 
 describe('next-pwa configuration', () => {
-	it('excludes dynamic css manifest from precache', async () => {
-		const configModule = await import('../../../pwa.config.js');
-		const pwaConfig = (configModule as any).default ?? configModule;
-		const buildExcludes = (pwaConfig.buildExcludes ?? []) as string[];
-		expect(buildExcludes).toContain('**/dynamic-css-manifest.json');
+	let pwaConfig: PwaConfig;
+
+	beforeAll(async () => {
+		pwaConfig = await loadConfig();
+	});
+
+	it('excludes dynamic css manifest from precache', () => {
+		const buildExcludes = pwaConfig.buildExcludes ?? [];
+		const excludesDynamicCss = buildExcludes.some((entry) => {
+			if (entry instanceof RegExp) {
+				return entry.test('static/css/dynamic-css-manifest.json');
+			}
+			return false;
+		});
+		expect(excludesDynamicCss).toBe(true);
+	});
+
+	it('enables cache for client navigation', () => {
+		expect(pwaConfig.cacheOnFrontEndNav).toBe(true);
+	});
+
+	it('limits poster runtime cache size', () => {
+		const runtimeCaching = pwaConfig.runtimeCaching ?? [];
+		const posterCache = runtimeCaching.find(
+			(entry) => entry?.options?.cacheName === 'poster-images'
+		);
+		expect(posterCache?.options?.expiration?.maxEntries).toBeGreaterThan(0);
+	});
+
+	it('registers offline fallback document', () => {
+		expect(pwaConfig.fallbacks?.document).toBe('/_offline');
 	});
 });

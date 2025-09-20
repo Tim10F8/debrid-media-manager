@@ -27,11 +27,28 @@ interface EpisodeInfo {
 	episode: number;
 }
 
-function ManagePage() {
+interface MediaMetadata {
+	title: string;
+	type: 'movie' | 'show';
+}
+
+export function ManagePage() {
 	const [rdKey] = useRealDebridAccessToken();
 	const [groupedLinks, setGroupedLinks] = useState<GroupedLinks>({});
 	const [loading, setLoading] = useState(true);
 	const [selectedLinks, setSelectedLinks] = useState<Set<string>>(new Set());
+	const [mediaInfo, setMediaInfo] = useState<Record<string, MediaMetadata>>({});
+
+	const getEpisodeInfo = (imdbId: string): EpisodeInfo | null => {
+		const parts = imdbId.split(':');
+		if (parts.length === 3) {
+			return {
+				season: parseInt(parts[1]),
+				episode: parseInt(parts[2]),
+			};
+		}
+		return null;
+	};
 
 	useEffect(() => {
 		const fetchLinks = async () => {
@@ -83,16 +100,74 @@ function ManagePage() {
 		fetchLinks();
 	}, [rdKey]);
 
-	const getEpisodeInfo = (imdbId: string): EpisodeInfo | null => {
-		const parts = imdbId.split(':');
-		if (parts.length === 3) {
-			return {
-				season: parseInt(parts[1]),
-				episode: parseInt(parts[2]),
-			};
-		}
-		return null;
-	};
+	useEffect(() => {
+		const imdbIdsToFetch = Object.keys(groupedLinks).filter((imdbId) => !mediaInfo[imdbId]);
+		if (imdbIdsToFetch.length === 0) return;
+
+		let active = true;
+
+		const loadMetadata = async () => {
+			const results = await Promise.all(
+				imdbIdsToFetch.map(async (imdbId) => {
+					const links = groupedLinks[imdbId] ?? [];
+					const isShow = links.some((link) => link.imdbId.split(':').length === 3);
+					const endpoint = isShow ? '/api/info/show' : '/api/info/movie';
+					const mediaType: MediaMetadata['type'] = isShow ? 'show' : 'movie';
+					try {
+						console.info(
+							`[StremioManage] Fetching metadata for ${imdbId} using ${endpoint}`
+						);
+						const response = await fetch(`${endpoint}?imdbid=${imdbId}`);
+						if (!response.ok) {
+							throw new Error(
+								`Metadata request failed with status ${response.status}`
+							);
+						}
+						const data = await response.json();
+						const title =
+							typeof data.title === 'string' && data.title.trim()
+								? data.title.trim()
+								: imdbId;
+						return {
+							imdbId,
+							info: {
+								title,
+								type: mediaType,
+							},
+						};
+					} catch (error) {
+						console.error(
+							`[StremioManage] Metadata lookup failed for ${imdbId}:`,
+							error
+						);
+						return {
+							imdbId,
+							info: {
+								title: imdbId,
+								type: mediaType,
+							},
+						};
+					}
+				})
+			);
+
+			if (!active) return;
+
+			setMediaInfo((prev) => {
+				const updated = { ...prev };
+				for (const result of results) {
+					updated[result.imdbId] = result.info;
+				}
+				return updated;
+			});
+		};
+
+		void loadMetadata();
+
+		return () => {
+			active = false;
+		};
+	}, [groupedLinks, mediaInfo]);
 
 	const getStremioUrl = (link: CastedLink): string => {
 		const baseImdbId = link.imdbId.split(':')[0];
@@ -126,15 +201,28 @@ function ManagePage() {
 			if (!response.ok) throw new Error('Failed to delete link');
 
 			// Update state after successful deletion
+			const baseImdbId = link.imdbId.split(':')[0];
+			let removedImdbId: string | null = null;
 			setGroupedLinks((prev) => {
 				const newGrouped = { ...prev };
-				const baseImdbId = link.imdbId.split(':')[0];
 				newGrouped[baseImdbId] = newGrouped[baseImdbId].filter((l) => l.url !== link.url);
 				if (newGrouped[baseImdbId].length === 0) {
 					delete newGrouped[baseImdbId];
+					removedImdbId = baseImdbId;
 				}
 				return newGrouped;
 			});
+
+			if (removedImdbId) {
+				const imdbIdToRemove = removedImdbId;
+				setMediaInfo((prev) => {
+					if (!(imdbIdToRemove in prev)) {
+						return prev;
+					}
+					const { [imdbIdToRemove]: _removed, ...rest } = prev;
+					return rest;
+				});
+			}
 
 			toast.success('Link deleted from Stremio list.');
 		} catch (error) {
@@ -171,9 +259,12 @@ function ManagePage() {
 				return url;
 			});
 
-			const deletedUrls = await Promise.all(deletePromises);
+			const deletedUrls = (await Promise.all(deletePromises)).filter(
+				(url): url is string => typeof url === 'string'
+			);
 
 			// Update state after successful deletions
+			const removedImdbIds: string[] = [];
 			setGroupedLinks((prev) => {
 				const newGrouped = { ...prev };
 				Object.keys(newGrouped).forEach((imdbId) => {
@@ -182,10 +273,21 @@ function ManagePage() {
 					);
 					if (newGrouped[imdbId].length === 0) {
 						delete newGrouped[imdbId];
+						removedImdbIds.push(imdbId);
 					}
 				});
 				return newGrouped;
 			});
+
+			if (removedImdbIds.length > 0) {
+				setMediaInfo((prev) => {
+					const updated = { ...prev };
+					for (const imdbId of removedImdbIds) {
+						delete updated[imdbId];
+					}
+					return updated;
+				});
+			}
 
 			setSelectedLinks(new Set());
 			toast.success('Deleted selected Stremio links.');
@@ -234,6 +336,22 @@ function ManagePage() {
 		} catch (error) {
 			return 'Unknown file';
 		}
+	};
+
+	const deriveTitleFromLinks = (links: CastedLink[]): string | null => {
+		for (const link of links) {
+			const filename = getFilename(link.url);
+			if (!filename || filename === 'Unknown file') {
+				continue;
+			}
+			const parsed = ptt.parse(filename);
+			const candidate =
+				typeof parsed.title === 'string' ? parsed.title.replace(/\./g, ' ').trim() : '';
+			if (candidate) {
+				return candidate;
+			}
+		}
+		return null;
 	};
 
 	const formatEpisodeLabel = (imdbId: string) => {
@@ -292,6 +410,12 @@ function ManagePage() {
 					{Object.entries(groupedLinks).map(([imdbId, links]) => {
 						const allSelected = links.every((link) => selectedLinks.has(link.url));
 						const someSelected = links.some((link) => selectedLinks.has(link.url));
+						const metadata = mediaInfo[imdbId];
+						const derivedTitle = deriveTitleFromLinks(links);
+						const displayTitle = metadata?.title ?? derivedTitle ?? imdbId;
+						const isShowGroup =
+							metadata?.type === 'show' ||
+							links.some((link) => link.imdbId.split(':').length === 3);
 						return (
 							<div key={imdbId} className="rounded-lg bg-gray-800 p-4">
 								<div className="mb-4 flex items-center justify-between">
@@ -315,17 +439,25 @@ function ManagePage() {
 									<Link
 										href={`/x/${imdbId}`}
 										className="haptic-sm rounded bg-purple-600 px-3 py-1 text-sm text-white hover:bg-purple-700"
+										title={`Cast other torrents for ${displayTitle}`}
+										aria-label={`Cast other torrents for ${displayTitle}`}
 									>
 										Cast other torrents
 									</Link>
 								</div>
 								<div className="mb-4 flex justify-center">
-									<div
-										className="cursor-pointer"
+									<button
+										type="button"
 										onClick={() => toggleGroupSelection(imdbId)}
+										aria-pressed={allSelected}
+										aria-label={`Toggle selection for ${isShowGroup ? 'show' : 'movie'} ${displayTitle}`}
+										className="group flex w-full max-w-[220px] flex-col items-center focus:outline-none"
 									>
-										<Poster imdbId={imdbId} title={imdbId} />
-									</div>
+										<Poster imdbId={imdbId} title={displayTitle} />
+										<span className="mt-2 w-full text-center text-sm font-semibold text-gray-100 group-hover:text-white">
+											{displayTitle}
+										</span>
+									</button>
 								</div>
 								<div className="max-h-[300px] space-y-2 overflow-y-auto">
 									{links.map((link) => {
