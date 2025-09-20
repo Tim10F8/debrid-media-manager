@@ -1,6 +1,6 @@
-import ProxyManager from '@/utils/proxyManager';
 import axios from 'axios';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 const ALLOWED_HOSTS = [
 	'comet.elfhosted.com',
@@ -44,8 +44,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		let response;
 
 		if (useTor) {
-			const proxyManager = new ProxyManager();
-			const torProxy = proxyManager.getTorProxy();
+			const torProxy = new SocksProxyAgent(
+				`socks5h://${Date.now()}:any_password@${process.env.PROXY || 'localhost:9050'}`,
+				{
+					timeout: parseInt(process.env.REQUEST_TIMEOUT!) || 30000,
+				}
+			);
 
 			response = await axios.get(url, {
 				httpAgent: torProxy,
