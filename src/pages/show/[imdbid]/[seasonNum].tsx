@@ -1,7 +1,6 @@
-import RelatedMedia from '@/components/RelatedMedia';
+import MediaHeader from '@/components/MediaHeader';
 import SearchTokens from '@/components/SearchTokens';
 import TvSearchResults from '@/components/TvSearchResults';
-import Poster from '@/components/poster';
 import { showInfoForRD } from '@/components/showInfo';
 import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
 import { useAvailabilityCheck } from '@/hooks/useAvailabilityCheck';
@@ -35,7 +34,6 @@ import { withAuth } from '@/utils/withAuth';
 import axios, { AxiosError } from 'axios';
 import { CloudOff, Loader2, RotateCcw, Search, Sparkles, Tv, Zap } from 'lucide-react';
 import Head from 'next/head';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { FunctionComponent, useEffect, useMemo, useRef, useState } from 'react';
@@ -823,14 +821,6 @@ const TvSearch: FunctionComponent = () => {
 		}
 	}
 
-	const backdropStyle = showInfo?.backdrop
-		? {
-				backgroundImage: `linear-gradient(to bottom, hsl(0, 0%, 12%,0.5) 0%, hsl(0, 0%, 12%,0) 50%, hsl(0, 0%, 12%,0.5) 100%), url(${showInfo.backdrop})`,
-				backgroundPosition: 'center',
-				backgroundSize: 'screen',
-			}
-		: {};
-
 	if (isLoading) {
 		return <div className="mx-2 my-1 min-h-screen bg-gray-900 text-white">Loading...</div>;
 	}
@@ -843,6 +833,106 @@ const TvSearch: FunctionComponent = () => {
 		);
 	}
 
+	const imdbId = (Array.isArray(imdbid) ? imdbid[0] : imdbid) ?? '';
+	const seasonId = (Array.isArray(seasonNum) ? seasonNum[0] : seasonNum) ?? '1';
+	const selectedSeason = Number.parseInt(seasonId, 10);
+
+	const seasonNavigation = (
+		<div className="flex items-center overflow-x-auto" data-testid="media-header-season-nav">
+			{Array.from({ length: showInfo.season_count }, (_, i) => showInfo.season_count - i).map(
+				(season, idx) => {
+					const color = selectedSeason === season ? 'red' : 'yellow';
+					return (
+						<Link
+							key={idx}
+							href={`/show/${imdbId}/${season}`}
+							className={`inline-flex items-center border-2 p-1 text-xs border-${color}-500 bg-${color}-900/30 text-${color}-100 hover:bg-${color}-800/50 mb-1 mr-2 rounded transition-colors`}
+						>
+							<Tv className="mr-2 h-3 w-3 text-cyan-500" />
+							<span className="whitespace-nowrap">
+								{showInfo.season_names && showInfo.season_names[season - 1]
+									? showInfo.season_names[season - 1]
+									: `Season ${season}`}
+							</span>
+						</Link>
+					);
+				}
+			)}
+		</div>
+	);
+
+	const headerActionButtons = (
+		<div data-testid="media-header-actions">
+			{rdKey && (
+				<>
+					<button
+						className="mb-1 mr-2 mt-0 rounded border-2 border-yellow-500 bg-yellow-900/30 p-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 disabled:cursor-not-allowed disabled:opacity-50"
+						onClick={() => handleAvailabilityTest(filteredResults)}
+						disabled={isCheckingAvailability}
+					>
+						<b className="flex items-center justify-center">
+							{isCheckingAvailability ? (
+								<>
+									<Loader2 className="mr-1 h-3 w-3 animate-spin text-yellow-500" />
+									Checking...
+								</>
+							) : (
+								<>
+									<Search className="mr-1 h-3 w-3 text-yellow-500" />
+									Check Available
+								</>
+							)}
+						</b>
+					</button>
+					{getFirstCompleteSeasonTorrent() && (
+						<button
+							className="haptic-sm mb-1 mr-2 mt-0 rounded border-2 border-green-500 bg-green-900/30 p-1 text-xs text-green-100 transition-colors hover:bg-green-800/50"
+							onClick={handleInstantRdWholeSeason}
+						>
+							<b className="flex items-center justify-center">
+								<Zap className="mr-1 h-3 w-3 text-yellow-500" />
+								Instant RD (Whole Season)
+							</b>
+						</button>
+					)}
+					{getIndividualEpisodeTorrents().length > 0 && (
+						<button
+							className="haptic-sm mb-1 mr-2 mt-0 rounded border-2 border-green-500 bg-green-900/30 p-1 text-xs text-green-100 transition-colors hover:bg-green-800/50"
+							onClick={handleInstantRdEveryEpisode}
+						>
+							<b className="flex items-center justify-center">
+								<Zap className="mr-1 h-3 w-3 text-yellow-500" />
+								Instant RD (Every Episode)
+							</b>
+						</button>
+					)}
+					<button
+						className="mb-1 mr-2 mt-0 rounded border-2 border-purple-500 bg-purple-900/30 p-1 text-xs text-purple-100 transition-colors hover:bg-purple-800/50"
+						onClick={() =>
+							window.open(`stremio://detail/series/${imdbId}/${imdbId}:${seasonId}:1`)
+						}
+					>
+						<b className="flex items-center justify-center">
+							<Sparkles className="mr-1 h-3 w-3 text-purple-500" />
+							Stremio
+						</b>
+					</button>
+				</>
+			)}
+			{onlyShowCached && totalUncachedCount > 0 && (
+				<button
+					className="haptic-sm mb-1 mr-2 mt-0 rounded border-2 border-blue-500 bg-blue-900/30 p-1 text-xs text-blue-100 transition-colors hover:bg-blue-800/50"
+					onClick={() => {
+						setOnlyShowCached(false);
+					}}
+				>
+					<CloudOff className="mr-1 h-3 w-3 text-blue-500" />
+					Show {totalUncachedCount} uncached
+				</button>
+			)}
+		</div>
+	);
+
 	return (
 		<div className="min-h-screen max-w-full bg-gray-900 text-gray-100">
 			<Head>
@@ -852,145 +942,20 @@ const TvSearch: FunctionComponent = () => {
 			</Head>
 			<Toaster position="bottom-right" />
 
-			<div
-				className="grid auto-cols-auto grid-flow-col auto-rows-auto gap-2"
-				style={backdropStyle}
-			>
-				{(showInfo.poster && (
-					<Image
-						width={200}
-						height={300}
-						src={showInfo.poster}
-						alt="Show poster"
-						className="row-span-5 shadow-lg"
-					/>
-				)) || <Poster imdbId={imdbid as string} title={showInfo.title} />}
-
-				<div className="flex justify-end p-2">
-					<Link
-						href="/"
-						className="h-fit w-fit rounded border-2 border-cyan-500 bg-cyan-900/30 px-2 py-1 text-sm text-cyan-100 transition-colors hover:bg-cyan-800/50"
-					>
-						Go Home
-					</Link>
-				</div>
-
-				<h2 className="text-xl font-bold [text-shadow:_0_2px_0_rgb(0_0_0_/_80%)]">
-					{showInfo.title} - Season {seasonNum}
-				</h2>
-
-				<div className="h-fit w-fit bg-slate-900/75" onClick={() => setDescLimit(0)}>
-					{descLimit > 0
-						? showInfo.description.substring(0, descLimit) + '..'
-						: showInfo.description}{' '}
-					{showInfo.imdb_score > 0 && (
-						<div className="inline text-yellow-100">
-							<Link href={`https://www.imdb.com/title/${imdbid}/`} target="_blank">
-								IMDB Score:{' '}
-								{showInfo.imdb_score < 10
-									? showInfo.imdb_score
-									: showInfo.imdb_score / 10}
-							</Link>
-						</div>
-					)}
-				</div>
-
-				<div className="flex items-center overflow-x-auto">
-					{Array.from(
-						{ length: showInfo.season_count },
-						(_, i) => showInfo.season_count - i
-					).map((season, idx) => {
-						const color = parseInt(seasonNum as string) === season ? 'red' : 'yellow';
-						return (
-							<Link
-								key={idx}
-								href={`/show/${imdbid}/${season}`}
-								className={`inline-flex items-center border-2 p-1 text-xs border-${color}-500 bg-${color}-900/30 text-${color}-100 hover:bg-${color}-800/50 mb-1 mr-2 rounded transition-colors`}
-							>
-								<Tv className="mr-2 h-3 w-3 text-cyan-500" />
-								<span className="whitespace-nowrap">
-									{showInfo.season_names && showInfo.season_names[season - 1]
-										? showInfo.season_names[season - 1]
-										: `Season ${season}`}
-								</span>
-							</Link>
-						);
-					})}
-				</div>
-
-				<div>
-					{rdKey && (
-						<>
-							<button
-								className="mb-1 mr-2 mt-0 rounded border-2 border-yellow-500 bg-yellow-900/30 p-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 disabled:cursor-not-allowed disabled:opacity-50"
-								onClick={() => handleAvailabilityTest(filteredResults)}
-								disabled={isCheckingAvailability}
-							>
-								<b className="flex items-center justify-center">
-									{isCheckingAvailability ? (
-										<>
-											<Loader2 className="mr-1 h-3 w-3 animate-spin text-yellow-500" />
-											Checking...
-										</>
-									) : (
-										<>
-											<Search className="mr-1 h-3 w-3 text-yellow-500" />
-											Check Available
-										</>
-									)}
-								</b>
-							</button>
-							{getFirstCompleteSeasonTorrent() && (
-								<button
-									className="haptic-sm mb-1 mr-2 mt-0 rounded border-2 border-green-500 bg-green-900/30 p-1 text-xs text-green-100 transition-colors hover:bg-green-800/50"
-									onClick={handleInstantRdWholeSeason}
-								>
-									<b className="flex items-center justify-center">
-										<Zap className="mr-1 h-3 w-3 text-yellow-500" />
-										Instant RD (Whole Season)
-									</b>
-								</button>
-							)}
-							{getIndividualEpisodeTorrents().length > 0 && (
-								<button
-									className="haptic-sm mb-1 mr-2 mt-0 rounded border-2 border-green-500 bg-green-900/30 p-1 text-xs text-green-100 transition-colors hover:bg-green-800/50"
-									onClick={handleInstantRdEveryEpisode}
-								>
-									<b className="flex items-center justify-center">
-										<Zap className="mr-1 h-3 w-3 text-yellow-500" />
-										Instant RD (Every Episode)
-									</b>
-								</button>
-							)}
-							<button
-								className="mb-1 mr-2 mt-0 rounded border-2 border-purple-500 bg-purple-900/30 p-1 text-xs text-purple-100 transition-colors hover:bg-purple-800/50"
-								onClick={() =>
-									window.open(
-										`stremio://detail/series/${imdbid}/${imdbid}:${seasonNum}:1`
-									)
-								}
-							>
-								<b className="flex items-center justify-center">
-									<Sparkles className="mr-1 h-3 w-3 text-purple-500" />
-									Stremio
-								</b>
-							</button>
-						</>
-					)}
-					{onlyShowCached && totalUncachedCount > 0 && (
-						<button
-							className="haptic-sm mb-1 mr-2 mt-0 rounded border-2 border-blue-500 bg-blue-900/30 p-1 text-xs text-blue-100 transition-colors hover:bg-blue-800/50"
-							onClick={() => {
-								setOnlyShowCached(false);
-							}}
-						>
-							<CloudOff className="mr-1 h-3 w-3 text-blue-500" />
-							Show {totalUncachedCount} uncached
-						</button>
-					)}
-					<RelatedMedia imdbId={imdbid as string} mediaType="show" />
-				</div>
-			</div>
+			<MediaHeader
+				mediaType="tv"
+				imdbId={imdbId}
+				title={showInfo.title}
+				seasonNum={seasonId}
+				description={showInfo.description}
+				poster={showInfo.poster}
+				backdrop={showInfo.backdrop}
+				imdbScore={showInfo.imdb_score}
+				descLimit={descLimit}
+				onDescToggle={() => setDescLimit(0)}
+				actionButtons={headerActionButtons}
+				additionalInfo={seasonNavigation}
+			/>
 
 			{searchState === 'loading' && (
 				<div className="flex items-center justify-center bg-black">Loading...</div>
