@@ -163,3 +163,41 @@ Torbox torrent info sample (GET https://api.torbox.app/v1/api/torrents/torrentin
     ]
   }
 }
+
+AllDebrid magnet status sample (POST https://api.alldebrid.com/v4.1/magnet/status with id=398585549)
+{
+  "status": "success",
+  "data": {
+    "magnets": {
+      "id": 398585549,
+      "filename": "Big Buck Bunny",
+      "size": 276445467,
+      "hash": "dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c",
+      "status": "Ready",
+      "statusCode": 4,
+      "uploadDate": 1758328423,
+      "completionDate": 1758328423,
+      "type": "m",
+      "notified": false,
+      "version": 2,
+      "nbLinks": 3,
+      "files": [
+        {
+          "n": "Big Buck Bunny.en.srt",
+          "s": 140,
+          "l": "https://alldebrid.com/f/PQpnX3A6Y7Qhgm_JWTODvTQcnI4fzCR5w6vGBcsuM-4"
+        },
+        {
+          "n": "Big Buck Bunny.mp4",
+          "s": 276134947,
+          "l": "https://alldebrid.com/f/z2aApVCLtA3KW6xhxVQxeWiO_a0pai96LQZqNXH7vf8"
+        },
+        {
+          "n": "poster.jpg",
+          "s": 310380,
+          "l": "https://alldebrid.com/f/u_rDbaW-2oev5Ynt0ag21Msuxr7mg-kmg6z-ERv92ZM"
+        }
+      ]
+    }
+  }
+}

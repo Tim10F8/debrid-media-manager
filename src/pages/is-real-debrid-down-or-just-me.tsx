@@ -16,6 +16,29 @@ type Props = {
 
 type StatusState = 'idle' | 'up' | 'down';
 
+function isRealDebridObservabilityPayload(value: unknown): value is RealDebridObservabilityStats {
+	if (!value || typeof value !== 'object') {
+		return false;
+	}
+	const candidate = value as Record<string, unknown>;
+	if (!Array.isArray(candidate.monitoredOperations)) {
+		return false;
+	}
+	if (!candidate.monitoredOperations.every((entry) => typeof entry === 'string')) {
+		return false;
+	}
+	if (typeof candidate.considered !== 'number') {
+		return false;
+	}
+	if (typeof candidate.windowSize !== 'number') {
+		return false;
+	}
+	if (!candidate.byOperation || typeof candidate.byOperation !== 'object') {
+		return false;
+	}
+	return true;
+}
+
 export const getServerSideProps: GetServerSideProps<Props> = async ({ res }) => {
 	res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate');
 	res.setHeader('CDN-Cache-Control', 'no-store');
@@ -38,13 +61,22 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 		const loadFreshStats = async () => {
 			try {
 				const cacheBuster = Date.now() + Math.random().toString(36).substring(7);
-				const response = await fetch(`/api/observability/real-debrid?_t=${cacheBuster}`, {
-					cache: 'no-store',
-				});
+				const params = new URLSearchParams({ _t: String(cacheBuster), verbose: 'true' });
+				const response = await fetch(
+					`/api/observability/real-debrid?${params.toString()}`,
+					{
+						cache: 'no-store',
+					}
+				);
 				if (!response.ok) {
+					console.error('Real-Debrid stats refresh failed with status', response.status);
 					return;
 				}
-				const payload: Props['stats'] = await response.json();
+				const payload: unknown = await response.json();
+				if (!isRealDebridObservabilityPayload(payload)) {
+					console.error('Received invalid Real-Debrid stats payload', payload);
+					return;
+				}
 				if (!cancelled) {
 					setStats(payload);
 				}

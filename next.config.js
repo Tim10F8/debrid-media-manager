@@ -1,25 +1,6 @@
 /** @type {import('next').NextConfig} */
-const withPWA = require('next-pwa')({
-	dest: 'public',
-	register: true,
-	skipWaiting: true,
-	disable: process.env.NODE_ENV === 'development',
-	scope: '/',
-	sw: 'service-worker.js',
-	cacheOnFrontEndNav: false,
-	runtimeCaching: [
-		{
-			urlPattern: /^https:\/\/posters\d+\.debridmediamanager\.com\/.*$/,
-			handler: 'CacheFirst',
-			options: {
-				cacheName: 'poster-images',
-				expiration: {
-					maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-				},
-			},
-		},
-	],
-});
+const pwaConfig = require('./pwa.config.js');
+const withPWA = require('next-pwa')(pwaConfig);
 
 const nextConfig = {
 	output: 'standalone',
