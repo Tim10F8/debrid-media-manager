@@ -1,5 +1,4 @@
 import LibraryActionButtons from '@/components/LibraryActionButtons';
-import LibraryHelpText from '@/components/LibraryHelpText';
 import LibraryMenuButtons from '@/components/LibraryMenuButtons';
 import LibrarySize from '@/components/LibrarySize';
 import LibraryTableHeader from '@/components/LibraryTableHeader';
@@ -1562,238 +1561,254 @@ function TorrentsPage() {
 	// Remove the initialize function as we're using cached data now
 
 	return (
-		<div className="mx-1 my-0 min-h-screen bg-gray-900 text-gray-100">
+		<div className="mx-1 my-0 flex min-h-screen flex-col bg-gray-900 text-gray-100">
 			<Head>
 				<title>Debrid Media Manager - Library</title>
 			</Head>
 			<Toaster position="bottom-right" />
-			<div className="mb-1 flex items-center justify-between">
-				<div className="flex items-center gap-2">
-					<h1
-						className="text-xl font-bold text-white"
-						onDoubleClick={backupOldWeekData}
-						style={{ cursor: 'default' }}
-					>
-						<BookOpen className="mr-1 inline-block h-5 w-5 text-cyan-400" />
-						Library{' '}
-						<LibrarySize
-							torrentCount={userTorrentsList.length}
-							totalBytes={totalBytes}
-							isLoading={isFetching}
-						/>
-						{selectedTorrents.size > 0 && (
-							<span className="ml-2 text-sm font-normal text-cyan-400">
-								({selectedTorrents.size}/{filteredList.length} selected)
-							</span>
-						)}
-					</h1>
-					<div className="flex items-center gap-2">
-						<span className="text-xs text-gray-500">{lastFetchLabel}</span>
-						<button
-							onClick={refreshLibrary}
-							disabled={isFetching}
-							className={`rounded-full p-1.5 transition-all ${
-								isFetching
-									? 'cursor-not-allowed bg-gray-700 text-gray-500'
-									: cacheError
-										? 'bg-red-900/50 text-red-400 hover:bg-red-800/50'
-										: 'bg-cyan-900/50 text-cyan-400 hover:bg-cyan-800/50 hover:text-cyan-300'
-							}`}
-							title={cacheError ? `Retry (${cacheError})` : 'Refresh library'}
-						>
-							<svg
-								className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
+			<div className="flex flex-1 flex-col">
+				<div className="sticky top-0 z-20 bg-gray-900 pb-2">
+					<div className="mb-1 flex items-center justify-between pt-2">
+						<div className="flex items-center gap-2">
+							<h1
+								className="text-xl font-bold text-white"
+								onDoubleClick={backupOldWeekData}
+								style={{ cursor: 'default' }}
 							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+								<BookOpen className="mr-1 inline-block h-5 w-5 text-cyan-400" />
+								Library{' '}
+								<LibrarySize
+									torrentCount={userTorrentsList.length}
+									totalBytes={totalBytes}
+									isLoading={isFetching}
 								/>
-							</svg>
-						</button>
+								{selectedTorrents.size > 0 && (
+									<span className="ml-2 text-sm font-normal text-cyan-400">
+										({selectedTorrents.size}/{filteredList.length} selected)
+									</span>
+								)}
+							</h1>
+							<div className="flex items-center gap-2">
+								<span className="text-xs text-gray-500">{lastFetchLabel}</span>
+								<button
+									onClick={refreshLibrary}
+									disabled={isFetching}
+									className={`rounded-full p-1.5 transition-all ${
+										isFetching
+											? 'cursor-not-allowed bg-gray-700 text-gray-500'
+											: cacheError
+												? 'bg-red-900/50 text-red-400 hover:bg-red-800/50'
+												: 'bg-cyan-900/50 text-cyan-400 hover:bg-cyan-800/50 hover:text-cyan-300'
+									}`}
+									title={cacheError ? `Retry (${cacheError})` : 'Refresh library'}
+								>
+									<svg
+										className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											strokeLinecap="round"
+											strokeLinejoin="round"
+											strokeWidth={2}
+											d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+										/>
+									</svg>
+								</button>
+							</div>
+						</div>
+						<Link
+							href="/"
+							className="rounded border-2 border-cyan-500 bg-cyan-900/30 px-2 py-0.5 text-sm text-cyan-100 transition-colors hover:bg-cyan-800/50"
+						>
+							Go Home
+						</Link>
+					</div>
+					<div className="mb-2 flex items-center border-b-2 border-gray-600 py-0">
+						<input
+							className="mr-3 w-full appearance-none border-none bg-transparent px-2 py-0.5 text-xs leading-tight text-gray-100 focus:outline-none"
+							type="text"
+							id="query"
+							placeholder="search by filename/hash/id, supports regex"
+							value={query}
+							onChange={(e) => {
+								setCurrentPage(1);
+								setQuery(e.target.value.toLocaleLowerCase());
+							}}
+						/>
+					</div>
+					<LibraryMenuButtons
+						currentPage={currentPage}
+						maxPages={Math.ceil(sortedData.length / ITEMS_PER_PAGE)}
+						onPrevPage={handlePrevPage}
+						onNextPage={handleNextPage}
+						onResetFilters={resetFilters}
+						sameHashSize={sameHash.size}
+						sameTitleSize={sameTitle.size}
+						selectedTorrentsSize={selectedTorrents.size}
+						uncachedCount={uncachedAdIDs.length + uncachedRdHashes.size}
+						inProgressCount={inProgressCount}
+						slowCount={slowCount}
+						failedCount={failedCount}
+					/>
+					<LibraryActionButtons
+						onSelectShown={() => selectShown(currentPageData, setSelectedTorrents)}
+						onResetSelection={() => resetSelection(setSelectedTorrents)}
+						onReinsertTorrents={handleReinsertTorrents}
+						onGenerateHashlist={handleGenerateHashlist}
+						onDeleteShownTorrents={handleDeleteShownTorrents}
+						onAddMagnet={handleAddMagnet}
+						onLocalRestore={wrapLocalRestoreFn}
+						onLocalBackup={localBackup}
+						onDedupeBySize={dedupeBySize}
+						onDedupeByRecency={dedupeByRecency}
+						onCombineSameHash={combineSameHash}
+						selectedTorrentsSize={selectedTorrents.size}
+						rdKey={rdKey}
+						adKey={adKey}
+						tbKey={tbKey}
+						showDedupe={
+							router.query.status === 'sametitle' ||
+							(!!titleFilter && filteredList.length > 1)
+						}
+						showHashCombine={
+							router.query.status === 'samehash' ||
+							(!!hashFilter && filteredList.length > 1)
+						}
+					/>
+				</div>
+				<div className="flex-1 overflow-hidden">
+					<div className="h-full overflow-y-auto pb-6">
+						<div className="overflow-x-auto">
+							{loading || grouping || filtering ? (
+								<div className="mt-2 flex items-center justify-center">
+									<div className="h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"></div>
+								</div>
+							) : (
+								<table className="w-full">
+									<thead>
+										<LibraryTableHeader
+											sortBy={sortBy}
+											onSort={handleSort}
+											filteredListLength={filteredList.length}
+											selectedTorrentsSize={selectedTorrents.size}
+										/>
+									</thead>
+									<tbody>
+										{currentPageData.map((torrent) => (
+											<LibraryTorrentRow
+												key={torrent.id}
+												torrent={torrent}
+												rdKey={rdKey}
+												adKey={adKey}
+												tbKey={tbKey}
+												shouldDownloadMagnets={shouldDownloadMagnets}
+												hashGrouping={hashGrouping}
+												titleGrouping={getTitleGroupings(torrent.mediaType)}
+												tvGroupingByTitle={tvGroupingByTitle}
+												hashFilter={hashFilter as string}
+												titleFilter={titleFilter as string}
+												tvTitleFilter={tvTitleFilter as string}
+												isSelected={selectedTorrents.has(torrent.id)}
+												onSelect={(id) =>
+													handleSelectTorrent(
+														id,
+														selectedTorrents,
+														setSelectedTorrents
+													)
+												}
+												onDelete={async (id) => {
+													// Use optimistic update from cache
+													removeFromCache(id);
+													setSelectedTorrents((prev) => {
+														const newSet = new Set(prev);
+														newSet.delete(id);
+														return newSet;
+													});
+												}}
+												onRefreshLibrary={refreshLibrary}
+												onShowInfo={async (t) => {
+													if (t.id.startsWith('rd:') && rdKey) {
+														const info = await getTorrentInfo(
+															rdKey,
+															t.id.substring(3)
+														);
+														if (
+															t.status ===
+																UserTorrentStatus.waiting ||
+															t.status ===
+																UserTorrentStatus.downloading
+														) {
+															const selectedFiles = info.files.filter(
+																(f: RDFileInfo) => f.selected === 1
+															);
+															updateInCache(t.id, {
+																progress: info.progress,
+																seeders: info.seeders,
+																speed: info.speed,
+																status: getRdStatus(info),
+																serviceStatus: info.status,
+																links: info.links,
+																selectedFiles: selectedFiles.map(
+																	(
+																		f: RDFileInfo,
+																		idx: number
+																	) => ({
+																		fileId: f.id,
+																		filename: f.path,
+																		filesize: f.bytes,
+																		link:
+																			selectedFiles.length ===
+																			info.links.length
+																				? info.links[idx]
+																				: '',
+																	})
+																),
+															});
+															await torrentDB.add(t);
+														}
+														// Show the info dialog
+														await handleShowInfoForRD(
+															t,
+															rdKey,
+															setUserTorrentsList,
+															torrentDB,
+															setSelectedTorrents
+														);
+													} else if (t.id.startsWith('ad:') && adKey) {
+														await handleShowInfoForAD(t, adKey);
+													} else if (t.id.startsWith('tb:') && tbKey) {
+														// For now, show basic info for TorBox torrents
+														console.log('TorBox torrent info:', t);
+														// TODO: Implement detailed TorBox info modal
+														alert(
+															`TorBox torrent: ${t.title}\nStatus: ${t.serviceStatus}\nProgress: ${t.progress}%\nSize: ${(t.bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
+														);
+													} else {
+														console.error(
+															'Cannot show info: missing debrid service key'
+														);
+													}
+												}}
+												onTypeChange={(t) => {
+													// Update in cache optimistically
+													updateInCache(t.id, { mediaType: t.mediaType });
+													// Also update in database
+													handleChangeType(
+														t,
+														setUserTorrentsList,
+														torrentDB
+													);
+												}}
+											/>
+										))}
+									</tbody>
+								</table>
+							)}
+						</div>
 					</div>
 				</div>
-
-				<Link
-					href="/"
-					className="rounded border-2 border-cyan-500 bg-cyan-900/30 px-2 py-0.5 text-sm text-cyan-100 transition-colors hover:bg-cyan-800/50"
-				>
-					Go Home
-				</Link>
-			</div>
-			<div className="mb-2 flex items-center border-b-2 border-gray-600 py-0">
-				<input
-					className="mr-3 w-full appearance-none border-none bg-transparent px-2 py-0.5 text-xs leading-tight text-gray-100 focus:outline-none"
-					type="text"
-					id="query"
-					placeholder="search by filename/hash/id, supports regex"
-					value={query}
-					onChange={(e) => {
-						setCurrentPage(1);
-						setQuery(e.target.value.toLocaleLowerCase());
-					}}
-				/>
-			</div>
-			<LibraryMenuButtons
-				currentPage={currentPage}
-				maxPages={Math.ceil(sortedData.length / ITEMS_PER_PAGE)}
-				onPrevPage={handlePrevPage}
-				onNextPage={handleNextPage}
-				onResetFilters={resetFilters}
-				sameHashSize={sameHash.size}
-				sameTitleSize={sameTitle.size}
-				selectedTorrentsSize={selectedTorrents.size}
-				uncachedCount={uncachedAdIDs.length + uncachedRdHashes.size}
-				inProgressCount={inProgressCount}
-				slowCount={slowCount}
-				failedCount={failedCount}
-			/>
-			<LibraryActionButtons
-				onSelectShown={() => selectShown(currentPageData, setSelectedTorrents)}
-				onResetSelection={() => resetSelection(setSelectedTorrents)}
-				onReinsertTorrents={handleReinsertTorrents}
-				onGenerateHashlist={handleGenerateHashlist}
-				onDeleteShownTorrents={handleDeleteShownTorrents}
-				onAddMagnet={handleAddMagnet}
-				onLocalRestore={wrapLocalRestoreFn}
-				onLocalBackup={localBackup}
-				onDedupeBySize={dedupeBySize}
-				onDedupeByRecency={dedupeByRecency}
-				onCombineSameHash={combineSameHash}
-				selectedTorrentsSize={selectedTorrents.size}
-				rdKey={rdKey}
-				adKey={adKey}
-				tbKey={tbKey}
-				showDedupe={
-					router.query.status === 'sametitle' ||
-					(!!titleFilter && filteredList.length > 1)
-				}
-				showHashCombine={
-					router.query.status === 'samehash' || (!!hashFilter && filteredList.length > 1)
-				}
-			/>
-			<LibraryHelpText helpText={helpText} onHide={() => setHelpText('hide')} />
-			<div className="overflow-x-auto">
-				{loading || grouping || filtering ? (
-					<div className="mt-2 flex items-center justify-center">
-						<div className="h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"></div>
-					</div>
-				) : (
-					<table className="w-full">
-						<thead>
-							<LibraryTableHeader
-								sortBy={sortBy}
-								onSort={handleSort}
-								filteredListLength={filteredList.length}
-								selectedTorrentsSize={selectedTorrents.size}
-							/>
-						</thead>
-						<tbody>
-							{currentPageData.map((torrent) => (
-								<LibraryTorrentRow
-									key={torrent.id}
-									torrent={torrent}
-									rdKey={rdKey}
-									adKey={adKey}
-									tbKey={tbKey}
-									shouldDownloadMagnets={shouldDownloadMagnets}
-									hashGrouping={hashGrouping}
-									titleGrouping={getTitleGroupings(torrent.mediaType)}
-									tvGroupingByTitle={tvGroupingByTitle}
-									hashFilter={hashFilter as string}
-									titleFilter={titleFilter as string}
-									tvTitleFilter={tvTitleFilter as string}
-									isSelected={selectedTorrents.has(torrent.id)}
-									onSelect={(id) =>
-										handleSelectTorrent(
-											id,
-											selectedTorrents,
-											setSelectedTorrents
-										)
-									}
-									onDelete={async (id) => {
-										// Use optimistic update from cache
-										removeFromCache(id);
-										setSelectedTorrents((prev) => {
-											const newSet = new Set(prev);
-											newSet.delete(id);
-											return newSet;
-										});
-									}}
-									onRefreshLibrary={refreshLibrary}
-									onShowInfo={async (t) => {
-										if (t.id.startsWith('rd:') && rdKey) {
-											const info = await getTorrentInfo(
-												rdKey,
-												t.id.substring(3)
-											);
-											if (
-												t.status === UserTorrentStatus.waiting ||
-												t.status === UserTorrentStatus.downloading
-											) {
-												const selectedFiles = info.files.filter(
-													(f: RDFileInfo) => f.selected === 1
-												);
-												updateInCache(t.id, {
-													progress: info.progress,
-													seeders: info.seeders,
-													speed: info.speed,
-													status: getRdStatus(info),
-													serviceStatus: info.status,
-													links: info.links,
-													selectedFiles: selectedFiles.map(
-														(f: RDFileInfo, idx: number) => ({
-															fileId: f.id,
-															filename: f.path,
-															filesize: f.bytes,
-															link:
-																selectedFiles.length ===
-																info.links.length
-																	? info.links[idx]
-																	: '',
-														})
-													),
-												});
-												await torrentDB.add(t);
-											}
-											// Show the info dialog
-											await handleShowInfoForRD(
-												t,
-												rdKey,
-												setUserTorrentsList,
-												torrentDB,
-												setSelectedTorrents
-											);
-										} else if (t.id.startsWith('ad:') && adKey) {
-											await handleShowInfoForAD(t, adKey);
-										} else if (t.id.startsWith('tb:') && tbKey) {
-											// For now, show basic info for TorBox torrents
-											console.log('TorBox torrent info:', t);
-											// TODO: Implement detailed TorBox info modal
-											alert(
-												`TorBox torrent: ${t.title}\nStatus: ${t.serviceStatus}\nProgress: ${t.progress}%\nSize: ${(t.bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
-											);
-										} else {
-											console.error(
-												'Cannot show info: missing debrid service key'
-											);
-										}
-									}}
-									onTypeChange={(t) => {
-										// Update in cache optimistically
-										updateInCache(t.id, { mediaType: t.mediaType });
-										// Also update in database
-										handleChangeType(t, setUserTorrentsList, torrentDB);
-									}}
-								/>
-							))}
-						</tbody>
-					</table>
-				)}
 			</div>
 		</div>
 	);
