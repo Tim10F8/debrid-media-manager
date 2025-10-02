@@ -23,6 +23,9 @@ function Search() {
 		(e?: React.FormEvent<HTMLFormElement>) => {
 			if (e) e.preventDefault();
 			if (!typedQuery) return;
+			setErrorMessage('');
+			setSearchResults([]);
+			setMiscResults({});
 			if (/(tt\d{7,})/.test(typedQuery)) {
 				setLoading(true);
 				const imdbid = typedQuery.match(/(tt\d{7,})/)?.[1];
@@ -79,7 +82,15 @@ function Search() {
 			setSearchResults(data.results);
 		} catch (error: any) {
 			setSearchResults([]);
-			setErrorMessage(error.message);
+			console.error('[Search] fetchData failed', { query: q, error });
+			const fallbackMessage = 'Failed to fetch search results; try again soon.';
+			const parsedMessage =
+				error instanceof Error && error.message ? error.message : String(error);
+			setErrorMessage(
+				parsedMessage.includes('Failed to fetch search results')
+					? parsedMessage
+					: fallbackMessage
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -127,7 +138,10 @@ function Search() {
 				{/* Display loading indicator */}
 				{loading && (
 					<div className="mt-4 flex items-center justify-center">
-						<div className="h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"></div>
+						<div
+							className="h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"
+							data-testid="loading-spinner"
+						></div>
 					</div>
 				)}
 				{/* Display error message */}

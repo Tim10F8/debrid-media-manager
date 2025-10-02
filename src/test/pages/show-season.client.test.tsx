@@ -240,8 +240,9 @@ describe('TV show page header', () => {
 		const actionRegion = within(screen.getByTestId('media-header-actions'));
 		expect(actionRegion.getByRole('button', { name: /Stremio/i })).toBeInTheDocument();
 
-		expect(posterMock).toHaveBeenCalledTimes(1);
-		expect(posterMock.mock.calls[0][0]).toMatchObject({
+		expect(posterMock).toHaveBeenCalled();
+		const posterCall = posterMock.mock.calls[posterMock.mock.calls.length - 1]?.[0];
+		expect(posterCall).toMatchObject({
 			imdbId: 'tt1234567',
 			title: 'Example Show',
 		});

@@ -5,10 +5,12 @@ type ExpirableValue<T> = {
 	expiry: number;
 };
 
+type SetLocalStorageValue<T> = T | null | ((prevState: T | null) => T | null);
+
 function useLocalStorage<T>(
 	key: string,
 	defaultValue: T | null = null
-): [T | null, (newValue: T | ((prevState: T | null) => T), expiryTimeInSecs?: number) => void] {
+): [T | null, (newValue: SetLocalStorageValue<T>, expiryTimeInSecs?: number) => void] {
 	const [storedValue, setStoredValue] = useState<T | null>(() => {
 		if (typeof window === 'undefined') {
 			// Running on the server, return the default value
@@ -36,12 +38,12 @@ function useLocalStorage<T>(
 		return defaultValue;
 	});
 
-	const setValue = (newValue: T | ((prevState: T | null) => T), expiryTimeInSecs?: number) => {
-		const valueToStore: T = newValue instanceof Function ? newValue(storedValue) : newValue;
+	const setValue = (newValue: SetLocalStorageValue<T>, expiryTimeInSecs?: number) => {
+		const valueToStore = newValue instanceof Function ? newValue(storedValue) : newValue;
 
 		setStoredValue(valueToStore);
 
-		if (expiryTimeInSecs) {
+		if (valueToStore !== null && expiryTimeInSecs) {
 			const expiryDate = Date.now() + expiryTimeInSecs * 1000;
 			const expirableValue: ExpirableValue<T> = {
 				value: valueToStore,
@@ -50,6 +52,8 @@ function useLocalStorage<T>(
 			window.localStorage.setItem(key, JSON.stringify(expirableValue));
 		} else if (valueToStore !== null) {
 			window.localStorage.setItem(key, JSON.stringify(valueToStore));
+		} else {
+			window.localStorage.removeItem(key);
 		}
 
 		// Notify other hook instances in this tab and across tabs

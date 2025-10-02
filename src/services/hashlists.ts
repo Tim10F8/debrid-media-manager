@@ -10,6 +10,10 @@ export async function createShortUrl(originalUrl: string): Promise<string> {
 			url: originalUrl,
 		});
 
+		if (!response.data || !response.data.shortUrl) {
+			throw new Error('Invalid response: missing shortUrl');
+		}
+
 		return response.data.shortUrl;
 	} catch (error) {
 		console.error('Error creating short URL:', error);

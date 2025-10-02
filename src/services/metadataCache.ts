@@ -18,9 +18,13 @@ export class MetadataCacheService {
 	/**
 	 * Check if cached data is expired
 	 */
-	private isCacheExpired(updatedAt: Date, maxAge: number): boolean {
+	private isCacheExpired(
+		updatedAt: Date,
+		maxAge: number,
+		currentTime: number = Date.now()
+	): boolean {
 		if (maxAge === 0) return false; // Permanent cache
-		const age = Date.now() - updatedAt.getTime();
+		const age = currentTime - updatedAt.getTime();
 		return age > maxAge;
 	}
 
@@ -43,12 +47,20 @@ export class MetadataCacheService {
 
 		// Fetch from API
 		console.log(`[MetadataCache] Fetching ${cacheType} data from: ${url}`);
-		const response = await axios.get<T>(url, config);
+		const response = await axios.get<T>(url, config || {});
 		const data = response.data;
 
-		// Cache the response
-		await this.cache.set(cacheKey, cacheType, data);
-		console.log(`[MetadataCache] Cached ${cacheType} data for: ${cacheKey}`);
+		// Cache the response (non-blocking)
+		try {
+			await this.cache.set(cacheKey, cacheType, data);
+			console.log(`[MetadataCache] Cached ${cacheType} data for: ${cacheKey}`);
+		} catch (error) {
+			console.error(
+				`[MetadataCache] Failed to cache ${cacheType} data for: ${cacheKey}`,
+				error
+			);
+			// Continue without caching - still return the data
+		}
 
 		return data;
 	}
