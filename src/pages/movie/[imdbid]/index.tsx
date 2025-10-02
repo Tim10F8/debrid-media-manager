@@ -643,8 +643,8 @@ const MovieSearch: FunctionComponent = () => {
 								onClick={() => handleCast(getFirstAvailableRdTorrent()!.hash)}
 							>
 								<b className="flex items-center justify-center">
+									<Cast className="mr-1 h-3 w-3 text-gray-500" />
 									Cast
-									<Cast className="ml-1 h-3 w-3 text-gray-500" />
 								</b>
 							</button>
 						</>

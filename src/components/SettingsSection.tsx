@@ -1,23 +1,18 @@
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Link2, Settings, X } from 'lucide-react';
+import { AlertTriangle, Check, Link2, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
 	defaultAvailabilityCheckLimit,
 	defaultDownloadMagnets,
 	defaultEpisodeSize,
 	defaultMagnetHandlerEnabled,
-	defaultMagnetInstructionsHidden,
 	defaultMovieSize,
 	defaultPlayer,
 	defaultTorrentsFilter,
 } from '../utils/settings';
 
 export const SettingsSection = () => {
-	const [isExpanded, setIsExpanded] = useState(false);
 	const [isMagnetHandlerEnabled, setIsMagnetHandlerEnabled] = useState(
 		defaultMagnetHandlerEnabled
-	);
-	const [isInstructionsHidden, setIsInstructionsHidden] = useState(
-		defaultMagnetInstructionsHidden
 	);
 
 	const [storedPlayer, setStoredPlayer] = useState(defaultPlayer);
@@ -47,11 +42,6 @@ export const SettingsSection = () => {
 		if (typeof localStorage === 'undefined') return;
 		// Check if protocol handler is registered
 		setIsMagnetHandlerEnabled(localStorage.getItem('settings:magnetHandlerEnabled') === 'true');
-
-		// Check if instructions are hidden
-		setIsInstructionsHidden(
-			localStorage.getItem('settings:magnetInstructionsHidden') === 'true'
-		);
 
 		// Load persistent settings
 		setStoredPlayer(localStorage.getItem('settings:player') || defaultPlayer);
@@ -216,18 +206,6 @@ export const SettingsSection = () => {
 			localStorage.setItem('settings:enableTorrentioTor', String(checked));
 	};
 
-	const handleHideInstructions = () => {
-		if (typeof localStorage !== 'undefined')
-			localStorage.setItem('settings:magnetInstructionsHidden', 'true');
-		setIsInstructionsHidden(true);
-	};
-
-	const handleShowInstructions = () => {
-		if (typeof localStorage !== 'undefined')
-			localStorage.setItem('settings:magnetInstructionsHidden', 'false');
-		setIsInstructionsHidden(false);
-	};
-
 	const getBrowserSettingsInfo = () => {
 		if (typeof navigator === 'undefined') {
 			return { text: 'Browser protocol handler settings:', url: '' };
@@ -257,24 +235,11 @@ export const SettingsSection = () => {
 
 	return (
 		<div className="w-full max-w-md">
-			<button
-				onClick={() => setIsExpanded(!isExpanded)}
-				className="haptic-sm flex w-full items-center justify-between rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-2 text-sm font-medium text-gray-100 transition-colors hover:bg-gray-700/50"
-			>
-				<span className="flex items-center">
-					<Settings className="mr-2 inline-block h-4 w-4 text-gray-400" />
-					Settings
-				</span>
-				<span>
-					{isExpanded ? (
-						<ChevronDown className="h-4 w-4 text-gray-400" />
-					) : (
-						<ChevronRight className="h-4 w-4 text-gray-400" />
-					)}
-				</span>
-			</button>
-
-			{isExpanded && (
+			<div className="rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-5 shadow-sm">
+				<div className="flex items-center gap-2 text-gray-100">
+					<Settings className="h-5 w-5 text-gray-300" />
+					<h1 className="text-lg font-semibold">Settings</h1>
+				</div>
 				<div className="mt-4 text-sm text-gray-200">
 					<div className="flex flex-col gap-4">
 						<div className="rounded border-2 border-yellow-500/30 p-4">
@@ -603,76 +568,62 @@ export const SettingsSection = () => {
 							</div>
 						</div>
 					</div>
-				</div>
-			)}
 
-			<div className="mt-4 flex flex-col gap-2">
-				<button
-					id="dmm-default"
-					className={`haptic-sm w-full rounded border-2 ${
-						isMagnetHandlerEnabled
-							? 'border-green-500 bg-green-900/30 text-green-100 hover:bg-green-800/50'
-							: 'border-blue-500 bg-blue-900/30 text-blue-100 hover:bg-blue-800/50'
-					} px-4 py-2 text-sm transition-colors`}
-					onClick={() => {
-						if (
-							typeof navigator !== 'undefined' &&
-							'registerProtocolHandler' in navigator
-						) {
-							try {
-								navigator.registerProtocolHandler(
-									'magnet',
-									`${(typeof location !== 'undefined' && location.origin) || ''}/library?addMagnet=%s`
-								);
-								if (typeof localStorage !== 'undefined')
-									localStorage.setItem('settings:magnetHandlerEnabled', 'true');
-								setIsMagnetHandlerEnabled(true);
-							} catch (error) {
-								console.error('Error registering protocol handler:', error);
-							}
-						}
-					}}
-				>
-					{isMagnetHandlerEnabled ? (
-						<>
-							<Check className="mr-1 inline-block h-4 w-4 text-green-400" />
-							DMM is your default magnet handler
-						</>
-					) : (
-						<>
-							<Link2 className="mr-1 inline-block h-4 w-4 text-blue-400" />
-							Make DMM your default magnet handler
-						</>
-					)}
-				</button>
+					<div className="mt-6 flex flex-col gap-2">
+						<button
+							id="dmm-default"
+							className={`haptic-sm w-full rounded border-2 ${
+								isMagnetHandlerEnabled
+									? 'border-green-500 bg-green-900/30 text-green-100 hover:bg-green-800/50'
+									: 'border-blue-500 bg-blue-900/30 text-blue-100 hover:bg-blue-800/50'
+							} px-4 py-2 text-sm transition-colors`}
+							onClick={() => {
+								if (
+									typeof navigator !== 'undefined' &&
+									'registerProtocolHandler' in navigator
+								) {
+									try {
+										navigator.registerProtocolHandler(
+											'magnet',
+											`${(typeof location !== 'undefined' && location.origin) || ''}/library?addMagnet=%s`
+										);
+										if (typeof localStorage !== 'undefined')
+											localStorage.setItem(
+												'settings:magnetHandlerEnabled',
+												'true'
+											);
+										setIsMagnetHandlerEnabled(true);
+									} catch (error) {
+										console.error('Error registering protocol handler:', error);
+									}
+								}
+							}}
+						>
+							{isMagnetHandlerEnabled ? (
+								<>
+									<Check className="mr-1 inline-block h-4 w-4 text-green-400" />
+									DMM is your default magnet handler
+								</>
+							) : (
+								<>
+									<Link2 className="mr-1 inline-block h-4 w-4 text-blue-400" />
+									Make DMM your default magnet handler
+								</>
+							)}
+						</button>
 
-				{!isInstructionsHidden ? (
-					<div className="flex flex-col gap-1 text-xs text-gray-400">
-						<div className="flex items-center justify-between">
+						<div className="flex flex-col gap-2 text-xs text-gray-400">
 							<div>{getBrowserSettingsInfo().text}</div>
-							<button
-								onClick={handleHideInstructions}
-								className="ml-2 text-gray-500 hover:text-gray-300"
-							>
-								<X className="h-3 w-3" />
-							</button>
+							<input
+								type="text"
+								readOnly
+								className="w-full rounded bg-gray-800 px-2 py-1.5 text-gray-200"
+								value={getBrowserSettingsInfo().url}
+								onClick={(e) => (e.target as HTMLInputElement).select()}
+							/>
 						</div>
-						<input
-							type="text"
-							readOnly
-							className="w-full rounded bg-gray-800 px-2 py-1.5 text-gray-200"
-							value={getBrowserSettingsInfo().url}
-							onClick={(e) => (e.target as HTMLInputElement).select()}
-						/>
 					</div>
-				) : (
-					<button
-						onClick={handleShowInstructions}
-						className="text-xs text-gray-500 hover:text-gray-300"
-					>
-						Show browser settings
-					</button>
-				)}
+				</div>
 			</div>
 		</div>
 	);

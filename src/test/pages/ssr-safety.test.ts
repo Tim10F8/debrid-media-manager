@@ -19,7 +19,7 @@ const importWithoutWindow = async (modulePath: string) => {
 
 describe('SSR safety', () => {
 	it('movie page can load when window is undefined', async () => {
-		await importWithoutWindow('@/pages/movie/[imdbid].tsx');
+		await importWithoutWindow('@/pages/movie/[imdbid]/index.tsx');
 	});
 
 	it('show page can load when window is undefined', async () => {

@@ -43,11 +43,6 @@ vi.mock('@/components/ServiceCard', () => ({
 	ServiceCard: () => <div data-testid="service-card" />,
 }));
 
-vi.mock('@/components/SettingsSection', () => ({
-	__esModule: true,
-	SettingsSection: () => <div data-testid="settings-section" />,
-}));
-
 vi.mock('@/components/TraktSection', () => ({
 	__esModule: true,
 	TraktSection: () => <div data-testid="trakt-section" />,
@@ -96,6 +91,7 @@ vi.mock('@/utils/withAuth', () => ({
 vi.mock('lucide-react', () => ({
 	__esModule: true,
 	Megaphone: () => <svg data-testid="megaphone-icon" />,
+	Settings: () => <svg data-testid="settings-icon" />,
 	Star: () => <svg data-testid="star-icon" />,
 	X: () => <svg data-testid="x-icon" />,
 }));
@@ -132,7 +128,7 @@ vi.mock('react-hot-toast', () => ({
 
 import IndexPage from '@/pages/index';
 
-describe('IndexPage Real-Debrid status link', () => {
+describe('IndexPage', () => {
 	beforeEach(() => {
 		currentUserMock.mockReset();
 		checkPremiumStatusMock.mockClear();
@@ -184,5 +180,93 @@ describe('IndexPage Real-Debrid status link', () => {
 		render(<IndexPage />);
 
 		expect(screen.queryByRole('link', { name: 'Is Real-Debrid down?' })).toBeNull();
+	});
+
+	it('provides a shortcut to the settings page', () => {
+		currentUserMock.mockReturnValue({
+			rdUser: { username: 'demo' },
+			rdError: null,
+			hasRDAuth: true,
+			rdIsRefreshing: false,
+			adUser: null,
+			adError: null,
+			hasADAuth: false,
+			tbUser: null,
+			tbError: null,
+			hasTBAuth: false,
+			traktUser: null,
+			traktError: null,
+			hasTraktAuth: false,
+			isLoading: false,
+		});
+
+		render(<IndexPage />);
+
+		const settingsLink = screen.getByRole('link', { name: /Settings/i });
+		expect(settingsLink).toHaveAttribute('href', '/settings');
+	});
+
+	it('keeps action buttons evenly spaced', () => {
+		currentUserMock.mockReturnValue({
+			rdUser: { username: 'demo' },
+			rdError: null,
+			hasRDAuth: true,
+			rdIsRefreshing: false,
+			adUser: null,
+			adError: null,
+			hasADAuth: false,
+			tbUser: null,
+			tbError: null,
+			hasTBAuth: false,
+			traktUser: null,
+			traktError: null,
+			hasTraktAuth: false,
+			isLoading: false,
+		});
+
+		render(<IndexPage />);
+
+		const refreshButton = screen.getByRole('button', { name: /Refresh/i });
+		const clearCacheButton = screen.getByRole('button', { name: /Clear library cache/i });
+		const logoutButton = screen.getByRole('button', { name: /Logout All/i });
+
+		expect(refreshButton.className).toBe(clearCacheButton.className);
+		expect(logoutButton.className).toBe(refreshButton.className);
+		expect(refreshButton).toHaveClass('w-full');
+
+		const container = refreshButton.parentElement;
+		expect(container).not.toBeNull();
+		expect(container).toHaveClass('grid');
+		expect(container).toHaveClass('gap-3');
+	});
+
+	it('applies the same spacing while loading', () => {
+		currentUserMock.mockReturnValue({
+			rdUser: null,
+			rdError: null,
+			hasRDAuth: false,
+			rdIsRefreshing: false,
+			adUser: null,
+			adError: null,
+			hasADAuth: false,
+			tbUser: null,
+			tbError: null,
+			hasTBAuth: false,
+			traktUser: null,
+			traktError: null,
+			hasTraktAuth: false,
+			isLoading: true,
+		});
+
+		render(<IndexPage />);
+
+		const clearDataButton = screen.getByRole('button', { name: /Clear Data and Reload/i });
+
+		expect(clearDataButton).toHaveClass('w-full');
+
+		const container = clearDataButton.parentElement;
+		expect(container).not.toBeNull();
+		expect(container).toHaveClass('grid');
+		expect(container).toHaveClass('gap-3');
 	});
 });

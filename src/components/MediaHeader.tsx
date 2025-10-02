@@ -91,7 +91,7 @@ const MediaHeader: React.FC<MediaHeaderProps> = ({
 
 			{additionalInfo}
 
-			<div>
+			<div className="flex flex-wrap items-center gap-2">
 				{actionButtons}
 				<RelatedMedia imdbId={imdbId} mediaType={mediaType === 'tv' ? 'show' : 'movie'} />
 			</div>

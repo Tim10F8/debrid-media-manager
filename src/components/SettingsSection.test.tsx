@@ -46,10 +46,10 @@ describe('SettingsSection', () => {
 		localStorage.setItem('settings:enablePeerflix', 'true');
 		localStorage.setItem('settings:enableTorrentsDB', 'false');
 
-		render(<SettingsSection />);
+		const { rerender } = render(<SettingsSection />);
 		const user = userEvent.setup();
 
-		await user.click(screen.getByRole('button', { name: /Settings/i }));
+		expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
 
 		const movieSizeContainer = screen.getByText('Biggest movie size').closest('div')!;
 		const movieSize = within(movieSizeContainer).getByRole('combobox');
@@ -166,7 +166,7 @@ describe('SettingsSection', () => {
 			.spyOn(window.navigator, 'userAgent', 'get')
 			.mockReturnValue('Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36');
 
-		render(<SettingsSection />);
+		const { rerender } = render(<SettingsSection />);
 		const user = userEvent.setup();
 
 		const magnetButton = screen.getByRole('button', {
@@ -198,30 +198,24 @@ describe('SettingsSection', () => {
 			const chromeInstructions = await screen.findByText('Chrome protocol handler settings:');
 			expect(chromeInstructions).toBeInTheDocument();
 			expect(screen.getByDisplayValue('chrome://settings/handlers')).toBeInTheDocument();
-
-			const chromeContainer = chromeInstructions.parentElement as HTMLElement;
-			const hideChrome = within(chromeContainer).getByRole('button');
-			await user.click(hideChrome);
-			expect(localStorage.getItem('settings:magnetInstructionsHidden')).toBe('true');
-			expect(
-				screen.getByRole('button', { name: /Show browser settings/i })
-			).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /Hide instructions/i })).toBeNull();
 
 			userAgentSpy.mockReturnValue('Mozilla/5.0 Edg/120.0.0.0');
-			await user.click(screen.getByRole('button', { name: /Show browser settings/i }));
-			expect(localStorage.getItem('settings:magnetInstructionsHidden')).toBe('false');
-			expect(screen.getByText('Edge protocol handler settings:')).toBeInTheDocument();
+			rerender(<SettingsSection />);
+			const edgeInstructions = await screen.findByText('Edge protocol handler settings:');
+			expect(edgeInstructions).toBeInTheDocument();
 			expect(
 				screen.getByDisplayValue('edge://settings/content/handlers')
 			).toBeInTheDocument();
 
-			const edgeInstructions = screen.getByText('Edge protocol handler settings:');
-			const edgeContainer = edgeInstructions.parentElement as HTMLElement;
-			await user.click(within(edgeContainer).getByRole('button'));
 			userAgentSpy.mockReturnValue('Mozilla/5.0 Safari/17.0');
-			await user.click(screen.getByRole('button', { name: /Show browser settings/i }));
-			expect(screen.getByText('Browser protocol handler settings:')).toBeInTheDocument();
-			expect(screen.getByDisplayValue('')).toBeInTheDocument();
+			rerender(<SettingsSection />);
+			const genericInstructions = await screen.findByText(
+				'Browser protocol handler settings:'
+			);
+			expect(genericInstructions).toBeInTheDocument();
+			const instructionsWrapper = genericInstructions.parentElement as HTMLElement;
+			expect(within(instructionsWrapper).getByDisplayValue('')).toBeInTheDocument();
 		} finally {
 			errorSpy.mockRestore();
 		}

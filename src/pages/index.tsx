@@ -4,7 +4,6 @@ import { Logo } from '@/components/Logo';
 import { MainActions } from '@/components/MainActions';
 import { SearchBar } from '@/components/SearchBar';
 import { ServiceCard } from '@/components/ServiceCard';
-import { SettingsSection } from '@/components/SettingsSection';
 import { TraktSection } from '@/components/TraktSection';
 import { useCurrentUser, useDebridLogin } from '@/hooks/auth';
 import { useCastToken } from '@/hooks/castToken';
@@ -13,7 +12,7 @@ import { handleLogout } from '@/utils/logout';
 import { checkPremiumStatus } from '@/utils/premiumCheck';
 import { genericToastOptions } from '@/utils/toastOptions';
 import { withAuth } from '@/utils/withAuth';
-import { Megaphone, Star, X } from 'lucide-react';
+import { Megaphone, Settings, Star, X } from 'lucide-react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -133,6 +132,10 @@ function IndexPage() {
 		setShowElfHostedBanner(false);
 	};
 
+	const actionButtonGroupClasses = 'grid w-full max-w-md gap-3 sm:grid-cols-2 md:grid-cols-3';
+	const actionButtonClasses =
+		'haptic-sm w-full rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-2 text-sm font-medium text-gray-100 transition-colors hover:bg-gray-700/50';
+
 	return (
 		<div className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
 			<Head>
@@ -206,7 +209,16 @@ function IndexPage() {
 								Is Real-Debrid down?
 							</Link>
 						) : null}
-						<SettingsSection />
+						<Link
+							href="/settings"
+							className="haptic-sm flex w-full items-center justify-between rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-2 text-sm font-medium text-gray-100 transition-colors hover:bg-gray-700/50"
+						>
+							<span className="flex items-center">
+								<Settings className="mr-2 inline-block h-4 w-4 text-gray-400" />
+								Settings
+							</span>
+							<span className="text-xs text-gray-400">Open full page</span>
+						</Link>
 						<BrowseSection terms={browseTerms} />
 						<TraktSection traktUser={traktUser} />
 						<div className="grid w-full grid-cols-1 gap-3">
@@ -238,22 +250,22 @@ function IndexPage() {
 						<InfoSection />
 
 						{/* Action Buttons */}
-						<div className="flex flex-wrap justify-center gap-2">
+						<div className={actionButtonGroupClasses}>
 							<button
 								onClick={() => window.location.reload()}
-								className="haptic-sm rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-2 text-sm font-medium text-gray-100 transition-colors hover:bg-gray-700/50"
+								className={actionButtonClasses}
 							>
 								↻&nbsp;Refresh
 							</button>
 							<button
 								onClick={() => handleClearCache()}
-								className="haptic-sm rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-2 text-sm font-medium text-gray-100 transition-colors hover:bg-gray-700/50"
+								className={actionButtonClasses}
 							>
 								Clear library cache
 							</button>
 							<button
 								onClick={async () => await handleLogout(undefined, router)}
-								className="haptic-sm rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-2 text-sm font-medium text-gray-100 transition-colors hover:bg-gray-700/50"
+								className={actionButtonClasses}
 							>
 								Logout All
 							</button>
@@ -265,15 +277,10 @@ function IndexPage() {
 					<h1 className="pb-4 text-center text-xl text-white">
 						Debrid Media Manager is loading...
 					</h1>
-					<div className="flex flex-col items-center gap-4">
-						<div className="flex gap-2">
-							<button
-								onClick={handleClearLocalStorage}
-								className="haptic-sm rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-2 text-sm font-medium text-gray-100 transition-colors hover:bg-gray-700/50"
-							>
-								Clear Data and Reload
-							</button>
-						</div>
+					<div className={actionButtonGroupClasses}>
+						<button onClick={handleClearLocalStorage} className={actionButtonClasses}>
+							Clear Data and Reload
+						</button>
 					</div>
 				</div>
 			)}
