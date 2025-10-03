@@ -1,8 +1,8 @@
+import SearchPage from '@/pages/search';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import getConfig from 'next/config';
 import { useRouter } from 'next/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import SearchPage from './search';
 
 // Mock Next.js router
 vi.mock('next/router', () => ({

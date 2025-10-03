@@ -4,11 +4,11 @@ import {
 	useRealDebridAccessToken,
 	useTorBoxAccessToken,
 } from '@/hooks/auth';
+import StartPage from '@/pages/start';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useRouter } from 'next/router';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import StartPage from './start';
 
 // Mock Next.js router
 vi.mock('next/router', () => ({
