@@ -20,7 +20,11 @@ export default function RelatedShowsPage() {
 	const router = useRouter();
 	const imdbIdParam = useMemo(() => {
 		const raw = router.query.imdbid;
-		return typeof raw === 'string' ? raw : '';
+		if (typeof raw !== 'string') {
+			return null;
+		}
+		const trimmed = raw.trim();
+		return trimmed.length > 0 ? trimmed : null;
 	}, [router.query.imdbid]);
 
 	const [relatedMedia, setRelatedMedia] = useState<MediaItem[]>([]);
@@ -28,7 +32,10 @@ export default function RelatedShowsPage() {
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
 	const fetchRelated = useCallback(async () => {
-		if (!imdbIdParam) return;
+		if (!imdbIdParam) {
+			console.info('Skipping related shows fetch because IMDb id is missing');
+			return;
+		}
 		console.info('Fetching related shows', { imdbId: imdbIdParam });
 		setIsLoading(true);
 		setStatusMessage(null);
@@ -57,13 +64,21 @@ export default function RelatedShowsPage() {
 	}, [fetchRelated, router.isReady]);
 
 	const handleNavigate = (event: MouseEvent<HTMLButtonElement>, imdbId: string) => {
-		const destination = buildDestination(imdbId, 'show');
+		const normalizedImdbId = imdbId.trim();
+		if (!normalizedImdbId) {
+			console.warn('Ignoring navigation request because IMDb id is missing');
+			return;
+		}
+		const destination = buildDestination(normalizedImdbId, 'show');
 		if (event.metaKey || event.ctrlKey) {
 			window.open(destination, '_blank');
 			return;
 		}
 		void router.push(destination);
 	};
+
+	const backLinkClasses =
+		'inline-flex items-center rounded border-2 border-indigo-500 bg-indigo-900/30 px-3 py-1 text-sm text-indigo-100 transition-colors hover:bg-indigo-800/50';
 
 	return (
 		<div className="min-h-screen bg-gray-900 text-gray-100">
@@ -76,12 +91,21 @@ export default function RelatedShowsPage() {
 						<h1 className="text-2xl font-bold">Related Shows</h1>
 						<p className="text-sm text-gray-400">Based on IMDb ID {imdbIdParam}</p>
 					</div>
-					<Link
-						href={`/show/${imdbIdParam}/1`}
-						className="inline-flex items-center rounded border-2 border-indigo-500 bg-indigo-900/30 px-3 py-1 text-sm text-indigo-100 transition-colors hover:bg-indigo-800/50"
-					>
-						Back to Show
-					</Link>
+					{imdbIdParam ? (
+						<Link
+							href={buildDestination(imdbIdParam, 'show')}
+							className={backLinkClasses}
+						>
+							Back to Show
+						</Link>
+					) : (
+						<span
+							aria-disabled="true"
+							className={`${backLinkClasses} pointer-events-none opacity-60`}
+						>
+							Back to Show
+						</span>
+					)}
 				</div>
 
 				{statusMessage && (
@@ -96,24 +120,31 @@ export default function RelatedShowsPage() {
 					<div>No related shows found.</div>
 				) : (
 					<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-						{relatedMedia.map((item) => (
-							<button
-								key={item.ids.imdb}
-								onClick={(event) => handleNavigate(event, item.ids.imdb)}
-								type="button"
-								className="cursor-pointer rounded bg-gray-800/40 p-2 text-left transition-transform hover:scale-105 hover:bg-gray-800/70"
-							>
-								<div className="mx-auto flex w-full max-w-[200px] flex-col items-center">
-									<Poster imdbId={item.ids.imdb} title={item.title} />
-									<div className="mt-2 w-full text-center">
-										<div className="text-sm font-semibold text-gray-100">
-											{item.title}
+						{relatedMedia.map((item) => {
+							const normalizedImdbId = item.ids?.imdb?.trim();
+							if (!normalizedImdbId) {
+								console.warn('Skipping related item without IMDb id', { item });
+								return null;
+							}
+							return (
+								<button
+									key={normalizedImdbId}
+									onClick={(event) => handleNavigate(event, normalizedImdbId)}
+									type="button"
+									className="cursor-pointer rounded bg-gray-800/40 p-2 text-left transition-transform hover:scale-105 hover:bg-gray-800/70"
+								>
+									<div className="mx-auto flex w-full max-w-[200px] flex-col items-center">
+										<Poster imdbId={normalizedImdbId} title={item.title} />
+										<div className="mt-2 w-full text-center">
+											<div className="text-sm font-semibold text-gray-100">
+												{item.title}
+											</div>
+											<div className="text-xs text-gray-400">{item.year}</div>
 										</div>
-										<div className="text-xs text-gray-400">{item.year}</div>
 									</div>
-								</div>
-							</button>
-						))}
+								</button>
+							);
+						})}
 					</div>
 				)}
 			</main>

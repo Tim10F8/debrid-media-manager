@@ -3,9 +3,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { axiosGetMock, pushMock } = vi.hoisted(() => ({
+const { axiosGetMock, pushMock, routerState } = vi.hoisted(() => ({
 	axiosGetMock: vi.fn(),
 	pushMock: vi.fn().mockResolvedValue(undefined),
+	routerState: {
+		query: { imdbid: 'tt9876543' as string | undefined },
+		isReady: true,
+		push: vi.fn().mockResolvedValue(undefined),
+	},
 }));
 
 vi.mock('axios', () => ({
@@ -21,8 +26,8 @@ vi.mock('next/config', () => ({
 vi.mock('next/router', () => ({
 	__esModule: true,
 	useRouter: () => ({
-		query: { imdbid: 'tt9876543' },
-		isReady: true,
+		query: routerState.query,
+		isReady: routerState.isReady,
 		push: pushMock,
 	}),
 }));
@@ -38,6 +43,8 @@ describe('show related page', () => {
 	beforeEach(() => {
 		axiosGetMock.mockReset();
 		pushMock.mockClear();
+		routerState.query = { imdbid: 'tt9876543' };
+		routerState.isReady = true;
 		window.open = vi.fn();
 	});
 
@@ -91,5 +98,22 @@ describe('show related page', () => {
 
 		expect(await screen.findByText('TMDB fallback exhausted.')).toBeInTheDocument();
 		expect(screen.getByText('No related shows found.')).toBeInTheDocument();
+	});
+
+	it('defers navigation options until imdb id is available', async () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		routerState.query = { imdbid: '' };
+		routerState.isReady = true;
+
+		render(<RelatedShowsPage />);
+
+		await waitFor(() => {
+			expect(axiosGetMock).not.toHaveBeenCalled();
+		});
+
+		expect(screen.queryByRole('link', { name: 'Back to Show' })).not.toBeInTheDocument();
+		const backToShow = screen.getByText('Back to Show');
+		expect(backToShow).toHaveAttribute('aria-disabled', 'true');
+		warnSpy.mockRestore();
 	});
 });
