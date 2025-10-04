@@ -160,6 +160,18 @@ model TrackerStats {
   @@index([lastChecked])
 }
 
+model TorrentSnapshot {
+  id        String   @id
+  hash      String
+  addedDate DateTime
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([hash])
+  @@index([hash, addedDate])
+}
+
 model MdblistCache {
   id        String   @id
   type      String   // "movie", "show", "search", "list", etc.

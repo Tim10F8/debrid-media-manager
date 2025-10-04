@@ -4,6 +4,7 @@ import { CastService } from './cast';
 import { ReportService } from './report';
 import { ScrapedService } from './scraped';
 import { SearchService } from './search';
+import { TorrentSnapshotService } from './torrentSnapshot';
 
 export {
 	AnimeService,
@@ -12,4 +13,5 @@ export {
 	ReportService,
 	ScrapedService,
 	SearchService,
+	TorrentSnapshotService,
 };

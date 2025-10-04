@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
 	AnimeService,
 	AvailabilityService,
@@ -5,6 +6,7 @@ import {
 	ReportService,
 	ScrapedService,
 	SearchService,
+	TorrentSnapshotService,
 } from './database';
 import { ScrapeSearchResult } from './mediasearch';
 import { TorrentInfoResponse } from './types';
@@ -16,6 +18,7 @@ export class Repository {
 	private animeService: AnimeService;
 	private castService: CastService;
 	private reportService: ReportService;
+	private torrentSnapshotService: TorrentSnapshotService;
 
 	constructor() {
 		this.availabilityService = new AvailabilityService();
@@ -24,6 +27,7 @@ export class Repository {
 		this.animeService = new AnimeService();
 		this.castService = new CastService();
 		this.reportService = new ReportService();
+		this.torrentSnapshotService = new TorrentSnapshotService();
 	}
 
 	// Ensure connection is properly closed when repository is no longer needed
@@ -35,6 +39,7 @@ export class Repository {
 			this.animeService.disconnect(),
 			this.castService.disconnect(),
 			this.reportService.disconnect(),
+			this.torrentSnapshotService.disconnect(),
 		]);
 	}
 
@@ -226,6 +231,30 @@ export class Repository {
 
 	public getAllUserCasts(userId: string) {
 		return this.castService.getAllUserCasts(userId);
+	}
+
+	// Torrent Snapshot Methods
+	public upsertTorrentSnapshot({
+		id,
+		hash,
+		addedDate,
+		payload,
+	}: {
+		id: string;
+		hash: string;
+		addedDate: Date;
+		payload: Prisma.InputJsonValue;
+	}) {
+		return this.torrentSnapshotService.upsertSnapshot({
+			id,
+			hash,
+			addedDate,
+			payload,
+		});
+	}
+
+	public getLatestTorrentSnapshot(hash: string) {
+		return this.torrentSnapshotService.getLatestSnapshot(hash);
 	}
 
 	// Report Service Methods

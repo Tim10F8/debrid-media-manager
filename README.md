@@ -38,9 +38,10 @@ You can share your whole collection or select specific items you want to share. 
 3. Create a copy of the `.env` file `cp .env .env.local` and fill in the details
 4. Fill in required settings in `.env.local` (e.g. `PROXY=socks5h://127.0.0.1:9050` if tor is running on your host machine)
 5. Get your Prisma database connection string from PlanetScale console and put that in your `.env.local` file
-6. Install the dependencies `npm i`
-7. This is a Next.js project so either go with `npm run dev` or `npm run build && npm run start`
-8. Head to `localhost:3000` and login
+6. Set `ZURGTORRENT_SYNC_SECRET` and `ZURGTORRENT_SNAPSHOT_PASSWORD_SECRET` in `.env.local` (or your deployment environment); the sync secret must match the `DMM_SNAPSHOT_TOKEN` secret configured on the zurgtorrent Cloudflare Worker so snapshot ingest requests are accepted, and the password secret is used to verify read access to stored snapshots
+7. Install the dependencies `npm i`
+8. This is a Next.js project so either go with `npm run dev` or `npm run build && npm run start`
+9. Head to `localhost:3000` and login
 
 ### External Search API
 
@@ -61,6 +62,7 @@ The website will be accessible at `http://localhost:3000`
 ### I just don't know where to start or why do I need this?
 
 [Read the guide here](https://docs.google.com/document/d/13enrfVXcGEEd0Yqb0PBTpGYrIvQpSfeIaAMZ_LiBDzM/edit). I highlighted my tested setup in green.
+
 ### But with Kodi and FEN and Stremio being available, why would I ever need this?
 
 If you want some level of curation on your library. I personally prefer watching only 100+ GB remux release. Don't ask me about -arr apps and/or Usenet. I also came from that setup and found it too much time consuming to maintain.
