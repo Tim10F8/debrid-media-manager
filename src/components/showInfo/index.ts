@@ -3,7 +3,6 @@ import { handleRestartTorrent } from '@/utils/addMagnet';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
 import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorrent';
 import { magnetToastOptions } from '@/utils/toastOptions';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { handleShare } from '../../utils/hashList';
 import { isVideo } from '../../utils/selectable';
@@ -11,8 +10,8 @@ import Modal from '../modals/modal';
 import { renderButton, renderInfoTable } from './components';
 import { renderTorrentInfo } from './render';
 import { icons } from './styles';
-import { ApiTorrentFile, MagnetLink, MediaInfoResponse } from './types';
-import { generatePasswordHash, getStreamInfo } from './utils';
+import { ApiTorrentFile, MagnetLink } from './types';
+import { fetchMediaInfo, getStreamInfo } from './utils';
 
 type ShowInfoHandlers = {
 	onDeleteRd?: (rdKey: string, id: string) => Promise<void>;
@@ -38,17 +37,7 @@ export const showInfoForRD = async (
 ): Promise<void> => {
 	Modal.showLoading();
 	let warning = '';
-	let mediaInfo: MediaInfoResponse | null = null;
-
-	try {
-		const password = await generatePasswordHash(info.hash);
-		const response = await axios.get<MediaInfoResponse>(
-			`https://debridmediamanager.com/mediainfo?hash=${info.hash}&password=${password}`
-		);
-		mediaInfo = response.data;
-	} catch (error) {
-		// Silently fail as media info is optional
-	}
+	const mediaInfo = await fetchMediaInfo(info.hash);
 	const isIntact =
 		info.fake ||
 		info.files.filter((f: ApiTorrentFile) => f.selected === 1).length === info.links.length;
@@ -551,17 +540,7 @@ export const showInfoForAD = async (
 	handlers: ShowInfoHandlers = {}
 ): Promise<void> => {
 	Modal.showLoading();
-	let mediaInfo: MediaInfoResponse | null = null;
-
-	try {
-		const password = await generatePasswordHash(info.hash);
-		const response = await axios.get<MediaInfoResponse>(
-			`https://debridmediamanager.com/mediainfo?hash=${info.hash}&password=${password}`
-		);
-		mediaInfo = response.data;
-	} catch (error) {
-		// Silently fail as media info is optional
-	}
+	const mediaInfo = await fetchMediaInfo(info.hash);
 	const torrent = {
 		id: `ad:${info.id}`,
 		hash: info.hash,

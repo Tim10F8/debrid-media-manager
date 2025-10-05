@@ -14,7 +14,6 @@ describe('/api/torrents/snapshot', () => {
 		vi.clearAllMocks();
 		process.env = { ...originalEnv };
 		process.env.ZURGTORRENT_SYNC_SECRET = 'sync-secret';
-		process.env.ZURGTORRENT_SNAPSHOT_PASSWORD_SECRET = 'password-secret';
 		mockRepository.upsertTorrentSnapshot = vi.fn();
 		mockRepository.getLatestTorrentSnapshot = vi.fn();
 	});
@@ -123,8 +122,8 @@ describe('/api/torrents/snapshot', () => {
 		expect(res.json).toHaveBeenCalledWith({ success: true, id: callArgs.id });
 	});
 
-	it('returns 500 when snapshot password secret is missing', async () => {
-		delete process.env.ZURGTORRENT_SNAPSHOT_PASSWORD_SECRET;
+	it('returns 500 when sync secret is missing for reads', async () => {
+		delete process.env.ZURGTORRENT_SYNC_SECRET;
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
 		const req = createMockRequest({
@@ -136,7 +135,7 @@ describe('/api/torrents/snapshot', () => {
 		await handler(req, res);
 
 		expect(errorSpy).toHaveBeenCalledWith(
-			'Missing ZURGTORRENT_SNAPSHOT_PASSWORD_SECRET environment variable'
+			'Missing ZURGTORRENT_SYNC_SECRET environment variable'
 		);
 		expect(res.status).toHaveBeenCalledWith(500);
 		expect(res.json).toHaveBeenCalledWith({ message: 'Server misconfiguration' });
@@ -184,7 +183,7 @@ describe('/api/torrents/snapshot', () => {
 		const hash = 'abcdef1234567890abcdef1234567890abcdef12';
 		const password = crypto
 			.createHash('sha1')
-			.update(hash + 'password-secret')
+			.update(hash + 'sync-secret')
 			.digest('hex');
 
 		const req = createMockRequest({
@@ -206,7 +205,7 @@ describe('/api/torrents/snapshot', () => {
 		const hash = 'abcdef1234567890abcdef1234567890abcdef12';
 		const password = crypto
 			.createHash('sha1')
-			.update(hash + 'password-secret')
+			.update(hash + 'sync-secret')
 			.digest('hex');
 
 		const req = createMockRequest({

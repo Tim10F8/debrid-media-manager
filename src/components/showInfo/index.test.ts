@@ -52,6 +52,7 @@ vi.mock('./render', () => ({
 
 vi.mock('./utils', () => ({
 	__esModule: true,
+	fetchMediaInfo: vi.fn(async () => null),
 	generatePasswordHash: vi.fn(async () => 'hashed'),
 	getStreamInfo: vi.fn(() => []),
 }));

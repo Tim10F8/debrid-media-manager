@@ -38,7 +38,7 @@ You can share your whole collection or select specific items you want to share. 
 3. Create a copy of the `.env` file `cp .env .env.local` and fill in the details
 4. Fill in required settings in `.env.local` (e.g. `PROXY=socks5h://127.0.0.1:9050` if tor is running on your host machine)
 5. Get your Prisma database connection string from PlanetScale console and put that in your `.env.local` file
-6. Set `ZURGTORRENT_SYNC_SECRET` and `ZURGTORRENT_SNAPSHOT_PASSWORD_SECRET` in `.env.local` (or your deployment environment); the sync secret must match the `DMM_SNAPSHOT_TOKEN` secret configured on the zurgtorrent Cloudflare Worker so snapshot ingest requests are accepted, and the password secret is used to verify read access to stored snapshots
+6. Set `ZURGTORRENT_SYNC_SECRET` in `.env.local` (or your deployment environment); this must match the `DMM_SNAPSHOT_TOKEN` secret configured on the zurgtorrent Cloudflare Worker so snapshot ingest requests are accepted and is also used to derive read passwords for stored snapshots
 7. Install the dependencies `npm i`
 8. This is a Next.js project so either go with `npm run dev` or `npm run build && npm run start`
 9. Head to `localhost:3000` and login

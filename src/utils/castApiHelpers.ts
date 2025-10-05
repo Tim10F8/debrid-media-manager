@@ -1,5 +1,4 @@
-import { UserResponse } from '@/services/types';
-import axios from 'axios';
+import { getCurrentUser } from '@/services/realDebrid';
 import crypto from 'crypto';
 import { NextApiRequest, NextApiResponse } from 'next';
 
@@ -27,16 +26,7 @@ export const validateToken = (req: NextApiRequest, res: NextApiResponse): string
 
 export const generateUserId = async (token: string): Promise<string> => {
 	try {
-		const headers = {
-			Authorization: `Bearer ${token}`,
-		};
-
-		const response = await axios.get<UserResponse>(
-			'https://app.real-debrid.com/rest/1.0/user',
-			{ headers }
-		);
-
-		const username = response.data.username;
+		const { username } = await getCurrentUser(token);
 		if (!username) {
 			throw new Error('Invalid username');
 		}
@@ -60,16 +50,7 @@ export const generateUserId = async (token: string): Promise<string> => {
 // Legacy 5-character token generator for backward compatibility during migration
 export const generateLegacyUserId = async (token: string): Promise<string> => {
 	try {
-		const headers = {
-			Authorization: `Bearer ${token}`,
-		};
-
-		const response = await axios.get<UserResponse>(
-			'https://app.real-debrid.com/rest/1.0/user',
-			{ headers }
-		);
-
-		const username = response.data.username;
+		const { username } = await getCurrentUser(token);
 		if (!username) {
 			throw new Error('Invalid username');
 		}

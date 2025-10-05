@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { languageEmojis } from './languages';
 import { MediaInfoResponse } from './types';
 
@@ -37,6 +38,56 @@ const formatDuration = (seconds: string) => {
 	const hours = Math.floor(duration / 3600);
 	const minutes = Math.floor((duration % 3600) / 60);
 	return `${hours}h ${minutes}m`;
+};
+
+const snapshotEndpoint = '/api/torrents/mediainfo';
+
+const hasMediaInfoPayload = (mediaInfo: MediaInfoResponse | null | undefined) => {
+	if (!mediaInfo || !mediaInfo.SelectedFiles) return false;
+	for (const file of Object.values(mediaInfo.SelectedFiles)) {
+		if (file?.MediaInfo?.streams?.length) {
+			return true;
+		}
+	}
+	return false;
+};
+
+const loggableError = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+export const fetchMediaInfo = async (hash: string): Promise<MediaInfoResponse | null> => {
+	if (!hash) return null;
+
+	try {
+		const response = await axios.get<MediaInfoResponse>(snapshotEndpoint, { params: { hash } });
+		if (hasMediaInfoPayload(response.data)) {
+			return response.data;
+		}
+		console.info('Torrent snapshot media info missing stream details', { hash });
+	} catch (error) {
+		console.info('Failed to load torrent media info from snapshot', {
+			hash,
+			error: loggableError(error),
+		});
+	}
+
+	try {
+		const password = await generatePasswordHash(hash);
+		const response = await axios.get<MediaInfoResponse>(
+			'https://debridmediamanager.com/mediainfo',
+			{ params: { hash, password } }
+		);
+		if (hasMediaInfoPayload(response.data)) {
+			return response.data;
+		}
+		console.info('Media info fallback response missing stream details', { hash });
+	} catch (error) {
+		console.error('Failed to load media info from fallback endpoint', {
+			hash,
+			error: loggableError(error),
+		});
+	}
+
+	return null;
 };
 
 export const getStreamInfo = (mediaInfo: MediaInfoResponse | null) => {

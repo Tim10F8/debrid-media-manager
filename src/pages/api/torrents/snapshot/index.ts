@@ -10,12 +10,8 @@ export const config = {
 	},
 };
 
-function getSyncSecret() {
+function getSharedSecret() {
 	return process.env.ZURGTORRENT_SYNC_SECRET;
-}
-
-function getSnapshotPasswordSecret() {
-	return process.env.ZURGTORRENT_SNAPSHOT_PASSWORD_SECRET;
 }
 
 function extractHash(payload: any): string | null {
@@ -58,15 +54,15 @@ function generatePassword(hash: string, salt: string): string {
 }
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
-	const syncSecret = getSyncSecret();
-	if (!syncSecret) {
+	const sharedSecret = getSharedSecret();
+	if (!sharedSecret) {
 		console.error('Missing ZURGTORRENT_SYNC_SECRET environment variable');
 		return res.status(500).json({ message: 'Server misconfiguration' });
 	}
 
 	const authHeader = req.headers['x-zurg-token'];
 	const token = Array.isArray(authHeader) ? authHeader[0] : authHeader;
-	if (token !== syncSecret) {
+	if (token !== sharedSecret) {
 		console.warn('Rejected torrent snapshot ingestion due to invalid sync secret');
 		return res.status(401).json({ message: 'Unauthorized' });
 	}
@@ -95,9 +91,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
-	const passwordSecret = getSnapshotPasswordSecret();
-	if (!passwordSecret) {
-		console.error('Missing ZURGTORRENT_SNAPSHOT_PASSWORD_SECRET environment variable');
+	const sharedSecret = getSharedSecret();
+	if (!sharedSecret) {
+		console.error('Missing ZURGTORRENT_SYNC_SECRET environment variable');
 		return res.status(500).json({ message: 'Server misconfiguration' });
 	}
 
@@ -112,7 +108,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 		return res.status(400).json({ message: 'Invalid hash format' });
 	}
 
-	const expected = generatePassword(hashParam, passwordSecret);
+	const expected = generatePassword(hashParam, sharedSecret);
 	if (password !== expected) {
 		console.warn('Rejected torrent snapshot request due to invalid password');
 		return res.status(401).json({ message: 'Unauthorized' });
