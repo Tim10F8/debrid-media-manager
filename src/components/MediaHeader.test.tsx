@@ -21,7 +21,9 @@ const { relatedMediaMock, posterMock } = vi.hoisted(() => ({
 
 vi.mock('next/image', () => ({
 	__esModule: true,
-	default: ({ alt, ...props }: any) => <img alt={alt} {...props} />,
+	default: ({ alt, ...props }: any) => (
+		<span role="img" aria-label={alt} data-testid="next-image-mock" {...props} />
+	),
 }));
 
 vi.mock('@/components/RelatedMedia', () => ({
