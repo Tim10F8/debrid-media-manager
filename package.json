@@ -15,6 +15,7 @@
 		"prepare": "husky"
 	},
 	"dependencies": {
+		"@badrap/valita": "^0.4.6",
 		"@ctrl/video-filename-parser": "^5.2.2",
 		"@octokit/rest": "^22.0.0",
 		"@prisma/client": "^6.5.0",
