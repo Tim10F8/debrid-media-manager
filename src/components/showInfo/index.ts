@@ -11,7 +11,7 @@ import { renderButton, renderInfoTable } from './components';
 import { renderTorrentInfo } from './render';
 import { icons } from './styles';
 import { ApiTorrentFile, MagnetLink } from './types';
-import { fetchMediaInfo, getStreamInfo } from './utils';
+import { buildSearchQueryFromFilename, fetchMediaInfo, getStreamInfo } from './utils';
 
 type ShowInfoHandlers = {
 	onDeleteRd?: (rdKey: string, id: string) => Promise<void>;
@@ -60,6 +60,15 @@ export const showInfoForRD = async (
 	};
 
 	const downloadAllLinksParam = info.links.slice(0, 553).join('\n');
+	const originalFilename = (info.original_filename || '').trim();
+	const searchQuery = buildSearchQueryFromFilename(info.original_filename, mediaType);
+	const searchAgainButton =
+		originalFilename && searchQuery && !info.fake
+			? renderButton('searchAgain', {
+					link: '/search',
+					linkParam: { name: 'query', value: searchQuery },
+				})
+			: '';
 	const libraryActions = !info.fake
 		? `
     <div class="mb-3 flex justify-center items-center flex-wrap">
@@ -140,15 +149,27 @@ export const showInfoForRD = async (
 			})()
 		: '';
 
+	const originalFilenameRow = info.original_filename
+		? [
+				{
+					label: 'Original filename',
+					value: searchAgainButton
+						? `<span class="mr-2">${info.original_filename}</span>${searchAgainButton}`
+						: info.original_filename,
+				},
+			]
+		: [];
+
 	const infoRows = info.fake
 		? [
 				{ label: 'Size', value: (info.bytes / 1024 ** 3).toFixed(2) + ' GB' },
+				...originalFilenameRow,
 				...getStreamInfo(mediaInfo),
 			]
 		: [
 				{ label: 'Size', value: (info.bytes / 1024 ** 3).toFixed(2) + ' GB' },
 				{ label: 'ID', value: info.id },
-				{ label: 'Original filename', value: info.original_filename },
+				...originalFilenameRow,
 				{
 					label: 'Original size',
 					value: (info.original_bytes / 1024 ** 3).toFixed(2) + ' GB',

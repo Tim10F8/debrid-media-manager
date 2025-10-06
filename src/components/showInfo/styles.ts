@@ -12,6 +12,8 @@ export const buttonStyles = {
 	exportLinks: 'border-2 border-sky-500 bg-sky-900/30 text-sky-100 hover:bg-sky-800/50',
 	generateStrm:
 		'border-2 border-purple-500 bg-purple-900/30 text-purple-100 hover:bg-purple-800/50',
+	searchAgain:
+		'border-2 border-blue-500 bg-blue-900/30 text-blue-100 hover:bg-blue-800/50 transition-colors',
 };
 
 // These are inline SVG strings because this component generates HTML for Swal popups
@@ -34,6 +36,7 @@ export const icons = {
 		'<svg class="inline-block w-4 h-4 mr-1" style="color: #7dd3fc;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>',
 	generateStrm:
 		'<svg class="inline-block w-4 h-4 mr-1" style="color: #c084fc;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>',
+	searchAgain: '',
 	saveSelection:
 		'<svg class="inline w-4 h-4" style="color: #10b981;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>',
 	selectVideos:
@@ -55,4 +58,5 @@ export const defaultLabels = {
 	downloadAll: 'Download All',
 	exportLinks: 'Get Links',
 	generateStrm: 'STRM Files',
+	searchAgain: 'Search again',
 };

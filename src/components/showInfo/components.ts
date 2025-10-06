@@ -13,7 +13,12 @@ const LIBRARY_ACTION_TYPES = new Set<keyof typeof buttonStyles>([
 	'castAll',
 ]);
 
-const FILE_ACTION_TYPES = new Set<keyof typeof buttonStyles>(['download', 'watch', 'cast']);
+const FILE_ACTION_TYPES = new Set<keyof typeof buttonStyles>([
+	'download',
+	'watch',
+	'cast',
+	'searchAgain',
+]);
 
 const BASE_BUTTON_CLASSES =
 	'haptic-sm inline-flex items-center gap-1 rounded transition-colors cursor-pointer';
@@ -28,7 +33,7 @@ export const renderButton = (
 	props: ActionButtonProps | LibraryActionButtonProps
 ) => {
 	const style = buttonStyles[type];
-	const icon = icons[type];
+	const iconMarkup = icons[type] ? `${icons[type]} ` : '';
 	const defaultLabel = defaultLabels[type];
 	const isLibraryAction = LIBRARY_ACTION_TYPES.has(type);
 	const spacingClass = isLibraryAction ? 'm-1' : '';
@@ -55,7 +60,7 @@ export const renderButton = (
 			.join('');
 		return `<form action="${props.link}" method="get" target="_blank" class="inline-block">
 	            ${hiddenInputs}
-	            <button type="submit" class="${buttonClasses}"${idAttr}>${icon} ${
+	            <button type="submit" class="${buttonClasses}"${idAttr}>${iconMarkup}${
 					props.text || defaultLabel
 				}</button>
 	        </form>`;
@@ -65,7 +70,7 @@ export const renderButton = (
 	const onClickAttr = 'onClick' in props && props.onClick ? ` onclick="${props.onClick}"` : '';
 	const idAttr = 'id' in props && (props as any).id ? ` id="${(props as any).id}"` : '';
 
-	return `<button type="button" class="${buttonClasses}"${idAttr}${onClickAttr}>${icon} ${
+	return `<button type="button" class="${buttonClasses}"${idAttr}${onClickAttr}>${iconMarkup}${
 		'text' in props ? props.text || defaultLabel : defaultLabel
 	}</button>`;
 };

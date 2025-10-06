@@ -3,7 +3,6 @@ import type { FireOptions, ModalResult } from './types';
 
 /**
  * Custom modal API that uses React Context internally
- * This provides a SweetAlert-like interface while using the unified React modal system
  */
 const Modal = {
 	fire: async (options: FireOptions): Promise<ModalResult> => {

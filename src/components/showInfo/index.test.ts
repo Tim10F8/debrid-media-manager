@@ -50,12 +50,16 @@ vi.mock('./render', () => ({
 	renderTorrentInfo: vi.fn(() => '<tr></tr>'),
 }));
 
-vi.mock('./utils', () => ({
-	__esModule: true,
-	fetchMediaInfo: vi.fn(async () => null),
-	generatePasswordHash: vi.fn(async () => 'hashed'),
-	getStreamInfo: vi.fn(() => []),
-}));
+vi.mock('./utils', async () => {
+	const actual = await vi.importActual<typeof import('./utils')>('./utils');
+	return {
+		__esModule: true,
+		...actual,
+		fetchMediaInfo: vi.fn(async () => null),
+		generatePasswordHash: vi.fn(async () => 'hashed'),
+		getStreamInfo: vi.fn(() => []),
+	};
+});
 
 import Modal from '../modals/modal';
 import { showInfoForAD, showInfoForRD } from './index';
@@ -94,6 +98,85 @@ describe('torrent info modal buttons', () => {
 		const options = mocks.modalFireMock.mock.calls[0][0];
 		expect(options.showCancelButton).toBe(false);
 		expect(options.showConfirmButton).toBe(false);
+	});
+
+	it('includes a search button for the original filename', async () => {
+		const rdInfo = {
+			id: 1,
+			hash: 'hash-1',
+			filename: 'Example.mkv',
+			bytes: 1024,
+			original_filename: 'ExampleOriginal.mkv',
+			original_bytes: 2048,
+			progress: 100,
+			speed: 0,
+			seeders: 0,
+			status: 'downloaded',
+			fake: false,
+			links: ['https://rd/link'],
+			files: [{ id: 'file1', selected: 1, path: 'Example.mkv', bytes: 1024 }],
+			added: new Date().toISOString(),
+		};
+
+		await showInfoForRD('app', 'rd-key', rdInfo, 'tt1234567', 'movie', false);
+
+		const html = mocks.modalFireMock.mock.calls[0][0].html as string;
+		expect(html).toContain('action="/search"');
+		expect(html).toContain('name="query" value="ExampleOriginal.mkv"');
+		expect(html).toContain('Search again');
+		expect(html).toMatch(
+			/Original filename<\/td>\s*<td><span class="mr-2">ExampleOriginal\.mkv<\/span>\s*<form/
+		);
+	});
+
+	it('hides search button when torrent info is fake', async () => {
+		const rdInfo = {
+			id: 1,
+			hash: 'hash-1',
+			filename: 'Example.mkv',
+			bytes: 1024,
+			original_filename: 'ExampleOriginal.mkv',
+			original_bytes: 2048,
+			progress: 100,
+			speed: 0,
+			seeders: 0,
+			status: 'downloaded',
+			fake: true,
+			links: [],
+			files: [{ id: 'file1', selected: 1, path: 'Example.mkv', bytes: 1024 }],
+			added: new Date().toISOString(),
+		};
+
+		await showInfoForRD('app', 'rd-key', rdInfo, 'tt1234567', 'movie', false);
+
+		const html = mocks.modalFireMock.mock.calls[0][0].html as string;
+		expect(html).not.toContain('Search again');
+		const matches = html.match(/Original filename<\/td>\s*<td>(.*?)<\/td>/);
+		expect(matches?.[1]).not.toContain('<form');
+	});
+
+	it('normalizes complex filenames for search queries', async () => {
+		const rdInfo = {
+			id: 1,
+			hash: 'hash-1',
+			filename: 'The.Grifters.1990.BDREMUX.2160p.HDR.DV.seleZen.mkv',
+			bytes: 1024,
+			original_filename: 'The.Grifters.1990.BDREMUX.2160p.HDR.DV.seleZen.mkv',
+			original_bytes: 2048,
+			progress: 100,
+			speed: 0,
+			seeders: 0,
+			status: 'downloaded',
+			fake: false,
+			links: ['https://rd/link'],
+			files: [{ id: 'file1', selected: 1, path: 'Example.mkv', bytes: 1024 }],
+			added: new Date().toISOString(),
+		};
+
+		await showInfoForRD('app', 'rd-key', rdInfo, 'tt1234567', 'movie', false);
+
+		const options = mocks.modalFireMock.mock.calls[0][0];
+		expect(options.html).toContain('name="query" value="The Grifters 1990"');
 	});
 
 	it('includes rdToken hidden input for library cast button', async () => {

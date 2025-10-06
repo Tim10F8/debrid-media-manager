@@ -1,3 +1,4 @@
+import { filenameParse } from '@ctrl/video-filename-parser';
 import axios from 'axios';
 import { languageEmojis } from './languages';
 import { MediaInfoResponse } from './types';
@@ -160,4 +161,39 @@ export const getStreamInfo = (mediaInfo: MediaInfoResponse | null) => {
 	}
 
 	return rows;
+};
+
+const pad = (value: number) => value.toString().padStart(2, '0');
+
+export const buildSearchQueryFromFilename = (
+	filename: string | undefined,
+	mediaType: 'movie' | 'tv' | 'other' = 'movie'
+) => {
+	const trimmed = filename?.trim();
+	if (!trimmed) return null;
+
+	try {
+		const parsed = mediaType === 'tv' ? filenameParse(trimmed, true) : filenameParse(trimmed);
+		const title = parsed?.title?.trim();
+		if (!title) return trimmed;
+
+		if (mediaType === 'tv') {
+			const season = Array.isArray((parsed as any).seasons)
+				? (parsed as any).seasons[0]
+				: undefined;
+			const episode = Array.isArray((parsed as any).episodeNumbers)
+				? (parsed as any).episodeNumbers[0]
+				: undefined;
+			if (season && episode) {
+				return `${title} S${pad(season)}E${pad(episode)}`;
+			}
+			return title;
+		}
+
+		const year = (parsed as any).year ? String((parsed as any).year).trim() : '';
+		const assembled = [title, year].filter(Boolean).join(' ').trim();
+		return assembled || title;
+	} catch (error) {
+		return trimmed;
+	}
 };
