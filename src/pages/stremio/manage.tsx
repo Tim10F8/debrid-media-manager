@@ -1,5 +1,6 @@
 import Poster from '@/components/poster';
 import { useRealDebridAccessToken } from '@/hooks/auth';
+import { useCastToken } from '@/hooks/castToken';
 import { withAuth } from '@/utils/withAuth';
 import { Eye, Trash2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -34,6 +35,7 @@ interface MediaMetadata {
 
 export function ManagePage() {
 	const [rdKey] = useRealDebridAccessToken();
+	useCastToken();
 	const [groupedLinks, setGroupedLinks] = useState<GroupedLinks>({});
 	const [loading, setLoading] = useState(true);
 	const [selectedLinks, setSelectedLinks] = useState<Set<string>>(new Set());

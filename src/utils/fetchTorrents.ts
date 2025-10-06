@@ -236,17 +236,18 @@ export function convertToAllDebridUserTorrent(magnetInfo: MagnetStatus): UserTor
 	}
 
 	// Determine media type
-	let mediaType = getTypeByNameAndFileCount(magnetInfo.filename);
+	let mediaType: UserTorrent['mediaType'] = getTypeByNameAndFileCount(magnetInfo.filename);
 
 	// Get filenames for additional type detection
-	const filenames = magnetInfo.links.map((f) => f.filename);
+	const filenames = magnetInfo.links.map((f) => f.filename ?? '');
 	const torrentAndFiles = [magnetInfo.filename, ...filenames];
 	const hasEpisodes = checkArithmeticSequenceInFilenames(filenames);
+	const noPlayableFiles =
+		filenames.length > 0 && every(torrentAndFiles, (f) => !isVideo({ path: f }));
 
 	// Refine media type detection
-	if (every(torrentAndFiles, (f) => !isVideo({ path: f }))) {
-		// Default to movie if we can't determine the type but need a valid value
-		mediaType = 'movie';
+	if (noPlayableFiles) {
+		mediaType = 'other';
 	} else if (
 		hasEpisodes ||
 		some(torrentAndFiles, (f) => /s\d\d\d?.?e\d\d\d?/i.test(f)) ||
@@ -266,22 +267,26 @@ export function convertToAllDebridUserTorrent(magnetInfo: MagnetStatus): UserTor
 	}
 
 	// Parse filename for media info
-	let info = {} as ParsedFilename;
-	try {
-		info =
-			mediaType === 'movie'
-				? filenameParse(magnetInfo.filename)
-				: filenameParse(magnetInfo.filename, true);
-	} catch (error) {
-		// flip the condition if error is thrown
-		mediaType = mediaType === 'movie' ? 'tv' : 'movie';
+	let info: ParsedFilename | undefined;
+	if (mediaType !== 'other') {
 		try {
 			info =
 				mediaType === 'movie'
 					? filenameParse(magnetInfo.filename)
 					: filenameParse(magnetInfo.filename, true);
-		} catch {
-			// If both parsing attempts fail, leave info as empty object
+		} catch (error) {
+			// flip the condition if error is thrown
+			const fallbackType: Exclude<UserTorrent['mediaType'], 'other'> =
+				mediaType === 'movie' ? 'tv' : 'movie';
+			mediaType = fallbackType;
+			try {
+				info =
+					fallbackType === 'movie'
+						? filenameParse(magnetInfo.filename)
+						: filenameParse(magnetInfo.filename, true);
+			} catch {
+				info = undefined;
+			}
 		}
 	}
 
@@ -302,10 +307,12 @@ export function convertToAllDebridUserTorrent(magnetInfo: MagnetStatus): UserTor
 		link: l.link,
 	}));
 
+	const infoForMediaId = info ?? magnetInfo.filename;
+
 	return {
 		info,
 		mediaType,
-		title: getMediaId(info, mediaType, false) || magnetInfo.filename,
+		title: getMediaId(infoForMediaId, mediaType, false) || magnetInfo.filename,
 		id: `ad:${magnetInfo.id}`,
 		filename: magnetInfo.filename,
 		hash: magnetInfo.hash || '',
@@ -356,7 +363,7 @@ export const getRdStatus = (torrentInfo: UserTorrentResponse): UserTorrentStatus
 };
 
 export const convertToTbUserTorrent = (info: TorBoxTorrentInfo): UserTorrent => {
-	let mediaType = getTypeByNameAndFileCount(info.name);
+	let mediaType: UserTorrent['mediaType'] = getTypeByNameAndFileCount(info.name);
 	const serviceStatus = info.download_state;
 	let status: UserTorrentStatus;
 
@@ -384,25 +391,55 @@ export const convertToTbUserTorrent = (info: TorBoxTorrentInfo): UserTorrent => 
 		}
 	}
 
+	const filenames = info.files?.map((file) => file.name ?? '') ?? [];
+	const torrentAndFiles = [info.name, ...filenames];
+	const hasEpisodes = checkArithmeticSequenceInFilenames(filenames);
+	const noPlayableFiles =
+		filenames.length > 0 && every(torrentAndFiles, (f) => !isVideo({ path: f }));
+
+	if (noPlayableFiles) {
+		mediaType = 'other';
+	} else if (
+		hasEpisodes ||
+		some(torrentAndFiles, (f) => /s\d\d\d?.?e\d\d\d?/i.test(f)) ||
+		some(torrentAndFiles, (f) => /season.?\d+/i.test(f)) ||
+		some(torrentAndFiles, (f) => /episodes?\s?\d+/i.test(f)) ||
+		some(torrentAndFiles, (f) => /\b[a-fA-F0-9]{8}\b/.test(f))
+	) {
+		mediaType = 'tv';
+	} else if (
+		!hasEpisodes &&
+		every(torrentAndFiles, (f) => !/s\d\d\d?.?e\d\d\d?/i.test(f)) &&
+		every(torrentAndFiles, (f) => !/season.?\d+/i.test(f)) &&
+		every(torrentAndFiles, (f) => !/episodes?\s?\d+/i.test(f)) &&
+		every(torrentAndFiles, (f) => !/\b[a-fA-F0-9]{8}\b/.test(f))
+	) {
+		mediaType = 'movie';
+	}
+
 	// Parse filename for media info
-	let parsedInfo = {} as ParsedFilename;
-	try {
-		parsedInfo =
-			mediaType === 'movie' ? filenameParse(info.name) : filenameParse(info.name, true);
-	} catch (error) {
-		// flip the condition if error is thrown
-		mediaType = mediaType === 'movie' ? 'tv' : 'movie';
+	let parsedInfo: ParsedFilename | undefined;
+	if (mediaType !== 'other') {
 		try {
 			parsedInfo =
 				mediaType === 'movie' ? filenameParse(info.name) : filenameParse(info.name, true);
-		} catch {
-			// If both parsing attempts fail, leave parsedInfo empty
+		} catch (error) {
+			const fallbackType: Exclude<UserTorrent['mediaType'], 'other'> =
+				mediaType === 'movie' ? 'tv' : 'movie';
+			mediaType = fallbackType;
+			try {
+				parsedInfo =
+					fallbackType === 'movie'
+						? filenameParse(info.name)
+						: filenameParse(info.name, true);
+			} catch {
+				parsedInfo = undefined;
+			}
 		}
 	}
 
-	// If parsed title is not meaningful (no word characters), treat as parse failure
-	if (!parsedInfo?.title || !/\w/.test(parsedInfo.title)) {
-		parsedInfo = {} as ParsedFilename;
+	if (parsedInfo && (!parsedInfo.title || !/\w/.test(parsedInfo.title))) {
+		parsedInfo = undefined;
 	}
 
 	// Convert TorBoxFile[] to SelectedFile[]
@@ -422,15 +459,14 @@ export const convertToTbUserTorrent = (info: TorBoxTorrentInfo): UserTorrent => 
 			? 100
 			: info.progress;
 
+	const infoForMediaId = parsedInfo ?? info.name;
+
 	return {
 		id: `tb:${info.id}`,
 		links: selectedFiles.map((f) => f.link).filter(Boolean),
 		seeders: info.seeds,
 		speed: info.download_speed,
-		title:
-			parsedInfo && (mediaType === 'movie' || mediaType === 'tv')
-				? getMediaId(parsedInfo, mediaType, false) || info.name
-				: info.name,
+		title: getMediaId(infoForMediaId, mediaType, false) || info.name,
 		selectedFiles,
 		filename: info.name,
 		bytes: info.size,
@@ -440,7 +476,7 @@ export const convertToTbUserTorrent = (info: TorBoxTorrentInfo): UserTorrent => 
 		added: new Date(info.created_at),
 		hash: info.hash,
 		mediaType,
-		info: Object.keys(parsedInfo).length > 0 ? parsedInfo : undefined,
+		info: parsedInfo,
 		tbData: info,
 	};
 };

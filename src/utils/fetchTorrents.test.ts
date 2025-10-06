@@ -463,6 +463,35 @@ describe('fetchTorrents utilities', () => {
 			expect(torrents[0].filename).toBe('Magnet');
 		});
 
+		it('classifies magnets without playable files as other media type', async () => {
+			const mockMagnets: MagnetStatus[] = [
+				{
+					id: 321,
+					filename: 'Archive.Bundle',
+					hash: 'hash321',
+					size: 123456,
+					statusCode: 4,
+					uploadDate: 1704067200,
+					links: [
+						{ filename: 'README.txt', size: 1024, link: 'link1' },
+						{ filename: 'manual.pdf', size: 2048, link: 'link2' },
+					],
+					seeders: 2,
+					downloadSpeed: 0,
+				} as any,
+			];
+
+			vi.mocked(getMagnetStatus).mockResolvedValueOnce({
+				data: { magnets: mockMagnets },
+			} as any);
+
+			await fetchAllDebrid(adKey, callback);
+
+			const torrents = callback.mock.calls[0][0];
+			expect(torrents[0].mediaType).toBe('other');
+			expect(torrents[0].title).toBe('Archive.Bundle');
+		});
+
 		it('should detect TV shows from episode patterns', async () => {
 			const mockMagnets: MagnetStatus[] = [
 				{
@@ -659,6 +688,51 @@ describe('fetchTorrents utilities', () => {
 			const result = convertToTbUserTorrent(tbInfo);
 
 			expect(result.mediaType).toBe('tv');
+		});
+
+		it('detects TV shows based on file entries even if name lacks pattern', () => {
+			const tbInfo: TorBoxTorrentInfo = {
+				id: 555,
+				name: 'Awesome.Collection',
+				size: 1500000000,
+				progress: 50,
+				download_state: 'downloading',
+				seeds: 8,
+				download_speed: 2000,
+				created_at: '2024-01-01T00:00:00Z',
+				hash: 'pack555',
+				files: [
+					{ name: 'Awesome.S01E01.mkv', size: 500000000, s3_path: 'https://s3.url/a' },
+					{ name: 'Awesome.S01E02.mkv', size: 500000000, s3_path: 'https://s3.url/b' },
+				],
+			} as any;
+
+			const result = convertToTbUserTorrent(tbInfo);
+
+			expect(result.mediaType).toBe('tv');
+		});
+
+		it('marks TorBox torrents without playable files as other', () => {
+			const tbInfo: TorBoxTorrentInfo = {
+				id: 556,
+				name: 'Document.Set',
+				size: 2048,
+				progress: 10,
+				download_state: 'queued',
+				seeds: 1,
+				download_speed: 0,
+				created_at: '2024-01-01T00:00:00Z',
+				hash: 'docs556',
+				files: [
+					{ name: 'Guide.txt', size: 1024, s3_path: 'https://s3.url/doc' },
+					{ name: 'Cover.jpg', size: 1024, s3_path: 'https://s3.url/img' },
+				],
+			} as any;
+
+			const result = convertToTbUserTorrent(tbInfo);
+
+			expect(result.mediaType).toBe('other');
+			expect(result.info).toBeUndefined();
 		});
 
 		it('should handle parse errors gracefully', () => {

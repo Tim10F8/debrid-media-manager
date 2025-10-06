@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { posterMock, toastMock } = vi.hoisted(() => ({
+const { posterMock, toastMock, saveCastProfileMock } = vi.hoisted(() => ({
 	posterMock: vi.fn(({ imdbId, title }: { imdbId: string; title: string }) => (
 		<div data-testid={`poster-${imdbId}`}>{title}</div>
 	)),
@@ -10,6 +10,7 @@ const { posterMock, toastMock } = vi.hoisted(() => ({
 		success: vi.fn(),
 		error: vi.fn(),
 	}),
+	saveCastProfileMock: vi.fn(),
 }));
 
 vi.mock('@/components/poster', () => ({
@@ -60,6 +61,11 @@ vi.mock('react-hot-toast', () => ({
 	Toaster: () => null,
 }));
 
+vi.mock('@/utils/castApiClient', () => ({
+	__esModule: true,
+	saveCastProfile: saveCastProfileMock,
+}));
+
 import { ManagePage } from '@/pages/stremio/manage';
 
 describe('Stremio manage page poster integration', () => {
@@ -70,9 +76,20 @@ describe('Stremio manage page poster integration', () => {
 		toastMock.mockClear();
 		toastMock.success.mockClear();
 		toastMock.error.mockClear();
+		saveCastProfileMock.mockClear();
+
+		window.localStorage.clear();
+		window.localStorage.setItem('rd:clientId', JSON.stringify('client-id'));
+		window.localStorage.setItem('rd:clientSecret', JSON.stringify('client-secret'));
+		window.localStorage.setItem('rd:refreshToken', JSON.stringify('refresh-token'));
+		window.localStorage.setItem('rd:accessToken', JSON.stringify('access-token'));
 
 		fetchMock = vi.fn<typeof fetch>(async (input: RequestInfo | URL) => {
 			const url = typeof input === 'string' ? input : input.toString();
+
+			if (url.startsWith('/api/stremio/id')) {
+				return new Response(JSON.stringify({ id: 'cast-token-abc123' }), { status: 200 });
+			}
 
 			if (url.startsWith('/api/stremio/links')) {
 				return new Response(
@@ -112,10 +129,19 @@ describe('Stremio manage page poster integration', () => {
 
 	afterEach(() => {
 		vi.unstubAllGlobals();
+		window.localStorage.clear();
 	});
 
 	it('uses poster component with metadata-derived titles for each group', async () => {
 		render(<ManagePage />);
+
+		await waitFor(() => {
+			expect(saveCastProfileMock).toHaveBeenCalledWith(
+				'client-id',
+				'client-secret',
+				'refresh-token'
+			);
+		});
 
 		await waitFor(() => {
 			const titles = posterMock.mock.calls.map(
