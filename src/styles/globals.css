@@ -3,22 +3,22 @@
 @tailwind utilities;
 @tailwind dark;
 
-body{
-    background: hsl(0, 0%, 12%);
-    color: azure;
+body {
+	background-color: rgb(17, 24, 39);
+	color: azure;
 }
 
 a {
-    color: inherit;
+	color: inherit;
 }
 
 /* Add these new utility classes for haptic feedback */
 .haptic {
-    @apply active:scale-95 transition-transform duration-75;
-    -webkit-tap-highlight-color: transparent;
+	@apply transition-transform duration-75 active:scale-95;
+	-webkit-tap-highlight-color: transparent;
 }
 
 .haptic-sm {
-    @apply active:scale-[0.98] transition-transform duration-75;
-    -webkit-tap-highlight-color: transparent;
+	@apply transition-transform duration-75 active:scale-[0.98];
+	-webkit-tap-highlight-color: transparent;
 }
