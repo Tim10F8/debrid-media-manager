@@ -11,6 +11,16 @@ import {
 import { ScrapeSearchResult } from './mediasearch';
 import { TorrentInfoResponse } from './types';
 
+export type RepositoryDependencies = Partial<{
+	availabilityService: AvailabilityService;
+	scrapedService: ScrapedService;
+	searchService: SearchService;
+	animeService: AnimeService;
+	castService: CastService;
+	reportService: ReportService;
+	torrentSnapshotService: TorrentSnapshotService;
+}>;
+
 export class Repository {
 	private availabilityService: AvailabilityService;
 	private scrapedService: ScrapedService;
@@ -20,14 +30,22 @@ export class Repository {
 	private reportService: ReportService;
 	private torrentSnapshotService: TorrentSnapshotService;
 
-	constructor() {
-		this.availabilityService = new AvailabilityService();
-		this.scrapedService = new ScrapedService();
-		this.searchService = new SearchService();
-		this.animeService = new AnimeService();
-		this.castService = new CastService();
-		this.reportService = new ReportService();
-		this.torrentSnapshotService = new TorrentSnapshotService();
+	constructor({
+		availabilityService,
+		scrapedService,
+		searchService,
+		animeService,
+		castService,
+		reportService,
+		torrentSnapshotService,
+	}: RepositoryDependencies = {}) {
+		this.availabilityService = availabilityService ?? new AvailabilityService();
+		this.scrapedService = scrapedService ?? new ScrapedService();
+		this.searchService = searchService ?? new SearchService();
+		this.animeService = animeService ?? new AnimeService();
+		this.castService = castService ?? new CastService();
+		this.reportService = reportService ?? new ReportService();
+		this.torrentSnapshotService = torrentSnapshotService ?? new TorrentSnapshotService();
 	}
 
 	// Ensure connection is properly closed when repository is no longer needed

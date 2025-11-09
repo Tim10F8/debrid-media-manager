@@ -98,4 +98,28 @@ describe('auth hooks', () => {
 		expect(result.current.hasTraktAuth).toBe(true);
 		expect(window.localStorage.getItem('trakt:userSlug')).toContain('sluggy');
 	});
+
+	it('authenticates after login when page remounts with new tokens', async () => {
+		mockGetRealDebridUser.mockResolvedValue({ username: 'rd-user' });
+
+		const { result: result1, unmount } = renderHook(() => useRealDebridAccessToken());
+
+		await waitFor(() => expect(result1.current[1]).toBe(false));
+		expect(result1.current[0]).toBeNull();
+		expect(mockGetRealDebridUser).not.toHaveBeenCalled();
+
+		unmount();
+		__resetRealDebridStateForTests();
+
+		setStoredValue('rd:accessToken', 'new-token');
+		setStoredValue('rd:refreshToken', 'refresh');
+		setStoredValue('rd:clientId', 'client');
+		setStoredValue('rd:clientSecret', 'secret');
+
+		const { result: result2 } = renderHook(() => useRealDebridAccessToken());
+
+		await waitFor(() => expect(result2.current[1]).toBe(false));
+		expect(result2.current[0]).toBe('new-token');
+		expect(mockGetRealDebridUser).toHaveBeenCalledWith('new-token');
+	});
 });

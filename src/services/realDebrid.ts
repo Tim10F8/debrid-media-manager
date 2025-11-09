@@ -752,4 +752,12 @@ export const getTimeISO = async (): Promise<string> => {
 
 export const __testing = {
 	realDebridAxios,
+	genericAxios,
+	clearUserRequestCache: () => {
+		userRequestCache.clear();
+	},
+	resetTimeISOCache: () => {
+		timeISOCache.promise = null;
+		timeISOCache.timestamp = 0;
+	},
 };

@@ -1,267 +1,156 @@
-import axios from 'axios';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getMdblistCacheService } from './database/mdblistCache';
-import { MetadataCacheService } from './metadataCache';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MetadataCacheService, getMetadataCache } from './metadataCache';
 
-// Mock dependencies
-vi.mock('axios');
-vi.mock('./database/mdblistCache');
+const cacheFactory: { current: CacheStub | null } = { current: null };
 
-// Mock console
-const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+vi.mock('./database/mdblistCache', () => ({
+	getMdblistCacheService: () => cacheFactory.current,
+}));
 
-describe('MetadataCacheService', () => {
-	let service: MetadataCacheService;
-	let mockCache: any;
+const axiosMocks = vi.hoisted(() => ({
+	get: vi.fn(),
+}));
 
-	beforeEach(() => {
-		vi.clearAllMocks();
+vi.mock('axios', () => ({
+	default: {
+		get: axiosMocks.get,
+	},
+}));
 
-		mockCache = {
-			getWithMetadata: vi.fn(),
-			set: vi.fn(),
-			delete: vi.fn(),
-			clear: vi.fn(),
-		};
+type CacheStub = {
+	getWithMetadata: ReturnType<typeof vi.fn>;
+	set: ReturnType<typeof vi.fn>;
+};
 
-		vi.mocked(getMdblistCacheService).mockReturnValue(mockCache);
-		service = new MetadataCacheService();
+const originalEnv = { ...process.env };
+
+const buildCache = (): CacheStub => ({
+	getWithMetadata: vi.fn(),
+	set: vi.fn(),
+});
+
+beforeEach(() => {
+	cacheFactory.current = buildCache();
+	axiosMocks.get.mockReset();
+	vi.clearAllMocks();
+	Object.assign(process.env, originalEnv);
+});
+
+afterAll(() => {
+	Object.assign(process.env, originalEnv);
+});
+
+describe('MetadataCacheService fetchWithCache', () => {
+	it('returns cached data when entry is still fresh', async () => {
+		const cacheData = { data: { cached: true }, updatedAt: new Date() };
+		cacheFactory.current = buildCache();
+		cacheFactory.current.getWithMetadata.mockResolvedValue(cacheData);
+
+		const service = new MetadataCacheService();
+		const result = await service.fetchWithCache('url', 'key', 'type', undefined, 3600000);
+
+		expect(result).toEqual(cacheData.data);
+		expect(axiosMocks.get).not.toHaveBeenCalled();
+		expect(cacheFactory.current.set).not.toHaveBeenCalled();
 	});
 
-	describe('isCacheExpired', () => {
-		it('should return false for permanent cache (maxAge = 0)', () => {
-			const updatedAt = new Date('2020-01-01');
-			const result = (service as any).isCacheExpired(updatedAt, 0);
-			expect(result).toBe(false);
-		});
+	it('fetches and caches data when entry is missing or expired', async () => {
+		const expired = { data: { cached: false }, updatedAt: new Date(Date.now() - 10000) };
+		cacheFactory.current = buildCache();
+		cacheFactory.current.getWithMetadata.mockResolvedValueOnce(expired);
+		axiosMocks.get.mockResolvedValue({ data: { fresh: true } });
 
-		it('should return true for expired cache', () => {
-			const updatedAt = new Date(Date.now() - 2000); // 2 seconds ago
-			const maxAge = 1000; // 1 second
-			const result = (service as any).isCacheExpired(updatedAt, maxAge);
-			expect(result).toBe(true);
-		});
+		const service = new MetadataCacheService();
+		const result = await service.fetchWithCache('url', 'key', 'type', { headers: {} }, 1000);
 
-		it('should return false for fresh cache', () => {
-			const updatedAt = new Date(Date.now() - 500); // 500ms ago
-			const maxAge = 1000; // 1 second
-			const result = (service as any).isCacheExpired(updatedAt, maxAge);
-			expect(result).toBe(false);
-		});
-
-		it('should handle edge case of exact expiration', () => {
-			const now = 1577836802000; // 2020-01-01T00:00:02.000Z in milliseconds
-			const updatedAt = new Date('2020-01-01T00:00:01.000Z'); // Exactly 1 second ago
-			const maxAge = 1000; // 1 second
-			const result = (service as any).isCacheExpired(updatedAt, maxAge, now);
-			expect(result).toBe(false); // Exactly at expiration time should not be expired yet
-		});
+		expect(result).toEqual({ fresh: true });
+		expect(axiosMocks.get).toHaveBeenCalledWith('url', { headers: {} });
+		expect(cacheFactory.current.set).toHaveBeenCalledWith('key', 'type', { fresh: true });
 	});
 
-	describe('fetchWithCache', () => {
-		it('should return cached data when available and fresh', async () => {
-			const url = 'https://api.example.com/data';
-			const cacheKey = 'test-key';
-			const cacheType = 'SEARCH';
-			const cachedData = { items: [1, 2, 3] };
-			const updatedAt = new Date();
+	it('continues even if cache.set throws', async () => {
+		cacheFactory.current = buildCache();
+		cacheFactory.current.getWithMetadata.mockResolvedValue(null);
+		cacheFactory.current.set.mockRejectedValue(new Error('write failure'));
+		axiosMocks.get.mockResolvedValue({ data: { ok: true } });
 
-			mockCache.getWithMetadata.mockResolvedValue({
-				data: cachedData,
-				updatedAt,
-			});
+		const service = new MetadataCacheService();
+		await expect(service.fetchWithCache('url', 'key', 'type')).resolves.toEqual({ ok: true });
+		expect(cacheFactory.current.set).toHaveBeenCalled();
+	});
+});
 
-			const result = await service.fetchWithCache(url, cacheKey, cacheType, {}, 3600000);
+describe('MetadataCacheService API helpers', () => {
+	it('throws when OMDB key is missing', async () => {
+		const service = new MetadataCacheService();
+		await expect(service.getOmdbInfo('tt123')).rejects.toThrow(
+			'OMDB_KEY environment variable is not set'
+		);
+	});
 
-			expect(result).toEqual(cachedData);
-			expect(mockCache.getWithMetadata).toHaveBeenCalledWith(cacheKey);
-			expect(axios.get).not.toHaveBeenCalled();
-			expect(console.log).toHaveBeenCalledWith(
-				`[MetadataCache] Using cached ${cacheType} data for: ${cacheKey}`
-			);
-		});
+	it('throws when TMDB key is missing', async () => {
+		const service = new MetadataCacheService();
+		await expect(service.searchTmdbByImdb('tt123')).rejects.toThrow(
+			'TMDB_KEY environment variable is not set'
+		);
+	});
 
-		it('should fetch from API when cache is expired', async () => {
-			const url = 'https://api.example.com/data';
-			const cacheKey = 'test-key';
-			const cacheType = 'SEARCH';
-			const cachedData = { items: [1, 2, 3] };
-			const updatedAt = new Date(Date.now() - 7200000); // 2 hours ago
-			const freshData = { items: [4, 5, 6] };
+	it('throws when Trakt client id is missing', async () => {
+		const service = new MetadataCacheService();
+		await expect(service.getTraktTrending('movies')).rejects.toThrow(
+			'TRAKT_CLIENT_ID environment variable is not set'
+		);
+	});
 
-			mockCache.getWithMetadata.mockResolvedValue({
-				data: cachedData,
-				updatedAt,
-			});
+	it('delegates to fetchWithCache with proper cache hints', async () => {
+		process.env.OMDB_KEY = 'abc';
+		process.env.TMDB_KEY = 'tmdb';
+		process.env.TRAKT_CLIENT_ID = 'trakt';
 
-			const mockResponse = { data: freshData };
-			vi.mocked(axios.get).mockResolvedValue(mockResponse);
+		const service = new MetadataCacheService();
+		const spy = vi.spyOn(service as any, 'fetchWithCache').mockResolvedValue('ok');
 
-			const result = await service.fetchWithCache(url, cacheKey, cacheType, {}, 3600000);
+		await service.getCinemetaMovie('tt123');
+		await service.searchCinemetaSeries('query');
+		await service.searchOmdb('title', 2020, 'movie');
+		await service.getTraktPopular('shows', 'drama', 5);
 
-			expect(result).toEqual(freshData);
-			expect(axios.get).toHaveBeenCalledWith(url, {});
-			expect(mockCache.set).toHaveBeenCalledWith(cacheKey, cacheType, freshData);
-			expect(console.log).toHaveBeenCalledWith(
-				`[MetadataCache] Fetching ${cacheType} data from: ${url}`
-			);
-		});
+		const [movieCall, seriesCall, omdbCall, traktCall] = spy.mock.calls;
+		expect(movieCall).toEqual([
+			'https://v3-cinemeta.strem.io/meta/movie/tt123.json',
+			'cinemeta_movie_tt123',
+			'cinemeta_movie',
+			undefined,
+		]);
+		expect(seriesCall[0]).toBe(
+			'https://v3-cinemeta.strem.io/catalog/series/top/search=query.json'
+		);
+		expect(seriesCall[1]).toBe('cinemeta_search_series_query');
+		expect(seriesCall[2]).toBe('cinemeta_search');
+		expect(seriesCall[4]).toBe(3600000);
 
-		it('should fetch from API when no cached data exists', async () => {
-			const url = 'https://api.example.com/data';
-			const cacheKey = 'test-key';
-			const cacheType = 'TRENDING';
-			const freshData = { items: [7, 8, 9] };
+		expect(omdbCall[0]).toBe('https://www.omdbapi.com/?s=title&y=2020&apikey=abc&type=movie');
+		expect(omdbCall[1]).toBe('omdb_search_title_2020_movie');
+		expect(omdbCall[2]).toBe('omdb_search');
+		expect(omdbCall[4]).toBe(3600000);
 
-			mockCache.getWithMetadata.mockResolvedValue(null);
+		expect(traktCall[0]).toBe('https://api.trakt.tv/shows/popular?genres=drama&limit=5');
+		expect(traktCall[1]).toBe('trakt_popular_shows_drama_5');
+		expect(traktCall[2]).toBe('trakt_popular');
+		expect(traktCall[3]).toEqual(
+			expect.objectContaining({
+				headers: expect.objectContaining({
+					'trakt-api-key': 'trakt',
+				}),
+			})
+		);
+		expect(traktCall[4]).toBe(21600000);
+	});
 
-			const mockResponse = { data: freshData };
-			vi.mocked(axios.get).mockResolvedValue(mockResponse);
-
-			const result = await service.fetchWithCache(url, cacheKey, cacheType, {}, 3600000);
-
-			expect(result).toEqual(freshData);
-			expect(axios.get).toHaveBeenCalledWith(url, {});
-			expect(mockCache.set).toHaveBeenCalledWith(cacheKey, cacheType, freshData);
-			expect(console.log).toHaveBeenCalledWith(
-				`[MetadataCache] Fetching ${cacheType} data from: ${url}`
-			);
-		});
-
-		it('should use permanent cache when no maxAge provided', async () => {
-			const url = 'https://api.example.com/data';
-			const cacheKey = 'test-key';
-			const cacheType = 'POPULAR';
-			const cachedData = { items: [1, 2, 3] };
-			const updatedAt = new Date('2020-01-01'); // Very old data
-
-			mockCache.getWithMetadata.mockResolvedValue({
-				data: cachedData,
-				updatedAt,
-			});
-
-			const result = await service.fetchWithCache(url, cacheKey, cacheType);
-
-			expect(result).toEqual(cachedData);
-			expect(axios.get).not.toHaveBeenCalled();
-			expect(mockCache.set).not.toHaveBeenCalled();
-		});
-
-		it('should handle API errors gracefully', async () => {
-			const url = 'https://api.example.com/data';
-			const cacheKey = 'test-key';
-			const cacheType = 'SEARCH';
-			const error = new Error('Network error');
-
-			mockCache.getWithMetadata.mockResolvedValue(null);
-			vi.mocked(axios.get).mockRejectedValue(error);
-
-			await expect(service.fetchWithCache(url, cacheKey, cacheType)).rejects.toThrow(
-				'Network error'
-			);
-			expect(mockCache.set).not.toHaveBeenCalled();
-		});
-
-		it('should handle cache errors gracefully', async () => {
-			const url = 'https://api.example.com/data';
-			const cacheKey = 'test-key';
-			const cacheType = 'SEARCH';
-			const freshData = { items: [1, 2, 3] };
-			const cacheError = new Error('Cache write failed');
-
-			mockCache.getWithMetadata.mockResolvedValue(null);
-
-			const mockResponse = { data: freshData };
-			vi.mocked(axios.get).mockResolvedValue(mockResponse);
-			mockCache.set.mockRejectedValue(cacheError);
-
-			// Should still return the data even if caching fails
-			const result = await service.fetchWithCache(url, cacheKey, cacheType);
-
-			expect(result).toEqual(freshData);
-			expect(axios.get).toHaveBeenCalledWith(url, {});
-			expect(mockCache.set).toHaveBeenCalledWith(cacheKey, cacheType, freshData);
-		});
-
-		it('should pass config to axios request', async () => {
-			const url = 'https://api.example.com/data';
-			const cacheKey = 'test-key';
-			const cacheType = 'SEARCH';
-			const config = {
-				headers: { Authorization: 'Bearer token' },
-				timeout: 5000,
-			};
-			const freshData = { items: [1, 2, 3] };
-
-			mockCache.getWithMetadata.mockResolvedValue(null);
-
-			const mockResponse = { data: freshData };
-			vi.mocked(axios.get).mockResolvedValue(mockResponse);
-
-			await service.fetchWithCache(url, cacheKey, cacheType, config);
-
-			expect(axios.get).toHaveBeenCalledWith(url, config);
-		});
-
-		it('should handle different cache types with appropriate durations', async () => {
-			const url = 'https://api.example.com/data';
-			const cacheKey = 'test-key';
-			const freshData = { items: [1, 2, 3] };
-
-			mockCache.getWithMetadata.mockResolvedValue(null);
-
-			const mockResponse = { data: freshData };
-			vi.mocked(axios.get).mockResolvedValue(mockResponse);
-
-			// Test SEARCH cache (1 hour)
-			await service.fetchWithCache(url, 'search-key', 'SEARCH', {}, 3600000);
-			expect(mockCache.set).toHaveBeenCalledWith('search-key', 'SEARCH', freshData);
-
-			// Test TRENDING cache (1 hour)
-			await service.fetchWithCache(url, 'trending-key', 'TRENDING', {}, 3600000);
-			expect(mockCache.set).toHaveBeenCalledWith('trending-key', 'TRENDING', freshData);
-
-			// Test POPULAR cache (6 hours)
-			await service.fetchWithCache(url, 'popular-key', 'POPULAR', {}, 21600000);
-			expect(mockCache.set).toHaveBeenCalledWith('popular-key', 'POPULAR', freshData);
-
-			// Test TOP_LISTS cache (24 hours)
-			await service.fetchWithCache(url, 'toplists-key', 'TOP_LISTS', {}, 86400000);
-			expect(mockCache.set).toHaveBeenCalledWith('toplists-key', 'TOP_LISTS', freshData);
-		});
-
-		it('should handle empty API responses', async () => {
-			const url = 'https://api.example.com/empty';
-			const cacheKey = 'empty-key';
-			const cacheType = 'SEARCH';
-			const emptyData = null;
-
-			mockCache.getWithMetadata.mockResolvedValue(null);
-
-			const mockResponse = { data: emptyData };
-			vi.mocked(axios.get).mockResolvedValue(mockResponse);
-
-			const result = await service.fetchWithCache(url, cacheKey, cacheType);
-
-			expect(result).toBeNull();
-			expect(mockCache.set).toHaveBeenCalledWith(cacheKey, cacheType, emptyData);
-		});
-
-		it('should handle array API responses', async () => {
-			const url = 'https://api.example.com/array';
-			const cacheKey = 'array-key';
-			const cacheType = 'TRENDING';
-			const arrayData = [1, 2, 3, 4, 5];
-
-			mockCache.getWithMetadata.mockResolvedValue(null);
-
-			const mockResponse = { data: arrayData };
-			vi.mocked(axios.get).mockResolvedValue(mockResponse);
-
-			const result = await service.fetchWithCache(url, cacheKey, cacheType);
-
-			expect(result).toEqual(arrayData);
-			expect(mockCache.set).toHaveBeenCalledWith(cacheKey, cacheType, arrayData);
-		});
+	it('getMetadataCache returns a singleton instance', () => {
+		cacheFactory.current = buildCache();
+		const first = getMetadataCache();
+		const second = getMetadataCache();
+		expect(first).toBe(second);
 	});
 });

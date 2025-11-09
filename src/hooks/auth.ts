@@ -72,8 +72,8 @@ const useRealDebrid = () => {
 		let isMounted = true;
 
 		const auth = async () => {
-			// Prevent duplicate initialization globally
-			if (globalRealDebridState.isInitialized) {
+			// Prevent duplicate initialization globally, but allow retry if no user yet
+			if (globalRealDebridState.isInitialized && globalRealDebridState.user) {
 				return;
 			}
 

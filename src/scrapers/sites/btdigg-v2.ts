@@ -214,6 +214,13 @@ async function processInBatches(
 	return searchResultsArr;
 }
 
+export const __testing = {
+	convertToMB,
+	isFoundDateRecent,
+	calculateMaxPages,
+	processInBatches,
+};
+
 export async function scrapeBtdigg(
 	finalQuery: string,
 	targetTitle: string,

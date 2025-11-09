@@ -207,7 +207,7 @@ describe('FloatingLibraryIndicator', () => {
 			expect(screen.getByText('3')).toBeInTheDocument();
 		});
 
-		it('triggers an initial refresh when mounting with empty library data', async () => {
+		it('should NOT trigger initial refresh (EnhancedLibraryCacheContext handles it)', async () => {
 			localStorage.setItem('rd:accessToken', 'test-token');
 			(useRealDebridAccessToken as any).mockReturnValue(['test-token', false, false]);
 			const refreshLibrary = vi.fn().mockResolvedValue(undefined);
@@ -219,8 +219,10 @@ describe('FloatingLibraryIndicator', () => {
 			render(<FloatingLibraryIndicator />);
 
 			await waitFor(() => {
-				expect(refreshLibrary).toHaveBeenCalledTimes(1);
+				expect(screen.getByText('0')).toBeInTheDocument();
 			});
+
+			expect(refreshLibrary).not.toHaveBeenCalled();
 		});
 
 		it('should show loading state', () => {

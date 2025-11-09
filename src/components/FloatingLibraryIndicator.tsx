@@ -4,7 +4,7 @@ import { useRelativeTimeLabel } from '@/hooks/useRelativeTimeLabel';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export default function FloatingLibraryIndicator() {
 	const { libraryItems, isLoading, isFetching, lastFetchTime, error, refreshLibrary } =
@@ -16,7 +16,6 @@ export default function FloatingLibraryIndicator() {
 	const [mounted, setMounted] = useState(false);
 	const [isLoggedIn, setIsLoggedIn] = useState(false);
 	const lastFetchLabel = useRelativeTimeLabel(lastFetchTime, 'Just now');
-	const initialRefreshRequestedRef = useRef(false);
 
 	// Check authentication status directly from localStorage
 	const checkAuthStatus = useCallback(() => {
@@ -102,56 +101,7 @@ export default function FloatingLibraryIndicator() {
 			hasTbKey: !!(tbKey && tbKey.trim()),
 			hasValidAuth,
 		});
-		if (!hasValidAuth) {
-			initialRefreshRequestedRef.current = false;
-		}
 	}, [rdToken, adKey, tbKey]);
-
-	useEffect(() => {
-		if (!mounted || !isLoggedIn) {
-			return;
-		}
-
-		if (isLoading || isFetching) {
-			return;
-		}
-
-		if (initialRefreshRequestedRef.current) {
-			return;
-		}
-
-		if (!!lastFetchTime || libraryItems.length > 0) {
-			initialRefreshRequestedRef.current = true;
-			return;
-		}
-
-		initialRefreshRequestedRef.current = true;
-		console.log('[FloatingLibraryIndicator] triggering initial refresh after login', {
-			hasRdToken: !!(rdToken && rdToken.trim()),
-			hasAdKey: !!(adKey && adKey.trim()),
-			hasTbKey: !!(tbKey && tbKey.trim()),
-		});
-		void (async () => {
-			try {
-				await refreshLibrary();
-				console.log('[FloatingLibraryIndicator] initial refresh complete');
-			} catch (err) {
-				console.error('[FloatingLibraryIndicator] initial refresh failed', err);
-				initialRefreshRequestedRef.current = false;
-			}
-		})();
-	}, [
-		mounted,
-		isLoggedIn,
-		isLoading,
-		isFetching,
-		lastFetchTime,
-		libraryItems.length,
-		rdToken,
-		adKey,
-		tbKey,
-		refreshLibrary,
-	]);
 
 	const handleRefresh = async () => {
 		console.log('[FloatingLibraryIndicator] manual refresh requested');
