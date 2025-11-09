@@ -1,0 +1,148 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+	adInstantCheck,
+	checkPin,
+	deleteMagnet,
+	getAllDebridUser,
+	getMagnetFiles,
+	getMagnetStatus,
+	getPin,
+	restartMagnet,
+	uploadMagnet,
+} from './allDebrid';
+
+const mocks = vi.hoisted(() => ({
+	getMock: vi.fn(),
+	postMock: vi.fn(),
+}));
+
+vi.mock('axios', () => ({
+	default: {
+		get: mocks.getMock,
+		post: mocks.postMock,
+	},
+}));
+
+vi.mock('next/config', () => ({
+	default: () => ({
+		publicRuntimeConfig: {
+			allDebridHostname: 'https://alldebrid.test',
+		},
+	}),
+}));
+
+const { getMock, postMock } = mocks;
+
+describe('AllDebrid service helpers', () => {
+	beforeEach(() => {
+		getMock.mockReset();
+		postMock.mockReset();
+	});
+
+	it('fetches a PIN and surfaces API errors', async () => {
+		getMock.mockResolvedValueOnce({
+			data: { status: 'success', data: { pin: '1234', check: 'check', expires_in: 10 } },
+		});
+		const pinData = await getPin();
+		expect(pinData.pin).toBe('1234');
+
+		getMock.mockResolvedValueOnce({
+			data: { status: 'error', error: { message: 'bad' } },
+		});
+		await expect(getPin()).rejects.toThrow('bad');
+	});
+
+	it('polls PIN activation until ready', async () => {
+		postMock
+			.mockResolvedValueOnce({
+				data: { status: 'success', data: { activated: false, expires_in: 10 } },
+			})
+			.mockResolvedValueOnce({
+				data: {
+					status: 'success',
+					data: { activated: true, apikey: 'key', expires_in: 10 },
+				},
+			});
+		vi.useFakeTimers();
+		const promise = checkPin('pin', 'check');
+		await vi.advanceTimersByTimeAsync(5000);
+		const result = await promise;
+		expect(result.apikey).toBe('key');
+		vi.useRealTimers();
+	});
+
+	it('fetches user info and uploads magnets', async () => {
+		getMock.mockResolvedValueOnce({
+			data: { status: 'success', data: { user: { username: 'demo' } } },
+		});
+		const user = await getAllDebridUser('token');
+		expect(user.username).toBe('demo');
+
+		postMock.mockResolvedValueOnce({
+			data: { status: 'success', data: { magnets: [{ id: 1 }] } },
+		});
+		const upload = await uploadMagnet('token', ['abcdef', 'magnet:?xt=urn:btih:deadbeef']);
+		expect(upload.magnets).toHaveLength(1);
+
+		postMock.mockResolvedValueOnce({
+			data: { status: 'error', error: { message: 'invalid magnet' } },
+		});
+		await expect(uploadMagnet('token', ['invalid'])).rejects.toThrow('invalid magnet');
+	});
+
+	it('retrieves magnet status and merges fetched files', async () => {
+		postMock
+			.mockResolvedValueOnce({
+				data: {
+					status: 'success',
+					data: {
+						magnets: [{ id: 10, statusCode: 4, links: [] }],
+					},
+				},
+			})
+			.mockResolvedValueOnce({
+				data: {
+					status: 'success',
+					data: {
+						magnets: [
+							{
+								id: '10',
+								files: [{ n: 'file.mkv', l: 'https://link', s: 100 }],
+							},
+						],
+					},
+				},
+			});
+
+		const response = await getMagnetStatus('token');
+		expect(response.data.magnets[0].links?.[0].filename).toContain('file.mkv');
+	});
+
+	it('returns empty magnet files when ids are invalid', async () => {
+		const empty = await getMagnetFiles('token', [0, -1]);
+		expect(empty.magnets).toEqual([]);
+
+		postMock.mockResolvedValueOnce({
+			data: { status: 'success', data: { magnets: [] } },
+		});
+		await getMagnetFiles('token', [1]);
+	});
+
+	it('deletes, restarts magnets, and fetches instant availability', async () => {
+		postMock.mockResolvedValueOnce({
+			data: { status: 'success', data: { message: 'ok' } },
+		});
+		const deleteResp = await deleteMagnet('token', '1');
+		expect(deleteResp.message).toBe('ok');
+
+		postMock.mockResolvedValueOnce({
+			data: { status: 'success', data: { magnets: [{ magnet: 'm1' }] } },
+		});
+		const restartResp = await restartMagnet('token', '1');
+		expect(restartResp.magnets?.[0].magnet).toBe('m1');
+
+		getMock.mockResolvedValueOnce({ data: { data: { magnets: [] } } });
+		const instant = await adInstantCheck('token', ['hash']);
+		expect(instant.data.magnets).toEqual([]);
+	});
+});
