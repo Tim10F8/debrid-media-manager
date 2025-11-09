@@ -16,7 +16,7 @@ import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
 
-function StremioPage() {
+export function StremioPage() {
 	const dmmCastToken = useCastToken();
 
 	if (!dmmCastToken) {
