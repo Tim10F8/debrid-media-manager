@@ -32,8 +32,7 @@ export interface AllDebridUser {
 	fidelityPoints: number;
 }
 
-// Global singleton state for RealDebrid to prevent duplicate calls
-let globalRealDebridState = {
+const initialRealDebridState = {
 	user: null as RealDebridUser | null,
 	error: null as Error | null,
 	loading: true,
@@ -41,6 +40,9 @@ let globalRealDebridState = {
 	isInitialized: false,
 	subscribers: new Set<() => void>(),
 };
+
+// Global singleton state for RealDebrid to prevent duplicate calls
+let globalRealDebridState = { ...initialRealDebridState };
 
 // Simplified hook that handles RealDebrid auth
 const useRealDebrid = () => {
@@ -144,6 +146,13 @@ const useRealDebrid = () => {
 	}, [refreshToken, clientId, clientSecret]);
 
 	return { user, error, loading, isRefreshing: false, hasAuth: !!token };
+};
+
+export const __resetRealDebridStateForTests = () => {
+	globalRealDebridState = {
+		...initialRealDebridState,
+		subscribers: new Set(),
+	};
 };
 
 // Separate hooks for other services
