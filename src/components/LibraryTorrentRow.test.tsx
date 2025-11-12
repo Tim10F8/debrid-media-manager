@@ -340,6 +340,33 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 		});
 	});
 
+	describe('Cast All Quick Action', () => {
+		it('opens cast endpoint for RD torrents when rdKey is present', () => {
+			const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+			render(<LibraryTorrentRow {...defaultProps} />);
+			const castButton = screen.getByTitle('Cast All');
+			fireEvent.click(castButton);
+			const expectedUrl = `/api/stremio/cast/library/${mockTorrent.id.substring(3)}:${mockTorrent.hash}?rdToken=${defaultProps.rdKey}`;
+			expect(openSpy).toHaveBeenCalledWith(expectedUrl, '_blank', 'noopener,noreferrer');
+			openSpy.mockRestore();
+		});
+
+		it('hides cast button when rdKey is missing', () => {
+			const { queryByTitle } = render(<LibraryTorrentRow {...defaultProps} rdKey={null} />);
+			expect(queryByTitle('Cast All')).not.toBeInTheDocument();
+		});
+
+		it('hides cast button for non-RD torrents', () => {
+			const { queryByTitle } = render(
+				<LibraryTorrentRow
+					{...defaultProps}
+					torrent={{ ...defaultProps.torrent, id: 'ad:456' }}
+				/>
+			);
+			expect(queryByTitle('Cast All')).not.toBeInTheDocument();
+		});
+	});
+
 	describe('Row Display', () => {
 		it('should display torrent information correctly', () => {
 			render(<LibraryTorrentRow {...defaultProps} />);

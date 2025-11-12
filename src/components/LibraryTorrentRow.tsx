@@ -18,6 +18,7 @@ import { torrentPrefix } from '@/utils/results';
 import { shortenNumber } from '@/utils/speed';
 import { getTorBoxStatusText } from '@/utils/torBoxStatus';
 import {
+	Cast,
 	Check,
 	Film,
 	FolderOpen,
@@ -223,6 +224,21 @@ function TorrentRow({
 				onClick={() => onShowInfo(torrent)}
 				className="flex place-content-center px-0.5 py-1"
 			>
+				{rdKey && torrent.id.startsWith('rd:') && (
+					<button
+						title="Cast All"
+						className="mb-2 mr-2 cursor-pointer text-gray-400"
+						onClick={(e) => {
+							e.stopPropagation();
+							const rdId = torrent.id.substring(3);
+							if (!rdId || !torrent.hash) return;
+							const castUrl = `/api/stremio/cast/library/${rdId}:${torrent.hash}?rdToken=${rdKey}`;
+							window.open(castUrl, '_blank', 'noopener,noreferrer');
+						}}
+					>
+						<Cast className="h-4 w-4 text-gray-400" />
+					</button>
+				)}
 				<button
 					title="Share"
 					className="mb-2 mr-2 cursor-pointer text-indigo-600"
