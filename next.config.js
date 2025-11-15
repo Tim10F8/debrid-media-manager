@@ -4,6 +4,15 @@ const withPWA = require('next-pwa')(pwaConfig);
 
 const nextConfig = {
 	output: 'standalone',
+	webpack: (config) => {
+		config.cache = {
+			type: 'filesystem',
+			buildDependencies: {
+				config: [__filename],
+			},
+		};
+		return config;
+	},
 	async rewrites() {
 		return [
 			// Support external callers using /anticors path by rewriting to API route
@@ -91,15 +100,6 @@ const nextConfig = {
 		patreonClientId: process.env.PATREON_CLIENT_ID,
 		githubClientId: process.env.GITHUB_CLIENT_ID,
 		discordClientId: process.env.DISCORD_CLIENT_ID,
-	},
-	webpack: (config) => {
-		config.cache = {
-			type: 'filesystem',
-			buildDependencies: {
-				config: [__filename],
-			},
-		};
-		return config;
 	},
 };
 
