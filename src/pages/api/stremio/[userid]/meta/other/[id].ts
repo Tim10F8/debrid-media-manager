@@ -8,61 +8,61 @@ import { NextApiRequest, NextApiResponse } from 'next';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	res.setHeader('access-control-allow-origin', '*');
 
-	const { userid, id } = req.query;
-	if (typeof userid !== 'string' || typeof id !== 'string') {
-		res.status(400).json({
-			status: 'error',
-			errorMessage: 'Invalid "userid" or "id" query parameter',
-		});
-		return;
-	}
-
-	if (req.method === 'OPTIONS') {
-		return res.status(200).end();
-	}
-
-	// Check for legacy 5-character token
-	if (isLegacyToken(userid)) {
-		res.status(200).json({
-			meta: {
-				id: id,
-				type: 'other',
-				name: '⚠️ DMM Cast Update Required',
-				description:
-					'Your DMM Cast addon needs to be reinstalled for improved security.\n\nPlease visit https://debridmediamanager.com/stremio to get your new install link.\n\nThis update provides better security with longer tokens.',
-				poster: 'https://static.debridmediamanager.com/dmmcast.png',
-				background: 'https://static.debridmediamanager.com/background.png',
-			},
-		});
-		return;
-	}
-
-	const torrentID = id.replaceAll(/^dmm:/g, '').replaceAll(/\.json$/g, '');
-
-	const profile = await db.getCastProfile(userid);
-	if (!profile) {
-		res.status(500).json({ error: `Failed to get Real-Debrid profile for user ${userid}` });
-		return;
-	}
-
-	let response: { access_token: string } | null = null;
 	try {
-		response = await getToken(
-			profile.clientId,
-			profile.clientSecret,
-			profile.refreshToken,
-			true
-		);
-		if (!response) {
-			throw new Error(`no token found for user ${userid}`);
+		const { userid, id } = req.query;
+		if (typeof userid !== 'string' || typeof id !== 'string') {
+			res.status(400).json({
+				status: 'error',
+				errorMessage: 'Invalid "userid" or "id" query parameter',
+			});
+			return;
 		}
-	} catch (error) {
-		console.error(error);
-		res.status(500).json({ error: `Failed to get Real-Debrid token for user ${userid}` });
-		return;
-	}
 
-	try {
+		if (req.method === 'OPTIONS') {
+			return res.status(200).end();
+		}
+
+		// Check for legacy 5-character token
+		if (isLegacyToken(userid)) {
+			res.status(200).json({
+				meta: {
+					id: id,
+					type: 'other',
+					name: '⚠️ DMM Cast Update Required',
+					description:
+						'Your DMM Cast addon needs to be reinstalled for improved security.\n\nPlease visit https://debridmediamanager.com/stremio to get your new install link.\n\nThis update provides better security with longer tokens.',
+					poster: 'https://static.debridmediamanager.com/dmmcast.png',
+					background: 'https://static.debridmediamanager.com/background.png',
+				},
+			});
+			return;
+		}
+
+		const torrentID = id.replaceAll(/^dmm:/g, '').replaceAll(/\.json$/g, '');
+
+		const profile = await db.getCastProfile(userid);
+		if (!profile) {
+			res.status(500).json({ error: `Failed to get Real-Debrid profile for user ${userid}` });
+			return;
+		}
+
+		let response: { access_token: string } | null = null;
+		try {
+			response = await getToken(
+				profile.clientId,
+				profile.clientSecret,
+				profile.refreshToken,
+				true
+			);
+			if (!response) {
+				throw new Error(`no token found for user ${userid}`);
+			}
+		} catch (error) {
+			console.error(error);
+			res.status(500).json({ error: `Failed to get Real-Debrid token for user ${userid}` });
+			return;
+		}
+
 		const result = await getDMMTorrent(userid as string, torrentID, response.access_token);
 		if ('error' in result) {
 			res.status(result.status).json({ error: result.error });
@@ -71,8 +71,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 		res.status(result.status).json(result.data);
 	} catch (error) {
-		console.error(error);
-		res.status(500).json({ error: `Failed to get DMM torrent: ${error}` });
+		console.error('Error in meta/other/[id] handler:', error);
+		res.status(500).json({
+			error: 'Internal server error',
+			message: error instanceof Error ? error.message : 'Unknown error',
+		});
 		return;
 	}
 }
