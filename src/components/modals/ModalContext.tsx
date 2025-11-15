@@ -53,29 +53,6 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 		resolve: () => {},
 	});
 
-	const fire = useCallback((options: FireOptions): Promise<ModalResult> => {
-		return new Promise((resolve) => {
-			if (options.willOpen) {
-				options.willOpen();
-			}
-
-			let type: ModalState['type'] = 'confirm';
-			if (options.input === 'text') {
-				type = 'input';
-			} else if (options.showDenyButton) {
-				type = 'choice';
-			} else if (options.html && !options.text) {
-				type = 'custom';
-			}
-
-			setModalState({
-				type,
-				options,
-				resolve,
-			});
-		});
-	}, []);
-
 	const close = useCallback(() => {
 		setModalState((prevState) => {
 			if (prevState.resolve) {
@@ -88,6 +65,36 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 			};
 		});
 	}, []);
+
+	const fire = useCallback(
+		(options: FireOptions): Promise<ModalResult> => {
+			return new Promise((resolve) => {
+				if (options.willOpen) {
+					options.willOpen();
+				}
+
+				let type: ModalState['type'] = 'confirm';
+				if (options.input === 'text') {
+					type = 'input';
+				} else if (options.showDenyButton) {
+					type = 'choice';
+				} else if (options.html && !options.text) {
+					type = 'custom';
+				}
+
+				if (typeof window !== 'undefined') {
+					(window as any).closePopup = close;
+				}
+
+				setModalState({
+					type,
+					options,
+					resolve,
+				});
+			});
+		},
+		[close]
+	);
 
 	const showLoading = useCallback(() => {
 		setModalState({
