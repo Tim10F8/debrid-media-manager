@@ -9,8 +9,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	res.setHeader('access-control-allow-origin', '*');
 
 	try {
+		console.log('[meta/other/id] Request received:', {
+			userid: req.query.userid,
+			id: req.query.id,
+			url: req.url,
+			method: req.method,
+		});
+
 		const { userid, id } = req.query;
 		if (typeof userid !== 'string' || typeof id !== 'string') {
+			console.log('[meta/other/id] Invalid parameters:', { userid, id });
 			res.status(400).json({
 				status: 'error',
 				errorMessage: 'Invalid "userid" or "id" query parameter',
@@ -19,11 +27,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		}
 
 		if (req.method === 'OPTIONS') {
+			console.log('[meta/other/id] OPTIONS request');
 			return res.status(200).end();
 		}
 
 		// Check for legacy 5-character token
 		if (isLegacyToken(userid)) {
+			console.log('[meta/other/id] Legacy token detected:', userid);
 			res.status(200).json({
 				meta: {
 					id: id,
@@ -39,15 +49,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		}
 
 		const torrentID = id.replaceAll(/^dmm:/g, '').replaceAll(/\.json$/g, '');
+		console.log('[meta/other/id] Torrent ID:', torrentID);
 
 		const profile = await db.getCastProfile(userid);
 		if (!profile) {
+			console.log('[meta/other/id] No profile found for user:', userid);
 			res.status(500).json({ error: `Failed to get Real-Debrid profile for user ${userid}` });
 			return;
 		}
+		console.log('[meta/other/id] Profile found for user:', userid);
 
 		let response: { access_token: string } | null = null;
 		try {
+			console.log('[meta/other/id] Getting token for user:', userid);
 			response = await getToken(
 				profile.clientId,
 				profile.clientSecret,
@@ -57,24 +71,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			if (!response) {
 				throw new Error(`no token found for user ${userid}`);
 			}
+			console.log('[meta/other/id] Token obtained successfully');
 		} catch (error) {
-			console.error(error);
+			console.error('[meta/other/id] Token error:', error);
 			res.status(500).json({ error: `Failed to get Real-Debrid token for user ${userid}` });
 			return;
 		}
 
+		console.log('[meta/other/id] Fetching torrent:', torrentID);
 		const result = await getDMMTorrent(userid as string, torrentID, response.access_token);
 		if ('error' in result) {
+			console.log('[meta/other/id] Torrent fetch error:', result);
 			res.status(result.status).json({ error: result.error });
 			return;
 		}
 
+		console.log('[meta/other/id] Success:', { status: result.status });
 		res.status(result.status).json(result.data);
 	} catch (error) {
-		console.error('Error in meta/other/[id] handler:', error);
+		console.error('[meta/other/id] Exception caught:', error);
 		res.status(500).json({
 			error: 'Internal server error',
 			message: error instanceof Error ? error.message : 'Unknown error',
+			stack: error instanceof Error ? error.stack : undefined,
 		});
 		return;
 	}

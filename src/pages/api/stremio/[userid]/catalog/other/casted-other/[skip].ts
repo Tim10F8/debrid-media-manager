@@ -6,16 +6,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	res.setHeader('access-control-allow-origin', '*');
 
 	try {
+		console.log('[casted-other/skip] Request received:', {
+			userid: req.query.userid,
+			skip: req.query.skip,
+			url: req.url,
+		});
+
 		const { userid, skip } = req.query;
 		if (typeof skip !== 'string') {
+			console.log('[casted-other/skip] Invalid skip parameter:', skip);
 			return res.status(400).json({ error: 'Invalid "skip" query parameter' });
 		}
 
 		const skipNum = skip.replaceAll(/^skip=/g, '').replaceAll(/\.json$/g, '');
 		const page = Math.floor(Number(skipNum) / PAGE_SIZE) + 1;
+		console.log('[casted-other/skip] Calculated page:', { skipNum, page });
 
 		// Check for legacy 5-character token
 		if (isLegacyToken(userid as string)) {
+			console.log('[casted-other/skip] Legacy token detected:', userid);
 			return res.status(200).json({
 				metas: [
 					{
@@ -30,18 +39,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			});
 		}
 
+		console.log('[casted-other/skip] Fetching library for user:', userid, 'page:', page);
 		const result = await getDMMLibrary(userid as string, page);
 
 		if ('error' in result) {
+			console.log('[casted-other/skip] Library fetch error:', result);
 			return res.status(result.status).json({ error: result.error });
 		}
 
+		console.log('[casted-other/skip] Success:', {
+			status: result.status,
+			metaCount: result.data.metas?.length,
+		});
 		res.status(result.status).json(result.data);
 	} catch (error) {
-		console.error('Error in casted-other/[skip] handler:', error);
+		console.error('[casted-other/skip] Exception caught:', error);
 		return res.status(500).json({
 			error: 'Internal server error',
 			message: error instanceof Error ? error.message : 'Unknown error',
+			stack: error instanceof Error ? error.stack : undefined,
 		});
 	}
 }
