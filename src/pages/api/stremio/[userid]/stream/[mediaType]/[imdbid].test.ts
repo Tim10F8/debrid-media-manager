@@ -47,6 +47,62 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 		});
 	});
 
+	it('sets CORS headers on all responses', async () => {
+		const testCases = [
+			{
+				name: 'invalid params',
+				query: { userid: 'user', mediaType: 'movie' },
+			},
+			{
+				name: 'OPTIONS',
+				method: 'OPTIONS',
+				query: { userid: 'user', mediaType: 'movie', imdbid: 'tt123' },
+			},
+			{
+				name: 'legacy token',
+				setup: () => mockIsLegacyToken.mockReturnValue(true),
+				query: { userid: 'short', mediaType: 'movie', imdbid: 'tt123' },
+			},
+			{
+				name: 'missing profile',
+				setup: () => mockRepository.getCastProfile.mockResolvedValue(null),
+				query: { userid: 'user', mediaType: 'movie', imdbid: 'tt123' },
+			},
+			{
+				name: 'token error',
+				setup: () => {
+					mockRepository.getCastProfile.mockResolvedValue({
+						clientId: 'id',
+						clientSecret: 'secret',
+						refreshToken: 'refresh',
+					});
+					mockGetToken.mockRejectedValue(new Error('rd down'));
+				},
+				query: { userid: 'user', mediaType: 'movie', imdbid: 'tt123' },
+			},
+		];
+
+		for (const testCase of testCases) {
+			vi.clearAllMocks();
+			mockIsLegacyToken.mockReturnValue(false);
+			mockRepository.getCastProfile = vi.fn();
+			mockRepository.getCastURLs = vi.fn();
+			mockRepository.getOtherCastURLs = vi.fn();
+
+			testCase.setup?.();
+
+			const req = createMockRequest({
+				query: testCase.query,
+				method: testCase.method || 'GET',
+			});
+			const res = createMockResponse();
+
+			await handler(req, res);
+
+			expect(res.setHeader).toHaveBeenCalledWith('access-control-allow-origin', '*');
+		}
+	});
+
 	it('supports OPTIONS preflight', async () => {
 		const req = createMockRequest({
 			method: 'OPTIONS',

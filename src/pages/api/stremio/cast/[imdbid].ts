@@ -6,6 +6,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 // cast: unrestricts a selected link and saves it to the database
 // called in the showInfo component
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+	res.setHeader('access-control-allow-origin', '*');
+
 	const { imdbid, token, hash, fileId, mediaType } = req.query;
 	if (!token || !hash || !fileId || !mediaType) {
 		res.status(400).json({

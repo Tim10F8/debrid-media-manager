@@ -2,6 +2,8 @@ import { repository as db } from '@/services/repository';
 import { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+	res.setHeader('access-control-allow-origin', '*');
+
 	const { userid, imdbid, pingpong, token } = req.query;
 	if (typeof userid !== 'string' || typeof imdbid !== 'string' || typeof pingpong !== 'string') {
 		res.status(400).json({
@@ -10,7 +12,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		});
 		return;
 	}
-	res.setHeader('access-control-allow-origin', '*');
 	// get the last casted stream url
 	const latestCast = await db.getLatestCast(imdbid, userid);
 	if (latestCast && latestCast.link) {

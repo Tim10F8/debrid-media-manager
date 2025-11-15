@@ -2,6 +2,8 @@ import { generateUserId, validateMethod, validateToken } from '@/utils/castApiHe
 import { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+	res.setHeader('access-control-allow-origin', '*');
+
 	if (!validateMethod(req, res, ['GET'])) return;
 
 	const token = validateToken(req, res);

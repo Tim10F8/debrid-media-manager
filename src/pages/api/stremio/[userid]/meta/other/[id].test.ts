@@ -51,6 +51,66 @@ describe('/api/stremio/[userid]/meta/other/[id]', () => {
 		expect(res.status).toHaveBeenCalledWith(400);
 	});
 
+	it('sets CORS headers on all responses including errors', async () => {
+		const testCases = [
+			{
+				name: 'invalid params',
+				setup: () => {},
+				query: { userid: ['u'] as any, id: 'dmm:1' },
+			},
+			{
+				name: 'OPTIONS request',
+				setup: () => {},
+				query: { userid: 'user', id: 'dmm:1' },
+				method: 'OPTIONS',
+			},
+			{
+				name: 'legacy token',
+				setup: () => mockIsLegacyToken.mockReturnValue(true),
+				query: { userid: 'abcde', id: 'dmm:1' },
+			},
+			{
+				name: 'missing profile',
+				setup: () => mockGetCastProfile.mockResolvedValue(null),
+				query: { userid: 'user', id: 'dmm:1' },
+			},
+			{
+				name: 'token error',
+				setup: () => mockGetToken.mockRejectedValue(new Error('oauth')),
+				query: { userid: 'user', id: 'dmm:1' },
+			},
+			{
+				name: 'success',
+				setup: () => {},
+				query: { userid: 'user', id: 'dmm:1' },
+			},
+		];
+
+		for (const testCase of testCases) {
+			vi.clearAllMocks();
+			mockIsLegacyToken.mockReturnValue(false);
+			mockGetCastProfile.mockResolvedValue({
+				clientId: 'id',
+				clientSecret: 'secret',
+				refreshToken: 'refresh',
+			});
+			mockGetToken.mockResolvedValue({ access_token: 'rd-token' });
+			mockGetDMMTorrent.mockResolvedValue({ status: 200, data: { meta: { id: 'dmm:1' } } });
+
+			testCase.setup();
+
+			const req = createMockRequest({
+				query: testCase.query,
+				method: testCase.method || 'GET',
+			});
+			const res = createMockResponse();
+
+			await handler(req, res);
+
+			expect(res.setHeader).toHaveBeenCalledWith('access-control-allow-origin', '*');
+		}
+	});
+
 	it('supports OPTIONS preflight', async () => {
 		const req = createMockRequest({
 			method: 'OPTIONS',

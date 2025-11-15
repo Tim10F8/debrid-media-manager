@@ -6,6 +6,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 
 // gets information about a torrent (viewing your library)
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+	res.setHeader('access-control-allow-origin', '*');
+
 	const { userid, id } = req.query;
 	if (typeof userid !== 'string' || typeof id !== 'string') {
 		res.status(400).json({
@@ -16,13 +18,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 
 	if (req.method === 'OPTIONS') {
-		res.setHeader('access-control-allow-origin', '*');
 		return res.status(200).end();
 	}
 
 	// Check for legacy 5-character token
 	if (isLegacyToken(userid)) {
-		res.setHeader('access-control-allow-origin', '*');
 		res.status(200).json({
 			meta: {
 				id: id,
@@ -64,7 +64,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	try {
 		const result = await getDMMTorrent(userid as string, torrentID, response.access_token);
-		res.setHeader('access-control-allow-origin', '*');
 		if ('error' in result) {
 			res.status(result.status).json({ error: result.error });
 			return;

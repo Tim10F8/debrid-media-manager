@@ -6,6 +6,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 // lists all available streams for a movie or show
 // note, addon prefix is /api/stremio/${userid}
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+	res.setHeader('access-control-allow-origin', '*');
+
 	const { userid, mediaType, imdbid } = req.query;
 
 	if (typeof userid !== 'string' || typeof imdbid !== 'string' || typeof mediaType !== 'string') {
@@ -17,13 +19,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 
 	if (req.method === 'OPTIONS') {
-		res.setHeader('access-control-allow-origin', '*');
 		return res.status(200).end();
 	}
 
 	// Check for legacy 5-character token
 	if (isLegacyToken(userid)) {
-		res.setHeader('access-control-allow-origin', '*');
 		res.status(200).json({
 			streams: [
 				{
@@ -165,7 +165,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			});
 		}
 
-		res.setHeader('access-control-allow-origin', '*');
 		res.status(200).json({
 			streams,
 			cacheMaxAge: 0,

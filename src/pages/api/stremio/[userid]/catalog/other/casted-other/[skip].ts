@@ -3,6 +3,8 @@ import { getDMMLibrary, PAGE_SIZE } from '@/utils/castCatalogHelper';
 import { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+	res.setHeader('access-control-allow-origin', '*');
+
 	const { userid, skip } = req.query;
 	if (typeof skip !== 'string') {
 		return res.status(400).json({ error: 'Invalid "skip" query parameter' });
@@ -13,7 +15,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	// Check for legacy 5-character token
 	if (isLegacyToken(userid as string)) {
-		res.setHeader('access-control-allow-origin', '*');
 		return res.status(200).json({
 			metas: [
 				{
@@ -30,7 +31,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	const result = await getDMMLibrary(userid as string, page);
 
-	res.setHeader('access-control-allow-origin', '*');
 	if ('error' in result) {
 		return res.status(result.status).json({ error: result.error });
 	}

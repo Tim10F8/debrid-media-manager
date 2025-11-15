@@ -3,6 +3,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 
 // Unrestrict and play a link
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+	res.setHeader('access-control-allow-origin', '*');
+
 	const { userid, link, token } = req.query;
 	if (typeof userid !== 'string' || typeof link !== 'string' || typeof token !== 'string') {
 		res.status(400).json({

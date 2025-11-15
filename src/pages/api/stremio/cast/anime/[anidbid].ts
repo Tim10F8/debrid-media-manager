@@ -4,6 +4,8 @@ import { getStreamUrl } from '@/utils/getStreamUrl';
 import { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+	res.setHeader('access-control-allow-origin', '*');
+
 	const { anidbid, token, hash, fileIds } = req.query;
 	if (!token || !hash || !fileIds) {
 		res.status(400).json({

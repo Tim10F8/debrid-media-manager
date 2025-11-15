@@ -6,6 +6,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 // TV SHOW cast: unrestricts a selected link and saves it to the database
 // called in the show page
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+	res.setHeader('access-control-allow-origin', '*');
+
 	const { imdbid, token, hash, fileIds } = req.query;
 	if (!token || !hash || !fileIds) {
 		res.status(400).json({
