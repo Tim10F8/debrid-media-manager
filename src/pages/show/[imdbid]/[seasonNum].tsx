@@ -70,7 +70,6 @@ const TvSearch: FunctionComponent = () => {
 	const [isLoading, setIsLoading] = useState(true);
 	const [searchState, setSearchState] = useState<string>('loading');
 	const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-	const [filteredResults, setFilteredResults] = useState<SearchResult[]>([]);
 	const [errorMessage, setErrorMessage] = useState('');
 	const [query, setQuery] = useState(storedTorrentsFilter);
 	const [descLimit, setDescLimit] = useState(100);
@@ -175,7 +174,6 @@ const TvSearch: FunctionComponent = () => {
 
 		// Clear previous results and query input when season changes
 		setSearchResults([]);
-		setFilteredResults([]);
 		setQuery(storedTorrentsFilter);
 
 		const initializeData = async () => {
@@ -485,7 +483,7 @@ const TvSearch: FunctionComponent = () => {
 	}
 
 	// Derive filtered results and uncached count using useMemo to prevent setState during render
-	const filteredResultsMemo = useMemo(() => {
+	const filteredResults = useMemo(() => {
 		if (searchResults.length === 0) {
 			return [];
 		}
@@ -493,14 +491,9 @@ const TvSearch: FunctionComponent = () => {
 	}, [query, searchResults]);
 
 	const totalUncachedCount = useMemo(() => {
-		return filteredResultsMemo.filter((r) => !r.rdAvailable && !r.adAvailable && !r.tbAvailable)
+		return filteredResults.filter((r) => !r.rdAvailable && !r.adAvailable && !r.tbAvailable)
 			.length;
-	}, [filteredResultsMemo]);
-
-	// Update filteredResults state when memo changes
-	useEffect(() => {
-		setFilteredResults(filteredResultsMemo);
-	}, [filteredResultsMemo]);
+	}, [filteredResults]);
 
 	// Handle toast notifications when search completes
 	useEffect(() => {

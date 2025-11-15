@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsSection } from './SettingsSection';
@@ -53,32 +53,32 @@ describe('SettingsSection', () => {
 
 		const movieSizeContainer = screen.getByText('Biggest movie size').closest('div')!;
 		const movieSize = within(movieSizeContainer).getByRole('combobox');
-		await waitFor(() => expect(movieSize).toHaveValue('15'));
+		expect(movieSize).toHaveValue('15');
 		await user.selectOptions(movieSize, '5');
 		expect(localStorage.getItem('settings:movieMaxSize')).toBe('5');
 
 		const episodeContainer = screen.getByText('Biggest episode size').closest('div')!;
 		const episodeSize = within(episodeContainer).getByRole('combobox');
-		await waitFor(() => expect(episodeSize).toHaveValue('5'));
+		expect(episodeSize).toHaveValue('5');
 		await user.selectOptions(episodeSize, '3');
 		expect(localStorage.getItem('settings:episodeMaxSize')).toBe('3');
 
 		const playerContainer = screen.getByText('Video player').closest('div')!;
 		const playerSelect = within(playerContainer).getByRole('combobox');
-		await waitFor(() => expect(playerSelect).toHaveValue('ios/infuse'));
+		expect(playerSelect).toHaveValue('ios/infuse');
 		await user.selectOptions(playerSelect, 'android/chooser');
 		expect(localStorage.getItem('settings:player')).toBe('android/chooser');
 
 		const filterContainer = screen.getByText('Default torrents filter').closest('div')!;
 		const filterInput = within(filterContainer).getByRole('textbox');
-		await waitFor(() => expect(filterInput).toHaveValue('hdr'));
+		expect(filterInput).toHaveValue('hdr');
 		await user.clear(filterInput);
 		await user.type(filterInput, '1080p');
 		expect(localStorage.getItem('settings:defaultTorrentsFilter')).toBe('1080p');
 
 		const trustedContainer = screen.getByText('Only trusted torrents').closest('div')!;
 		const trustedCheckbox = within(trustedContainer).getByRole('checkbox');
-		await waitFor(() => expect(trustedCheckbox).toBeChecked());
+		expect(trustedCheckbox).toBeChecked();
 		await user.click(trustedCheckbox);
 		expect(trustedCheckbox).not.toBeChecked();
 		expect(localStorage.getItem('settings:onlyTrustedTorrents')).toBe('false');
@@ -87,21 +87,21 @@ describe('SettingsSection', () => {
 			.getByText('Download .magnet files instead of copy')
 			.closest('div')!;
 		const downloadCheckbox = within(downloadContainer).getByRole('checkbox');
-		await waitFor(() => expect(downloadCheckbox).toBeChecked());
+		expect(downloadCheckbox).toBeChecked();
 		await user.click(downloadCheckbox);
 		expect(downloadCheckbox).not.toBeChecked();
 		expect(localStorage.getItem('settings:downloadMagnets')).toBe('false');
 
 		const reportContainer = screen.getByText('Show mass report buttons').closest('div')!;
 		const reportCheckbox = within(reportContainer).getByRole('checkbox');
-		await waitFor(() => expect(reportCheckbox).toBeChecked());
+		expect(reportCheckbox).toBeChecked();
 		await user.click(reportCheckbox);
 		expect(reportCheckbox).not.toBeChecked();
 		expect(localStorage.getItem('settings:showMassReportButtons')).toBe('false');
 
 		const limitContainer = screen.getByText('Availability check limit').closest('div')!;
 		const limitInput = within(limitContainer).getByRole('spinbutton');
-		await waitFor(() => expect(limitInput).toHaveValue(5));
+		expect(limitInput).toHaveValue(5);
 		await user.clear(limitInput);
 		await user.type(limitInput, '10');
 		expect(localStorage.getItem('settings:availabilityCheckLimit')).toBe('10');
@@ -110,37 +110,37 @@ describe('SettingsSection', () => {
 			.getByText('Include tracker stats in availability check')
 			.closest('div')!;
 		const trackerCheckbox = within(trackerContainer).getByRole('checkbox');
-		await waitFor(() => expect(trackerCheckbox).toBeChecked());
+		expect(trackerCheckbox).toBeChecked();
 		await user.click(trackerCheckbox);
 		expect(localStorage.getItem('settings:includeTrackerStats')).toBe('false');
 
 		const torrentioContainer = screen.getByText('Enable Torrentio').closest('div')!;
 		const torrentioCheckbox = within(torrentioContainer).getByRole('checkbox');
-		await waitFor(() => expect(torrentioCheckbox).not.toBeChecked());
+		expect(torrentioCheckbox).not.toBeChecked();
 		await user.click(torrentioCheckbox);
 		expect(localStorage.getItem('settings:enableTorrentio')).toBe('true');
 
 		const cometContainer = screen.getByText('Enable Comet').closest('div')!;
 		const cometCheckbox = within(cometContainer).getByRole('checkbox');
-		await waitFor(() => expect(cometCheckbox).toBeChecked());
+		expect(cometCheckbox).toBeChecked();
 		await user.click(cometCheckbox);
 		expect(localStorage.getItem('settings:enableComet')).toBe('false');
 
 		const mediaFusionContainer = screen.getByText('Enable MediaFusion').closest('div')!;
 		const mediaFusionCheckbox = within(mediaFusionContainer).getByRole('checkbox');
-		await waitFor(() => expect(mediaFusionCheckbox).not.toBeChecked());
+		expect(mediaFusionCheckbox).not.toBeChecked();
 		await user.click(mediaFusionCheckbox);
 		expect(localStorage.getItem('settings:enableMediaFusion')).toBe('true');
 
 		const peerflixContainer = screen.getByText('Enable Peerflix').closest('div')!;
 		const peerflixCheckbox = within(peerflixContainer).getByRole('checkbox');
-		await waitFor(() => expect(peerflixCheckbox).toBeChecked());
+		expect(peerflixCheckbox).toBeChecked();
 		await user.click(peerflixCheckbox);
 		expect(localStorage.getItem('settings:enablePeerflix')).toBe('false');
 
 		const torrentsDbContainer = screen.getByText('Enable TorrentsDB').closest('div')!;
 		const torrentsDbCheckbox = within(torrentsDbContainer).getByRole('checkbox');
-		await waitFor(() => expect(torrentsDbCheckbox).not.toBeChecked());
+		expect(torrentsDbCheckbox).not.toBeChecked();
 		await user.click(torrentsDbCheckbox);
 		expect(localStorage.getItem('settings:enableTorrentsDB')).toBe('true');
 	});

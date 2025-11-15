@@ -31,6 +31,7 @@ import {
 import { extractHashes } from '@/utils/extractHashes';
 import { getRdStatus } from '@/utils/fetchTorrents';
 import { generateHashList } from '@/utils/hashList';
+import { filterLibraryItems } from '@/utils/libraryFilters';
 import { handleSelectTorrent, resetSelection, selectShown } from '@/utils/librarySelection';
 import { handleChangeType } from '@/utils/libraryTypeManagement';
 import { localRestore } from '@/utils/localRestore';
@@ -102,7 +103,6 @@ function TorrentsPage() {
 	// loading states
 	const [rdSyncing, setRdSyncing] = useState(false);
 	const [adSyncing, setAdSyncing] = useState(false);
-	const [filtering, setFiltering] = useState(false);
 	const [grouping, setGrouping] = useState(false);
 
 	// Use cached items directly instead of duplicating state
@@ -134,11 +134,6 @@ function TorrentsPage() {
 			typeof window !== 'undefined' &&
 			window.localStorage.getItem('settings:downloadMagnets') === 'true'
 	);
-
-	// filter counts
-	const [slowCount, setSlowCount] = useState(0);
-	const [inProgressCount, setInProgressCount] = useState(0);
-	const [failedCount, setFailedCount] = useState(0);
 
 	// stats
 	const [totalBytes, setTotalBytes] = useState<number>(0);
@@ -455,86 +450,28 @@ function TorrentsPage() {
 	// filter the list
 	useEffect(() => {
 		if (loading || grouping) return;
-		setFiltering(true);
-		setSlowCount(memoSlowCount);
-		setInProgressCount(memoInProgressCount);
-		setFailedCount(memoFailedCount);
 		if (hasNoQueryParamsBut('page')) {
 			setFilteredList(quickSearchLibrary(query, userTorrentsList));
-			// deleteFailedTorrents(userTorrentsList); // disabled because this is BAD!
-			setFiltering(false);
 			setHelpTextBasedOnTime();
 			return;
 		}
-		let tmpList = userTorrentsList;
-		if (status === 'slow') {
-			tmpList = tmpList.filter(isSlowOrNoLinks);
-			setFilteredList(quickSearchLibrary(query, tmpList));
-			if (helpText !== 'hide')
-				setHelpText(
-					'The displayed torrents are older than one hour and lack any seeders. You can use the "Delete shown" option to remove them.'
-				);
+		const { list: filteredItems, helpText: nextHelpText } = filterLibraryItems({
+			torrents: userTorrentsList,
+			status,
+			titleFilter,
+			tvTitleFilter,
+			hashFilter,
+			mediaType,
+			selectedTorrents,
+			sameTitle,
+			sameHash,
+			uncachedRdHashes,
+			uncachedAdIDs,
+		});
+		setFilteredList(quickSearchLibrary(query, filteredItems));
+		if (nextHelpText && helpText !== 'hide') {
+			setHelpText(nextHelpText);
 		}
-		if (status === 'inprogress') {
-			tmpList = tmpList.filter(isInProgress);
-			setFilteredList(quickSearchLibrary(query, tmpList));
-			if (helpText !== 'hide') setHelpText('Torrents that are still downloading');
-		}
-		if (status === 'failed') {
-			tmpList = tmpList.filter(isFailed);
-			setFilteredList(quickSearchLibrary(query, tmpList));
-			if (helpText !== 'hide') setHelpText('Torrents that have a failure status');
-		}
-		if (status === 'uncached') {
-			tmpList = tmpList.filter(
-				(t) =>
-					(t.status === UserTorrentStatus.finished &&
-						t.id.startsWith('rd:') &&
-						uncachedRdHashes.has(t.hash)) ||
-					(t.id.startsWith('ad:') && uncachedAdIDs.includes(t.id))
-			);
-			setFilteredList(quickSearchLibrary(query, tmpList));
-			if (helpText !== 'hide') setHelpText('Torrents that are no longer cached');
-		}
-		if (status === 'selected') {
-			tmpList = tmpList.filter((t) => selectedTorrents.has(t.id));
-			setFilteredList(quickSearchLibrary(query, tmpList));
-			if (helpText !== 'hide') setHelpText('Torrents that you have selected');
-		}
-		if (titleFilter) {
-			const decoded = decodeURIComponent(titleFilter as string);
-			tmpList = tmpList.filter((t) => normalize(t.title) === decoded);
-			setFilteredList(quickSearchLibrary(query, tmpList));
-		}
-		if (tvTitleFilter) {
-			const decoded = decodeURIComponent(tvTitleFilter as string);
-			tmpList = tmpList.filter(
-				(t) => t.mediaType === 'tv' && t.info?.title && normalize(t.info.title) === decoded
-			);
-			setFilteredList(quickSearchLibrary(query, tmpList));
-		}
-		if (hashFilter) {
-			const hashVal = hashFilter as string;
-			tmpList = tmpList.filter((t) => t.hash === hashVal);
-			setFilteredList(quickSearchLibrary(query, tmpList));
-		}
-		if (status === 'sametitle') {
-			tmpList = tmpList.filter((t) => sameTitle.has(normalize(t.title)));
-			setFilteredList(quickSearchLibrary(query, tmpList));
-		}
-		if (status === 'samehash') {
-			tmpList = tmpList.filter((t) => sameHash.has(t.hash));
-			setFilteredList(quickSearchLibrary(query, tmpList));
-		}
-		if (mediaType) {
-			tmpList = tmpList.filter((t) => mediaType === t.mediaType);
-			setFilteredList(quickSearchLibrary(query, tmpList));
-			if (helpText !== 'hide')
-				setHelpText(
-					`Torrents shown are detected as ${['movies', 'TV shows', 'non-movie/TV content'][['movie', 'tv', 'other'].indexOf(mediaType as string)]}.`
-				);
-		}
-		setFiltering(false);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [router.query, userTorrentsList, loading, grouping, query, currentPage, uncachedRdHashes]);
 
@@ -1648,9 +1585,9 @@ function TorrentsPage() {
 						sameTitleSize={sameTitle.size}
 						selectedTorrentsSize={selectedTorrents.size}
 						uncachedCount={uncachedAdIDs.length + uncachedRdHashes.size}
-						inProgressCount={inProgressCount}
-						slowCount={slowCount}
-						failedCount={failedCount}
+						inProgressCount={memoInProgressCount}
+						slowCount={memoSlowCount}
+						failedCount={memoFailedCount}
 					/>
 					<LibraryActionButtons
 						onSelectShown={() => selectShown(currentPageData, setSelectedTorrents)}
@@ -1681,7 +1618,7 @@ function TorrentsPage() {
 				<div className="flex-1 overflow-hidden">
 					<div className="h-full overflow-y-auto pb-6">
 						<div className="overflow-x-auto">
-							{loading || grouping || filtering ? (
+							{loading || grouping ? (
 								<div className="mt-2 flex items-center justify-center">
 									<div className="h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"></div>
 								</div>

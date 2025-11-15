@@ -1,5 +1,6 @@
 import { AlertTriangle, Check, Link2, Settings } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { getLocalStorageBoolean, getLocalStorageItemOrDefault } from '../utils/browserStorage';
 import {
 	defaultAvailabilityCheckLimit,
 	defaultDownloadMagnets,
@@ -11,65 +12,70 @@ import {
 } from '../utils/settings';
 
 export const SettingsSection = () => {
-	const [isMagnetHandlerEnabled, setIsMagnetHandlerEnabled] = useState(
-		defaultMagnetHandlerEnabled
+	const [isMagnetHandlerEnabled, setIsMagnetHandlerEnabled] = useState(() =>
+		getLocalStorageBoolean('settings:magnetHandlerEnabled', defaultMagnetHandlerEnabled)
 	);
 
-	const [storedPlayer, setStoredPlayer] = useState(defaultPlayer);
-	const [movieMaxSize, setMovieMaxSize] = useState(defaultMovieSize);
-	const [episodeMaxSize, setEpisodeMaxSize] = useState(defaultEpisodeSize);
-	const [onlyTrustedTorrents, setOnlyTrustedTorrents] = useState(false);
-	const [defaultTorrentsFilterValue, setDefaultTorrentsFilterValue] =
-		useState(defaultTorrentsFilter);
-	const [downloadMagnets, setDownloadMagnets] = useState(defaultDownloadMagnets);
-	const [showMassReportButtons, setShowMassReportButtons] = useState(false);
-	const [availabilityCheckLimit, setAvailabilityCheckLimit] = useState(
-		defaultAvailabilityCheckLimit
+	const [storedPlayer, setStoredPlayer] = useState(() =>
+		getLocalStorageItemOrDefault('settings:player', defaultPlayer)
 	);
-	const [includeTrackerStats, setIncludeTrackerStats] = useState(false);
-	const [enableTorrentio, setEnableTorrentio] = useState(true);
-	const [enableComet, setEnableComet] = useState(true);
-	const [enableMediaFusion, setEnableMediaFusion] = useState(true);
-	const [enablePeerflix, setEnablePeerflix] = useState(true);
-	const [enableTorrentsDB, setEnableTorrentsDB] = useState(true);
-	const [enableTorrentioTor, setEnableTorrentioTor] = useState(false);
-	const [enableCometTor, setEnableCometTor] = useState(false);
-	const [enableMediaFusionTor, setEnableMediaFusionTor] = useState(false);
-	const [enablePeerflixTor, setEnablePeerflixTor] = useState(false);
-	const [enableTorrentsDBTor, setEnableTorrentsDBTor] = useState(false);
-
-	useEffect(() => {
-		if (typeof localStorage === 'undefined') return;
-		// Check if protocol handler is registered
-		setIsMagnetHandlerEnabled(localStorage.getItem('settings:magnetHandlerEnabled') === 'true');
-
-		// Load persistent settings
-		setStoredPlayer(localStorage.getItem('settings:player') || defaultPlayer);
-		setMovieMaxSize(localStorage.getItem('settings:movieMaxSize') || defaultMovieSize);
-		setEpisodeMaxSize(localStorage.getItem('settings:episodeMaxSize') || defaultEpisodeSize);
-		setOnlyTrustedTorrents(localStorage.getItem('settings:onlyTrustedTorrents') === 'true');
-		setDefaultTorrentsFilterValue(
-			localStorage.getItem('settings:defaultTorrentsFilter') || defaultTorrentsFilter
-		);
-		setDownloadMagnets(
-			localStorage.getItem('settings:downloadMagnets') === 'true' || defaultDownloadMagnets
-		);
-		setShowMassReportButtons(localStorage.getItem('settings:showMassReportButtons') === 'true');
-		setAvailabilityCheckLimit(
-			localStorage.getItem('settings:availabilityCheckLimit') || defaultAvailabilityCheckLimit
-		);
-		setIncludeTrackerStats(localStorage.getItem('settings:includeTrackerStats') === 'true');
-		setEnableTorrentio(localStorage.getItem('settings:enableTorrentio') !== 'false');
-		setEnableComet(localStorage.getItem('settings:enableComet') !== 'false');
-		setEnableMediaFusion(localStorage.getItem('settings:enableMediaFusion') !== 'false');
-		setEnablePeerflix(localStorage.getItem('settings:enablePeerflix') !== 'false');
-		setEnableTorrentsDB(localStorage.getItem('settings:enableTorrentsDB') !== 'false');
-		setEnableTorrentioTor(localStorage.getItem('settings:enableTorrentioTor') === 'true');
-		setEnableCometTor(localStorage.getItem('settings:enableCometTor') === 'true');
-		setEnableMediaFusionTor(localStorage.getItem('settings:enableMediaFusionTor') === 'true');
-		setEnablePeerflixTor(localStorage.getItem('settings:enablePeerflixTor') === 'true');
-		setEnableTorrentsDBTor(localStorage.getItem('settings:enableTorrentsDBTor') === 'true');
-	}, []);
+	const [movieMaxSize, setMovieMaxSize] = useState(() =>
+		getLocalStorageItemOrDefault('settings:movieMaxSize', defaultMovieSize)
+	);
+	const [episodeMaxSize, setEpisodeMaxSize] = useState(() =>
+		getLocalStorageItemOrDefault('settings:episodeMaxSize', defaultEpisodeSize)
+	);
+	const [onlyTrustedTorrents, setOnlyTrustedTorrents] = useState(() =>
+		getLocalStorageBoolean('settings:onlyTrustedTorrents', false)
+	);
+	const [defaultTorrentsFilterValue, setDefaultTorrentsFilterValue] = useState(() =>
+		getLocalStorageItemOrDefault('settings:defaultTorrentsFilter', defaultTorrentsFilter)
+	);
+	const [downloadMagnets, setDownloadMagnets] = useState(() =>
+		getLocalStorageBoolean('settings:downloadMagnets', defaultDownloadMagnets)
+	);
+	const [showMassReportButtons, setShowMassReportButtons] = useState(() =>
+		getLocalStorageBoolean('settings:showMassReportButtons', false)
+	);
+	const [availabilityCheckLimit, setAvailabilityCheckLimit] = useState(() =>
+		getLocalStorageItemOrDefault(
+			'settings:availabilityCheckLimit',
+			defaultAvailabilityCheckLimit
+		)
+	);
+	const [includeTrackerStats, setIncludeTrackerStats] = useState(() =>
+		getLocalStorageBoolean('settings:includeTrackerStats', false)
+	);
+	const [enableTorrentio, setEnableTorrentio] = useState(() =>
+		getLocalStorageBoolean('settings:enableTorrentio', true)
+	);
+	const [enableComet, setEnableComet] = useState(() =>
+		getLocalStorageBoolean('settings:enableComet', true)
+	);
+	const [enableMediaFusion, setEnableMediaFusion] = useState(() =>
+		getLocalStorageBoolean('settings:enableMediaFusion', true)
+	);
+	const [enablePeerflix, setEnablePeerflix] = useState(() =>
+		getLocalStorageBoolean('settings:enablePeerflix', true)
+	);
+	const [enableTorrentsDB, setEnableTorrentsDB] = useState(() =>
+		getLocalStorageBoolean('settings:enableTorrentsDB', true)
+	);
+	const [enableTorrentioTor, setEnableTorrentioTor] = useState(() =>
+		getLocalStorageBoolean('settings:enableTorrentioTor', false)
+	);
+	const [enableCometTor, setEnableCometTor] = useState(() =>
+		getLocalStorageBoolean('settings:enableCometTor', false)
+	);
+	const [enableMediaFusionTor, setEnableMediaFusionTor] = useState(() =>
+		getLocalStorageBoolean('settings:enableMediaFusionTor', false)
+	);
+	const [enablePeerflixTor, setEnablePeerflixTor] = useState(() =>
+		getLocalStorageBoolean('settings:enablePeerflixTor', false)
+	);
+	const [enableTorrentsDBTor, setEnableTorrentsDBTor] = useState(() =>
+		getLocalStorageBoolean('settings:enableTorrentsDBTor', false)
+	);
 
 	const handlePlayerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
 		const value = e.target.value;
