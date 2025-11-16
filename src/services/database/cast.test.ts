@@ -168,19 +168,10 @@ describe('CastService', () => {
 		});
 	});
 
-	it('combines other casts and available streams sorted by updatedAt', async () => {
+	it('prioritizes Available and only queries casts when Available < limit', async () => {
 		const now = new Date();
 		const oneHourAgo = new Date(now.getTime() - 1000 * 60 * 60);
 		const twoHoursAgo = new Date(now.getTime() - 2000 * 60 * 60);
-
-		prismaMock.cast.findMany.mockResolvedValueOnce([
-			{
-				url: 'https://files.dmm.test/othercast.mkv',
-				link: 'https://app.real-debrid.com/d/otherlink',
-				size: BigInt(2048),
-				updatedAt: twoHoursAgo,
-			},
-		]);
 
 		prismaMock.available.findMany.mockResolvedValueOnce([
 			{
@@ -193,6 +184,15 @@ describe('CastService', () => {
 					},
 				],
 				updatedAt: oneHourAgo,
+			},
+		]);
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([
+			{
+				url: 'https://files.dmm.test/othercast.mkv',
+				link: 'https://app.real-debrid.com/d/otherlink',
+				size: BigInt(2048),
+				updatedAt: twoHoursAgo,
 			},
 		]);
 
@@ -213,10 +213,31 @@ describe('CastService', () => {
 		});
 	});
 
-	it('handles TV show imdbId format in getOtherStreams', async () => {
+	it('only returns Available streams when Available >= limit', async () => {
 		const now = new Date();
 
-		prismaMock.cast.findMany.mockResolvedValueOnce([]);
+		const availableItems = Array.from({ length: 5 }, (_, i) => ({
+			filename: `Available Torrent ${i}`,
+			files: [
+				{
+					link: `https://app.real-debrid.com/d/availlink${i}`,
+					path: `/movies/available${i}.mkv`,
+					bytes: BigInt(3145728000),
+				},
+			],
+			updatedAt: new Date(now.getTime() - i * 1000),
+		}));
+
+		prismaMock.available.findMany.mockResolvedValueOnce(availableItems);
+
+		const otherStreams = await service.getOtherStreams('tt123', 'user1', 5);
+
+		expect(otherStreams).toHaveLength(5);
+		expect(prismaMock.cast.findMany).not.toHaveBeenCalled();
+	});
+
+	it('handles TV show imdbId format in getOtherStreams', async () => {
+		const now = new Date();
 
 		prismaMock.available.findMany.mockResolvedValueOnce([
 			{
@@ -231,6 +252,8 @@ describe('CastService', () => {
 				updatedAt: now,
 			},
 		]);
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([]);
 
 		const otherStreams = await service.getOtherStreams('tt123:1:1', 'user1', 5);
 
@@ -268,8 +291,6 @@ describe('CastService', () => {
 	it('filters out available items without files in getOtherStreams', async () => {
 		const now = new Date();
 
-		prismaMock.cast.findMany.mockResolvedValueOnce([]);
-
 		prismaMock.available.findMany.mockResolvedValueOnce([
 			{
 				filename: 'No Files',
@@ -277,6 +298,8 @@ describe('CastService', () => {
 				updatedAt: now,
 			},
 		]);
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([]);
 
 		const otherStreams = await service.getOtherStreams('tt123', 'user1', 5);
 
@@ -293,8 +316,8 @@ describe('CastService', () => {
 			updatedAt: new Date(now.getTime() - i * 1000),
 		}));
 
-		prismaMock.cast.findMany.mockResolvedValueOnce(castItems);
 		prismaMock.available.findMany.mockResolvedValueOnce([]);
+		prismaMock.cast.findMany.mockResolvedValueOnce(castItems);
 
 		const otherStreams = await service.getOtherStreams('tt123', 'user1', 3);
 

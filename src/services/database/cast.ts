@@ -350,56 +350,70 @@ export class CastService extends DatabaseClient {
 			filename: string;
 		}[]
 	> {
-		const [otherCastItems, availableItems] = await Promise.all([
-			this.prisma.cast.findMany({
-				where: {
-					imdbId: imdbId,
-					link: {
-						not: null,
+		const availableItems = await this.prisma.available.findMany({
+			where: {
+				imdbId: imdbId.split(':')[0],
+				status: 'downloaded',
+			},
+			include: {
+				files: {
+					select: {
+						link: true,
+						path: true,
+						bytes: true,
 					},
-					size: {
-						gt: 10,
+					orderBy: {
+						bytes: 'desc',
 					},
-					userId: {
-						not: userId,
-					},
+					take: 1,
 				},
-				distinct: ['size'],
-				orderBy: {
-					updatedAt: 'desc',
+			},
+			orderBy: {
+				updatedAt: 'desc',
+			},
+			take: limit,
+		});
+
+		const availableResults = availableItems
+			.filter((item) => item.files.length > 0 && item.files[0].link)
+			.map((item) => ({
+				url: item.files[0].link,
+				link: item.files[0].link,
+				size: Number(item.files[0].bytes) / 1024 / 1024,
+				filename: item.files[0].path.split('/').pop() || item.filename,
+				updatedAt: item.updatedAt,
+			}));
+
+		if (availableResults.length >= limit) {
+			return availableResults.slice(0, limit).map(({ updatedAt, ...item }) => item);
+		}
+
+		const remainingLimit = limit - availableResults.length;
+		const otherCastItems = await this.prisma.cast.findMany({
+			where: {
+				imdbId: imdbId,
+				link: {
+					not: null,
 				},
-				select: {
-					url: true,
-					link: true,
-					size: true,
-					updatedAt: true,
+				size: {
+					gt: 10,
 				},
-				take: limit,
-			}),
-			this.prisma.available.findMany({
-				where: {
-					imdbId: imdbId.split(':')[0],
-					status: 'downloaded',
+				userId: {
+					not: userId,
 				},
-				include: {
-					files: {
-						select: {
-							link: true,
-							path: true,
-							bytes: true,
-						},
-						orderBy: {
-							bytes: 'desc',
-						},
-						take: 1,
-					},
-				},
-				orderBy: {
-					updatedAt: 'desc',
-				},
-				take: limit,
-			}),
-		]);
+			},
+			distinct: ['size'],
+			orderBy: {
+				updatedAt: 'desc',
+			},
+			select: {
+				url: true,
+				link: true,
+				size: true,
+				updatedAt: true,
+			},
+			take: remainingLimit,
+		});
 
 		const otherCastResults = otherCastItems
 			.filter(
@@ -414,17 +428,7 @@ export class CastService extends DatabaseClient {
 				updatedAt: item.updatedAt,
 			}));
 
-		const availableResults = availableItems
-			.filter((item) => item.files.length > 0 && item.files[0].link)
-			.map((item) => ({
-				url: item.files[0].link,
-				link: item.files[0].link,
-				size: Number(item.files[0].bytes) / 1024 / 1024,
-				filename: item.files[0].path.split('/').pop() || item.filename,
-				updatedAt: item.updatedAt,
-			}));
-
-		const combined = [...otherCastResults, ...availableResults]
+		const combined = [...availableResults, ...otherCastResults]
 			.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 			.slice(0, limit);
 
