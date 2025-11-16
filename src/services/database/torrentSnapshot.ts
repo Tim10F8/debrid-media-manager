@@ -32,4 +32,26 @@ export class TorrentSnapshotService extends DatabaseClient {
 			orderBy: { addedDate: 'desc' },
 		});
 	}
+
+	public async getSnapshotsByHashes(hashes: string[]) {
+		if (hashes.length === 0) {
+			return [];
+		}
+
+		const snapshots = await this.prisma.torrentSnapshot.findMany({
+			where: {
+				hash: { in: hashes },
+			},
+			orderBy: { addedDate: 'desc' },
+		});
+
+		const snapshotMap = new Map<string, (typeof snapshots)[0]>();
+		for (const snapshot of snapshots) {
+			if (!snapshotMap.has(snapshot.hash)) {
+				snapshotMap.set(snapshot.hash, snapshot);
+			}
+		}
+
+		return Array.from(snapshotMap.values());
+	}
 }

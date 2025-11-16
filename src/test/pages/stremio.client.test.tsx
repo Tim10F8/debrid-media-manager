@@ -37,15 +37,35 @@ import { StremioPage } from '@/pages/stremio';
 describe('StremioPage', () => {
 	beforeEach(() => {
 		castTokenMock.mockReset();
+		localStorage.clear();
 	});
 
-	it('shows a loading state until the cast token is ready', () => {
+	it('shows an error message when user is not logged in with RD', () => {
+		castTokenMock.mockReturnValue(undefined);
+		render(<StremioPage />);
+		expect(screen.getByText(/Real-Debrid Required/i)).toBeInTheDocument();
+		expect(screen.getByText(/You must be logged in with Real-Debrid/i)).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: /Login with Real-Debrid/i })).toHaveAttribute(
+			'href',
+			'/realdebrid/login'
+		);
+	});
+
+	it('shows a loading state until the cast token is ready when user has RD credentials', () => {
+		localStorage.setItem('rd:clientId', 'client123');
+		localStorage.setItem('rd:clientSecret', 'secret123');
+		localStorage.setItem('rd:refreshToken', 'refresh123');
+		localStorage.setItem('rd:accessToken', 'access123');
 		castTokenMock.mockReturnValue(undefined);
 		render(<StremioPage />);
 		expect(screen.getByText(/Debrid Media Manager is loading/i)).toBeInTheDocument();
 	});
 
 	it('renders install links when a cast token is available', () => {
+		localStorage.setItem('rd:clientId', 'client123');
+		localStorage.setItem('rd:clientSecret', 'secret123');
+		localStorage.setItem('rd:refreshToken', 'refresh123');
+		localStorage.setItem('rd:accessToken', 'access123');
 		castTokenMock.mockReturnValue('token123');
 		render(<StremioPage />);
 

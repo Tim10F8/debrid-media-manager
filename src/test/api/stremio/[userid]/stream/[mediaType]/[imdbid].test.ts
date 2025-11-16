@@ -1,3 +1,4 @@
+import { languageEmojis } from '@/components/showInfo/languages';
 import handler from '@/pages/api/stremio/[userid]/stream/[mediaType]/[imdbid]';
 import { repository } from '@/services/repository';
 import { createMockRequest, createMockResponse } from '@/test/utils/api';
@@ -22,6 +23,9 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 		mockRepository.getCastProfile = vi.fn();
 		mockRepository.getCastURLs = vi.fn();
 		mockRepository.getOtherCastURLs = vi.fn();
+		mockRepository.getUserCastStreams = vi.fn();
+		mockRepository.getOtherStreams = vi.fn();
+		mockRepository.getSnapshotsByHashes = vi.fn();
 		mockIsLegacyToken.mockReturnValue(false);
 	});
 
@@ -148,6 +152,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 				link: 'https://app.real-debrid.com/d/abcdefghijklmnopqrstuvwxyz',
 				size: 2048,
 				filename: 'My Show S01E01.mkv',
+				hash: 'abc123',
 			},
 		]);
 		mockRepository.getOtherStreams = vi.fn().mockResolvedValue([
@@ -156,8 +161,10 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 				link: 'https://app.real-debrid.com/d/abcdefghijklmnopqrstuvwxyz123',
 				size: 512,
 				filename: 'Other.mkv',
+				hash: 'def456',
 			},
 		]);
+		mockRepository.getSnapshotsByHashes = vi.fn().mockResolvedValue([]);
 
 		const req = createMockRequest({
 			query: {
@@ -172,10 +179,11 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 
 		expect(res.status).toHaveBeenCalledWith(200);
 		const payload = (res.json as Mock).mock.calls[0][0] as {
-			streams: Array<{ name: string; url?: string; externalUrl?: string }>;
+			streams: Array<{ name: string; title: string; url?: string; externalUrl?: string }>;
 		};
 		expect(payload.streams).toHaveLength(3);
-		expect(payload.streams.some((stream) => stream.name.includes('DMM 🧙‍♂️ Yours'))).toBe(true);
+		const userStream = payload.streams.find((s) => s.title.includes('🎬 DMM Cast (Yours)'));
+		expect(userStream).toBeDefined();
 		expect(mockRepository.getOtherStreams).toHaveBeenCalledWith(
 			'tt7654321:2:3',
 			'user123',
@@ -207,5 +215,236 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 
 		expect(res.status).toHaveBeenCalledWith(500);
 		expect(res.json).toHaveBeenCalledWith({ error: 'Failed to get casted URLs' });
+	});
+
+	it('generates stream names based on resolution, codec and size', async () => {
+		mockRepository.getCastProfile = vi.fn().mockResolvedValue({
+			clientId: 'id',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			movieMaxSize: 10,
+			episodeMaxSize: 3,
+		});
+		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
+			{
+				url: 'https://files.dmm.test/Movie.2024.2160p.mkv',
+				link: 'https://app.real-debrid.com/d/abcdefghijklmnopqrstuvwxyz',
+				size: 20480,
+				filename: 'Movie.2024.2160p.mkv',
+				hash: 'abcdef1234567890abcdef1234567890abcdef12',
+			},
+		]);
+		mockRepository.getOtherStreams = vi.fn().mockResolvedValue([]);
+		mockRepository.getSnapshotsByHashes = vi.fn().mockResolvedValue([
+			{
+				id: 'abcdef1234567890abcdef1234567890abcdef12:2024-01-01',
+				hash: 'abcdef1234567890abcdef1234567890abcdef12',
+				addedDate: new Date('2024-01-01'),
+				payload: {
+					MediaInfo: {
+						streams: [
+							{
+								codec_type: 'video',
+								codec_name: 'hevc',
+								width: 3840,
+								height: 2160,
+							},
+						],
+					},
+				},
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
+		]);
+
+		const req = createMockRequest({
+			query: {
+				userid: 'user123',
+				mediaType: 'movie',
+				imdbid: 'tt123456',
+			},
+		});
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(200);
+		const payload = (res.json as Mock).mock.calls[0][0] as {
+			streams: Array<{ name: string; title: string }>;
+		};
+
+		const stream = payload.streams.find((s) => s.title.includes('Movie.2024.2160p.mkv'));
+		expect(stream).toBeDefined();
+		expect(stream?.name).toBe('4K • HEVC • 20.00 GB');
+	});
+
+	it('enriches streams with metadata from snapshots', async () => {
+		mockRepository.getCastProfile = vi.fn().mockResolvedValue({
+			clientId: 'id',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			movieMaxSize: 10,
+			episodeMaxSize: 3,
+		});
+		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
+			{
+				url: 'https://files.dmm.test/Movie.2024.2160p.mkv',
+				link: 'https://app.real-debrid.com/d/abcdefghijklmnopqrstuvwxyz',
+				size: 20480,
+				filename: 'Movie.2024.2160p.mkv',
+				hash: 'abcdef1234567890abcdef1234567890abcdef12',
+			},
+		]);
+		mockRepository.getOtherStreams = vi.fn().mockResolvedValue([]);
+		mockRepository.getSnapshotsByHashes = vi.fn().mockResolvedValue([
+			{
+				id: 'abcdef1234567890abcdef1234567890abcdef12:2024-01-01',
+				hash: 'abcdef1234567890abcdef1234567890abcdef12',
+				addedDate: new Date('2024-01-01'),
+				payload: {
+					MediaInfo: {
+						streams: [
+							{
+								codec_type: 'video',
+								codec_name: 'hevc',
+								width: 3840,
+								height: 2160,
+								side_data_list: [{ dv_profile: 5 }],
+							},
+							{
+								codec_type: 'audio',
+								codec_name: 'eac3',
+								channels: 6,
+								tags: { language: 'eng' },
+							},
+							{
+								codec_type: 'audio',
+								codec_name: 'aac',
+								channels: 2,
+								tags: { language: 'jpn' },
+							},
+						],
+					},
+				},
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
+		]);
+
+		const req = createMockRequest({
+			query: {
+				userid: 'user123',
+				mediaType: 'movie',
+				imdbid: 'tt123456',
+			},
+		});
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(200);
+		const payload = (res.json as Mock).mock.calls[0][0] as {
+			streams: Array<{ title: string }>;
+		};
+
+		const stream = payload.streams.find((s) => s.title.includes('Movie.2024.2160p.mkv'));
+		expect(stream).toBeDefined();
+		expect(stream?.title).toContain('DD+');
+		expect(stream?.title).toContain(languageEmojis.eng);
+		expect(stream?.title).toContain(languageEmojis.jpn);
+		expect(stream?.title).toContain('🎬 DMM Cast (Yours)');
+	});
+
+	it('handles missing snapshots gracefully', async () => {
+		mockRepository.getCastProfile = vi.fn().mockResolvedValue({
+			clientId: 'id',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			movieMaxSize: 10,
+			episodeMaxSize: 3,
+		});
+		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
+			{
+				url: 'https://files.dmm.test/Movie.mkv',
+				link: 'https://app.real-debrid.com/d/abcdefghijklmnopqrstuvwxyz',
+				size: 2048,
+				filename: 'Movie.mkv',
+				hash: 'unknownhash1234567890unknownhash12345678',
+			},
+		]);
+		mockRepository.getOtherStreams = vi.fn().mockResolvedValue([]);
+		mockRepository.getSnapshotsByHashes = vi.fn().mockResolvedValue([]);
+
+		const req = createMockRequest({
+			query: {
+				userid: 'user123',
+				mediaType: 'movie',
+				imdbid: 'tt123456',
+			},
+		});
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(200);
+		const payload = (res.json as Mock).mock.calls[0][0] as {
+			streams: Array<{ title: string }>;
+		};
+
+		const stream = payload.streams.find((s) => s.title.includes('Movie.mkv'));
+		expect(stream).toBeDefined();
+		expect(stream?.title).toContain('🎬 DMM Cast (Yours)');
+	});
+
+	it('fetches snapshots for unique hashes only', async () => {
+		mockRepository.getCastProfile = vi.fn().mockResolvedValue({
+			clientId: 'id',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			movieMaxSize: 10,
+			episodeMaxSize: 3,
+		});
+		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
+			{
+				url: 'https://files.dmm.test/File1.mkv',
+				link: 'https://app.real-debrid.com/d/link1',
+				size: 1024,
+				filename: 'File1.mkv',
+				hash: 'samehash12345678901234567890samehash1234',
+			},
+			{
+				url: 'https://files.dmm.test/File2.mkv',
+				link: 'https://app.real-debrid.com/d/link2',
+				size: 1024,
+				filename: 'File2.mkv',
+				hash: 'samehash12345678901234567890samehash1234',
+			},
+		]);
+		mockRepository.getOtherStreams = vi.fn().mockResolvedValue([
+			{
+				url: 'https://files.dmm.test/File3.mkv',
+				link: 'https://app.real-debrid.com/d/link3',
+				size: 1024,
+				filename: 'File3.mkv',
+				hash: 'differenthash90123456789differenthash901',
+			},
+		]);
+		mockRepository.getSnapshotsByHashes = vi.fn().mockResolvedValue([]);
+
+		const req = createMockRequest({
+			query: {
+				userid: 'user123',
+				mediaType: 'movie',
+				imdbid: 'tt123456',
+			},
+		});
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(mockRepository.getSnapshotsByHashes).toHaveBeenCalledWith([
+			'samehash12345678901234567890samehash1234',
+			'differenthash90123456789differenthash901',
+		]);
 	});
 });

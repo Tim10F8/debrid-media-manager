@@ -423,6 +423,7 @@ export class CastService extends DatabaseClient {
 			link: string;
 			size: number;
 			filename: string;
+			hash: string;
 		}[]
 	> {
 		const castItems = await this.prisma.cast.findMany({
@@ -443,19 +444,22 @@ export class CastService extends DatabaseClient {
 				url: true,
 				link: true,
 				size: true,
+				hash: true,
 			},
 			take: limit,
 		});
 
 		return castItems
 			.filter(
-				(item): item is { url: string; link: string; size: bigint } => item.link !== null
+				(item): item is { url: string; link: string; size: bigint; hash: string } =>
+					item.link !== null
 			)
 			.map((item) => ({
 				url: item.url,
 				link: item.link,
 				size: Number(item.size),
 				filename: item.url.split('/').pop() || 'Unknown',
+				hash: item.hash,
 			}));
 	}
 
@@ -470,6 +474,7 @@ export class CastService extends DatabaseClient {
 			link: string;
 			size: number;
 			filename: string;
+			hash: string;
 		}[]
 	> {
 		const { baseImdbId, season: seasonFilter, episode: episodeFilter } = parseImdbId(imdbId);
@@ -498,6 +503,7 @@ export class CastService extends DatabaseClient {
 				link: true,
 				path: true,
 				bytes: true,
+				hash: true,
 			},
 			orderBy: {
 				bytes: 'desc',
@@ -512,6 +518,7 @@ export class CastService extends DatabaseClient {
 				link: file.link,
 				size: Number(file.bytes) / 1024 / 1024,
 				filename: file.path.split('/').pop() || file.path,
+				hash: file.hash,
 				source: 'file' as const,
 			}));
 
@@ -529,7 +536,9 @@ export class CastService extends DatabaseClient {
 				...(seasonFilter !== undefined && { season: seasonFilter }),
 				...(episodeFilter !== undefined && { episode: episodeFilter }),
 			},
-			include: {
+			select: {
+				hash: true,
+				filename: true,
 				files: {
 					select: {
 						link: true,
@@ -569,6 +578,7 @@ export class CastService extends DatabaseClient {
 				link: item.files[0].link,
 				size: Number(item.files[0].bytes) / 1024 / 1024,
 				filename: item.files[0].path.split('/').pop() || item.filename,
+				hash: item.hash,
 				source: 'torrent' as const,
 			}));
 
@@ -601,19 +611,22 @@ export class CastService extends DatabaseClient {
 				url: true,
 				link: true,
 				size: true,
+				hash: true,
 			},
 			take: remainingLimit,
 		});
 
 		const castStreams = otherCastItems
 			.filter(
-				(item): item is { url: string; link: string; size: bigint } => item.link !== null
+				(item): item is { url: string; link: string; size: bigint; hash: string } =>
+					item.link !== null
 			)
 			.map((item) => ({
 				url: item.url,
 				link: item.link,
 				size: Number(item.size),
 				filename: item.url.split('/').pop() || 'Unknown',
+				hash: item.hash,
 				source: 'cast' as const,
 			}));
 

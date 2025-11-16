@@ -15,9 +15,43 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useState } from 'react';
 
 export function StremioPage() {
 	const dmmCastToken = useCastToken();
+	const [hasRdCredentials] = useState(() => {
+		if (typeof window !== 'undefined') {
+			const clientId = localStorage.getItem('rd:clientId');
+			const clientSecret = localStorage.getItem('rd:clientSecret');
+			const refreshToken = localStorage.getItem('rd:refreshToken');
+			const accessToken = localStorage.getItem('rd:accessToken');
+			return !!(clientId && clientSecret && refreshToken && accessToken);
+		}
+		return false;
+	});
+
+	if (!hasRdCredentials) {
+		return (
+			<div className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
+				<Head>
+					<title>Debrid Media Manager - Stremio</title>
+				</Head>
+				<div className="max-w-md rounded-lg border-2 border-red-500 bg-red-900/20 p-6 text-center">
+					<AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-400" />
+					<h1 className="mb-3 text-2xl font-bold text-red-400">Real-Debrid Required</h1>
+					<p className="mb-4 text-gray-300">
+						You must be logged in with Real-Debrid to use the Stremio Cast feature.
+					</p>
+					<Link
+						href="/realdebrid/login"
+						className="haptic-sm inline-block rounded border-2 border-purple-500 bg-purple-800/30 px-6 py-2 font-medium text-purple-100 transition-colors hover:bg-purple-700/50"
+					>
+						Login with Real-Debrid
+					</Link>
+				</div>
+			</div>
+		);
+	}
 
 	if (!dmmCastToken) {
 		return (

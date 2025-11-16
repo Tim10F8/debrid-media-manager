@@ -296,6 +296,10 @@ export class Repository {
 		return this.torrentSnapshotService.getLatestSnapshot(hash);
 	}
 
+	public getSnapshotsByHashes(hashes: string[]) {
+		return this.torrentSnapshotService.getSnapshotsByHashes(hashes);
+	}
+
 	// Report Service Methods
 	public reportContent(
 		hash: string,

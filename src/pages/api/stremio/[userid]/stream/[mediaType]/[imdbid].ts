@@ -1,5 +1,10 @@
 import { repository as db } from '@/services/repository';
 import { isLegacyToken } from '@/utils/castApiHelpers';
+import {
+	extractStreamMetadata,
+	formatStremioStreamTitle,
+	generateStreamName,
+} from '@/utils/streamMetadata';
 import { NextApiRequest, NextApiResponse } from 'next';
 
 // lists all available streams for a movie or show
@@ -62,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 	const streams = [
 		{
-			name: '​1:Cast✨',
+			name: 'DMM Cast✨',
 			title: 'Cast a file inside a torrent',
 			externalUrl,
 			behaviorHints: {
@@ -80,23 +85,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			db.getOtherStreams(imdbidStr, userid, 5, maxSize > 0 ? maxSize : undefined),
 		]);
 
+		const allHashes = [
+			...userCastItems.map((item) => item.hash),
+			...otherItems.map((item) => item.hash),
+		];
+		const uniqueHashes = Array.from(new Set(allHashes));
+
+		const snapshots = await db.getSnapshotsByHashes(uniqueHashes);
+		const snapshotMap = new Map(snapshots.map((s) => [s.hash, s]));
+
+		console.log('[Stremio Stream] Metadata enrichment stats:', {
+			totalStreams: userCastItems.length + otherItems.length,
+			uniqueHashes: uniqueHashes.length,
+			snapshotsFound: snapshots.length,
+			hitRate: `${((snapshots.length / uniqueHashes.length) * 100).toFixed(1)}%`,
+		});
+
 		for (const item of userCastItems) {
-			let title = item.filename ?? 'Unknown Title';
-			let sizeStr = '';
-			if (item.size > 1024) {
-				sizeStr = `${(item.size / 1024).toFixed(2)} GB`;
-			} else {
-				sizeStr = `${item.size.toFixed(2)} MB`;
-			}
-			title = decodeURIComponent(title);
-			if (title.length > 30) {
-				const mid = title.length / 2;
-				title = title.substring(0, mid) + '-\n' + title.substring(mid);
-			}
-			title = title + '\n' + `📦 ${sizeStr}`;
+			const snapshot = snapshotMap.get(item.hash);
+			const metadata = snapshot ? extractStreamMetadata(snapshot.payload) : null;
+			const title = formatStremioStreamTitle(
+				item.filename ?? 'Unknown Title',
+				item.size,
+				metadata,
+				true
+			);
+			const name = generateStreamName(item.size, metadata);
 
 			streams.push({
-				name: 'DMM 🧙‍♂️ Yours',
+				name,
 				title,
 				url: item.link
 					? `${process.env.DMM_ORIGIN}/api/stremio/${userid}/play/${item.link.substring(26)}`
@@ -107,26 +124,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			} as any);
 		}
 
-		const icons = ['🦄', '🐈', '🦊', '🐺', '🦁', '🐯', '🐻'];
 		for (let i = 0; i < otherItems.length; i++) {
 			const item = otherItems[i];
-			let title = item.filename ?? 'Unknown Title';
-			let sizeStr = '';
-			if (item.size > 1024) {
-				sizeStr = `${(item.size / 1024).toFixed(2)} GB`;
-			} else {
-				sizeStr = `${item.size.toFixed(2)} MB`;
-			}
-			title = decodeURIComponent(title);
-			if (title.length > 30) {
-				const mid = title.length / 2;
-				title = title.substring(0, mid) + '-\n' + title.substring(mid);
-			}
-			title = title + '\n' + `📦 ${sizeStr}`;
+			const snapshot = snapshotMap.get(item.hash);
+			const metadata = snapshot ? extractStreamMetadata(snapshot.payload) : null;
+			const title = formatStremioStreamTitle(
+				item.filename ?? 'Unknown Title',
+				item.size,
+				metadata,
+				false
+			);
+			const name = generateStreamName(item.size, metadata);
 
-			const icon = icons[i % icons.length];
 			streams.push({
-				name: `DMM ${icon} Other`,
+				name,
 				title,
 				url: item.link
 					? `${process.env.DMM_ORIGIN}/api/stremio/${userid}/play/${item.link.substring(26)}`
