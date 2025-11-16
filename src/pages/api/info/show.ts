@@ -34,6 +34,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 		const [mdbResponse, cinemetaResponse] = await Promise.all([mdbPromise, cinePromise]);
 
+		const isShowType = (response: any): response is MShow => {
+			return 'seasons' in response;
+		};
+
+		console.log(`[show.ts] Processing show ${imdbid}:`, {
+			hasMdbResponse: !!mdbResponse,
+			hasCinemetaResponse: !!cinemetaResponse,
+			mdbSeasons: isShowType(mdbResponse) ? mdbResponse.seasons?.length : 'N/A',
+			cinemetaVideos: cinemetaResponse.meta?.videos?.length,
+		});
+
 		let season_count = 1;
 		let season_names = [];
 		let imdb_score;
@@ -45,10 +56,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		);
 		const cineSeasonCount = uniqueSeasons.length > 0 ? Math.max(...uniqueSeasons) : 1;
 
-		// Check if mdbResponse is MShow type by checking if it has seasons property
-		const isShowType = (response: any): response is MShow => {
-			return 'seasons' in response;
-		};
+		console.log(`[show.ts] Cinemeta data for ${imdbid}:`, {
+			totalVideos: cineSeasons.length,
+			uniqueSeasons,
+			cineSeasonCount,
+		});
 
 		const mdbSeasons = isShowType(mdbResponse)
 			? mdbResponse.seasons.filter((season) => season.season_number > 0)
@@ -60,9 +72,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				: 1;
 		season_names = mdbSeasons.map((season) => season.name);
 
+		console.log(`[show.ts] MDBList data for ${imdbid}:`, {
+			mdbSeasons: mdbSeasons.map((s) => ({ num: s.season_number, name: s.name })),
+			mdbSeasonCount,
+		});
+
 		if (cineSeasonCount > mdbSeasonCount) {
 			season_count = cineSeasonCount;
-			// add remaining to season_names
 			const remaining = Array.from(
 				{ length: cineSeasonCount - mdbSeasonCount },
 				(_, i) => i + 1
@@ -70,8 +86,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			season_names = season_names.concat(
 				remaining.map((i) => `Season ${mdbSeasonCount + i}`)
 			);
+			console.log(
+				`[show.ts] Using cinemeta count (${cineSeasonCount}) over mdb count (${mdbSeasonCount})`
+			);
 		} else {
 			season_count = mdbSeasonCount;
+			console.log(
+				`[show.ts] Using mdb count (${mdbSeasonCount}) over cinemeta count (${cineSeasonCount})`
+			);
 		}
 
 		imdb_score =
@@ -109,7 +131,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			});
 		}
 
-		res.status(200).json({
+		const responseData = {
 			title,
 			description: mdbResponse?.description ?? cinemetaResponse?.meta?.description ?? 'n/a',
 			poster: mdbResponse?.poster ?? cinemetaResponse?.meta?.poster ?? '',
@@ -121,7 +143,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			season_names,
 			imdb_score: imdb_score ?? 0,
 			season_episode_counts,
+		};
+
+		console.log(`[show.ts] Final response for ${imdbid}:`, {
+			season_count: responseData.season_count,
+			season_names: responseData.season_names,
+			season_episode_counts: responseData.season_episode_counts,
 		});
+
+		res.status(200).json(responseData);
 	} catch (error) {
 		if (axios.isAxiosError(error)) {
 			console.error('Error fetching show info:', {

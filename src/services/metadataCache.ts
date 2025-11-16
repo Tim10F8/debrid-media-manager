@@ -13,6 +13,8 @@ export class MetadataCacheService {
 		TRENDING: 3600000, // 1 hour
 		POPULAR: 21600000, // 6 hours
 		TOP_LISTS: 86400000, // 24 hours
+		// TV series metadata can change as new seasons are added
+		TV_SERIES: 604800000, // 7 days
 	};
 
 	/**
@@ -80,7 +82,13 @@ export class MetadataCacheService {
 	async getCinemetaSeries(imdbId: string, config?: AxiosRequestConfig): Promise<any> {
 		const url = `https://v3-cinemeta.strem.io/meta/series/${imdbId}.json`;
 		const cacheKey = `cinemeta_series_${imdbId}`;
-		return this.fetchWithCache(url, cacheKey, 'cinemeta_series', config);
+		return this.fetchWithCache(
+			url,
+			cacheKey,
+			'cinemeta_series',
+			config,
+			this.CACHE_DURATIONS.TV_SERIES
+		);
 	}
 
 	/**

@@ -105,4 +105,98 @@ describe('/api/info/show', () => {
 		expect(res.json).toHaveBeenCalledWith({ error: 'Failed to fetch show information' });
 		consoleSpy.mockRestore();
 	});
+
+	it('uses higher season count from cinemeta when mdb has fewer seasons', async () => {
+		mockMdbClient.getInfoByImdbId.mockResolvedValue({
+			title: 'New Show',
+			description: 'A new show',
+			poster: 'poster.jpg',
+			backdrop: 'backdrop.jpg',
+			ratings: [{ source: 'imdb', score: 7.5 }],
+			seasons: [{ season_number: 1, name: 'Season 1', episode_count: 10 }],
+		});
+		mockMetadataCache.getCinemetaSeries.mockResolvedValue({
+			meta: {
+				name: 'New Show',
+				description: 'A new show',
+				poster: 'poster.jpg',
+				background: 'background.jpg',
+				imdbRating: 7.5,
+				videos: [
+					{ season: 1, episode: 1 },
+					{ season: 1, episode: 2 },
+					{ season: 2, episode: 1 },
+					{ season: 2, episode: 2 },
+				],
+			},
+		});
+
+		const req = createMockRequest({
+			query: { imdbid: 'tt31187479' },
+		});
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(200);
+		expect(res.json).toHaveBeenCalledWith(
+			expect.objectContaining({
+				season_count: 2,
+				season_names: ['Season 1', 'Season 2'],
+				season_episode_counts: {
+					1: 10,
+					2: 2,
+				},
+			})
+		);
+	});
+
+	it('uses higher season count from mdb when cinemeta has fewer seasons', async () => {
+		mockMdbClient.getInfoByImdbId.mockResolvedValue({
+			title: 'Established Show',
+			description: 'An established show',
+			poster: 'poster.jpg',
+			backdrop: 'backdrop.jpg',
+			ratings: [{ source: 'imdb', score: 8.0 }],
+			seasons: [
+				{ season_number: 1, name: 'Season 1', episode_count: 12 },
+				{ season_number: 2, name: 'Season 2', episode_count: 12 },
+				{ season_number: 3, name: 'Season 3', episode_count: 10 },
+			],
+		});
+		mockMetadataCache.getCinemetaSeries.mockResolvedValue({
+			meta: {
+				name: 'Established Show',
+				description: 'An established show',
+				poster: 'poster.jpg',
+				background: 'background.jpg',
+				imdbRating: 8.0,
+				videos: [
+					{ season: 1, episode: 1 },
+					{ season: 1, episode: 2 },
+					{ season: 2, episode: 1 },
+				],
+			},
+		});
+
+		const req = createMockRequest({
+			query: { imdbid: 'tt12345678' },
+		});
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(200);
+		expect(res.json).toHaveBeenCalledWith(
+			expect.objectContaining({
+				season_count: 3,
+				season_names: ['Season 1', 'Season 2', 'Season 3'],
+				season_episode_counts: {
+					1: 12,
+					2: 12,
+					3: 10,
+				},
+			})
+		);
+	});
 });

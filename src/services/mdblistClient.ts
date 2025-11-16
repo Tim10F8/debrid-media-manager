@@ -51,11 +51,21 @@ export class MDBListClient {
 	 * Get info for a movie or show by IMDB ID
 	 */
 	async getInfoByImdbId(imdbId: string): Promise<MMovie | MShow> {
-		// Check cache first
-		const cached = await this.cache.get(imdbId);
+		const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+
+		const cached = await this.cache.getWithMetadata(imdbId);
 		if (cached) {
-			console.log(`[MDBList] Using cached data for IMDB ID: ${imdbId}`);
-			return cached;
+			const isShow = cached.data.type === 'show';
+			const cacheAge = Date.now() - cached.updatedAt.getTime();
+
+			if (!isShow || cacheAge < SEVEN_DAYS) {
+				console.log(`[MDBList] Using cached data for IMDB ID: ${imdbId}`);
+				return cached.data;
+			}
+
+			console.log(
+				`[MDBList] Cache expired for show ${imdbId} (age: ${Math.floor(cacheAge / 86400000)} days), refetching`
+			);
 		}
 
 		const url = new URL(this.baseUrl);
@@ -64,7 +74,6 @@ export class MDBListClient {
 
 		const response = (await axios.get(url.toString())).data;
 
-		// Determine type and cache accordingly
 		const type = response.type === 'movie' ? 'movie' : 'show';
 		await this.cache.set(imdbId, type, response);
 		console.log(`[MDBList] Cached ${type} data for IMDB ID: ${imdbId}`);
