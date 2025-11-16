@@ -83,18 +83,49 @@ export const SettingsSection = () => {
 		if (typeof localStorage !== 'undefined') localStorage.setItem('settings:player', value);
 	};
 
+	const updateCastSizeLimits = async (movieSize?: string, episodeSize?: string) => {
+		if (typeof localStorage === 'undefined') return;
+
+		const castToken = localStorage.getItem('rd:castToken');
+		const clientId = localStorage.getItem('rd:clientId');
+		const clientSecret = localStorage.getItem('rd:clientSecret');
+		const refreshToken = localStorage.getItem('rd:refreshToken');
+
+		if (!castToken || !clientId || !clientSecret) return;
+
+		try {
+			await fetch('/api/stremio/cast/updateSizeLimits', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					clientId,
+					clientSecret,
+					refreshToken,
+					movieMaxSize: movieSize !== undefined ? Number(movieSize) : undefined,
+					episodeMaxSize: episodeSize !== undefined ? Number(episodeSize) : undefined,
+				}),
+			});
+		} catch (error) {
+			console.error('Failed to update size limits on server:', error);
+		}
+	};
+
 	const handleMovieSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
 		const value = e.target.value;
 		setMovieMaxSize(value);
-		if (typeof localStorage !== 'undefined')
+		if (typeof localStorage !== 'undefined') {
 			localStorage.setItem('settings:movieMaxSize', value);
+			updateCastSizeLimits(value, undefined);
+		}
 	};
 
 	const handleEpisodeSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
 		const value = e.target.value;
 		setEpisodeMaxSize(value);
-		if (typeof localStorage !== 'undefined')
+		if (typeof localStorage !== 'undefined') {
 			localStorage.setItem('settings:episodeMaxSize', value);
+			updateCastSizeLimits(undefined, value);
+		}
 	};
 
 	const handleTorrentsFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -319,6 +350,10 @@ export const SettingsSection = () => {
 										<option value="5">5 GB (~35 Mbps)</option>
 										<option value="0">Biggest available</option>
 									</select>
+									<p className="mt-1 text-xs text-gray-400">
+										💡 These size limits also apply to the Stremio Cast addon
+										stream selection
+									</p>
 								</div>
 							</div>
 						</div>

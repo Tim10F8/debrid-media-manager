@@ -139,6 +139,8 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			clientId: 'id',
 			clientSecret: 'secret',
 			refreshToken: 'refresh',
+			movieMaxSize: 10,
+			episodeMaxSize: 3,
 		});
 		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
 			{
@@ -174,6 +176,12 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 		};
 		expect(payload.streams).toHaveLength(3);
 		expect(payload.streams.some((stream) => stream.name.includes('DMM 🧙‍♂️ Yours'))).toBe(true);
+		expect(mockRepository.getOtherStreams).toHaveBeenCalledWith(
+			'tt7654321:2:3',
+			'user123',
+			5,
+			3
+		);
 	});
 
 	it('returns 500 when cast URLs retrieval fails', async () => {
@@ -181,6 +189,8 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			clientId: 'id',
 			clientSecret: 'secret',
 			refreshToken: 'refresh',
+			movieMaxSize: 10,
+			episodeMaxSize: 3,
 		});
 		mockRepository.getUserCastStreams = vi.fn().mockRejectedValue(new Error('db'));
 

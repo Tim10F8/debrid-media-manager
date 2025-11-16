@@ -10,7 +10,9 @@ export class CastService extends DatabaseClient {
 		userId: string,
 		clientId: string,
 		clientSecret: string,
-		refreshToken: string | null = null
+		refreshToken: string | null = null,
+		movieMaxSize?: number,
+		episodeMaxSize?: number
 	) {
 		return this.prisma.castProfile.upsert({
 			where: {
@@ -20,6 +22,8 @@ export class CastService extends DatabaseClient {
 				clientId,
 				clientSecret,
 				refreshToken: refreshToken ?? undefined,
+				...(movieMaxSize !== undefined && { movieMaxSize }),
+				...(episodeMaxSize !== undefined && { episodeMaxSize }),
 				updatedAt: new Date(),
 			},
 			create: {
@@ -27,6 +31,8 @@ export class CastService extends DatabaseClient {
 				clientId,
 				clientSecret,
 				refreshToken: refreshToken ?? '',
+				movieMaxSize: movieMaxSize ?? 0,
+				episodeMaxSize: episodeMaxSize ?? 0,
 				updatedAt: new Date(),
 			},
 		});
@@ -125,6 +131,8 @@ export class CastService extends DatabaseClient {
 		clientId: string;
 		clientSecret: string;
 		refreshToken: string;
+		movieMaxSize: number;
+		episodeMaxSize: number;
 	} | null> {
 		const profile = await this.prisma.castProfile.findUnique({
 			where: { userId },
@@ -132,6 +140,8 @@ export class CastService extends DatabaseClient {
 				clientId: true,
 				clientSecret: true,
 				refreshToken: true,
+				movieMaxSize: true,
+				episodeMaxSize: true,
 			},
 		});
 		return profile;
@@ -341,7 +351,8 @@ export class CastService extends DatabaseClient {
 	public async getOtherStreams(
 		imdbId: string,
 		userId: string,
-		limit: number = 5
+		limit: number = 5,
+		maxSize?: number
 	): Promise<
 		{
 			url: string;
@@ -350,10 +361,20 @@ export class CastService extends DatabaseClient {
 			filename: string;
 		}[]
 	> {
+		const hasMaxSize = typeof maxSize === 'number' && maxSize > 0;
+		const normalizedMaxSizeMb = hasMaxSize ? Math.round(maxSize * 1024) : undefined;
+		const maxSizeBytes =
+			normalizedMaxSizeMb !== undefined
+				? BigInt(normalizedMaxSizeMb) * BigInt(1024 * 1024)
+				: undefined;
+		const maxSizeCastLimit =
+			normalizedMaxSizeMb !== undefined ? BigInt(normalizedMaxSizeMb) : undefined;
+
 		const availableItems = await this.prisma.available.findMany({
 			where: {
 				imdbId: imdbId.split(':')[0],
 				status: 'downloaded',
+				...(maxSizeBytes !== undefined && { bytes: { lte: maxSizeBytes } }),
 			},
 			include: {
 				files: {
@@ -369,7 +390,7 @@ export class CastService extends DatabaseClient {
 				},
 			},
 			orderBy: {
-				updatedAt: 'desc',
+				bytes: 'desc',
 			},
 			take: limit,
 		});
@@ -381,11 +402,10 @@ export class CastService extends DatabaseClient {
 				link: item.files[0].link,
 				size: Number(item.files[0].bytes) / 1024 / 1024,
 				filename: item.files[0].path.split('/').pop() || item.filename,
-				updatedAt: item.updatedAt,
 			}));
 
 		if (availableResults.length >= limit) {
-			return availableResults.slice(0, limit).map(({ updatedAt, ...item }) => item);
+			return availableResults.slice(0, limit);
 		}
 
 		const remainingLimit = limit - availableResults.length;
@@ -397,6 +417,7 @@ export class CastService extends DatabaseClient {
 				},
 				size: {
 					gt: 10,
+					...(maxSizeCastLimit !== undefined && { lte: maxSizeCastLimit }),
 				},
 				userId: {
 					not: userId,
@@ -404,34 +425,31 @@ export class CastService extends DatabaseClient {
 			},
 			distinct: ['size'],
 			orderBy: {
-				updatedAt: 'desc',
+				size: 'desc',
 			},
 			select: {
 				url: true,
 				link: true,
 				size: true,
-				updatedAt: true,
 			},
 			take: remainingLimit,
 		});
 
 		const otherCastResults = otherCastItems
 			.filter(
-				(item): item is { url: string; link: string; size: bigint; updatedAt: Date } =>
-					item.link !== null
+				(item): item is { url: string; link: string; size: bigint } => item.link !== null
 			)
 			.map((item) => ({
 				url: item.url,
 				link: item.link,
 				size: Number(item.size),
 				filename: item.url.split('/').pop() || 'Unknown',
-				updatedAt: item.updatedAt,
 			}));
 
 		const combined = [...availableResults, ...otherCastResults]
-			.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+			.sort((a, b) => b.size - a.size)
 			.slice(0, limit);
 
-		return combined.map(({ updatedAt, ...item }) => item);
+		return combined;
 	}
 }

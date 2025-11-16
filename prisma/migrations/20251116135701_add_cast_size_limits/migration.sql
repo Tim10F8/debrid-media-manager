@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE `CastProfile` ADD COLUMN `movieMaxSize` DOUBLE NOT NULL DEFAULT 0,
+    ADD COLUMN `episodeMaxSize` DOUBLE NOT NULL DEFAULT 0;

@@ -42,6 +42,24 @@ describe('CastService', () => {
 		});
 	});
 
+	it('upserts cast profiles with size limits', async () => {
+		await service.saveCastProfile('user', 'client', 'secret', 'refresh', 15, 3);
+		expect(prismaMock.castProfile.upsert).toHaveBeenCalledWith({
+			where: { userId: 'user' },
+			update: expect.objectContaining({
+				clientId: 'client',
+				clientSecret: 'secret',
+				movieMaxSize: 15,
+				episodeMaxSize: 3,
+			}),
+			create: expect.objectContaining({
+				refreshToken: 'refresh',
+				movieMaxSize: 15,
+				episodeMaxSize: 3,
+			}),
+		});
+	});
+
 	it('returns the latest cast entry when both url and link exist', async () => {
 		prismaMock.cast.findFirst.mockResolvedValueOnce({
 			url: 'url',
@@ -169,10 +187,6 @@ describe('CastService', () => {
 	});
 
 	it('prioritizes Available and only queries casts when Available < limit', async () => {
-		const now = new Date();
-		const oneHourAgo = new Date(now.getTime() - 1000 * 60 * 60);
-		const twoHoursAgo = new Date(now.getTime() - 2000 * 60 * 60);
-
 		prismaMock.available.findMany.mockResolvedValueOnce([
 			{
 				filename: 'Available Torrent',
@@ -183,7 +197,6 @@ describe('CastService', () => {
 						bytes: BigInt(3145728000),
 					},
 				],
-				updatedAt: oneHourAgo,
 			},
 		]);
 
@@ -192,7 +205,6 @@ describe('CastService', () => {
 				url: 'https://files.dmm.test/othercast.mkv',
 				link: 'https://app.real-debrid.com/d/otherlink',
 				size: BigInt(2048),
-				updatedAt: twoHoursAgo,
 			},
 		]);
 
@@ -214,8 +226,6 @@ describe('CastService', () => {
 	});
 
 	it('only returns Available streams when Available >= limit', async () => {
-		const now = new Date();
-
 		const availableItems = Array.from({ length: 5 }, (_, i) => ({
 			filename: `Available Torrent ${i}`,
 			files: [
@@ -225,7 +235,6 @@ describe('CastService', () => {
 					bytes: BigInt(3145728000),
 				},
 			],
-			updatedAt: new Date(now.getTime() - i * 1000),
 		}));
 
 		prismaMock.available.findMany.mockResolvedValueOnce(availableItems);
@@ -237,8 +246,6 @@ describe('CastService', () => {
 	});
 
 	it('handles TV show imdbId format in getOtherStreams', async () => {
-		const now = new Date();
-
 		prismaMock.available.findMany.mockResolvedValueOnce([
 			{
 				filename: 'Show Season Pack',
@@ -249,7 +256,6 @@ describe('CastService', () => {
 						bytes: BigInt(1073741824),
 					},
 				],
-				updatedAt: now,
 			},
 		]);
 
@@ -267,8 +273,6 @@ describe('CastService', () => {
 	});
 
 	it('filters out items without links in getUserCastStreams', async () => {
-		const now = new Date();
-
 		prismaMock.cast.findMany.mockResolvedValueOnce([
 			{
 				url: 'https://files.dmm.test/withlink.mkv',
@@ -289,13 +293,10 @@ describe('CastService', () => {
 	});
 
 	it('filters out available items without files in getOtherStreams', async () => {
-		const now = new Date();
-
 		prismaMock.available.findMany.mockResolvedValueOnce([
 			{
 				filename: 'No Files',
 				files: [],
-				updatedAt: now,
 			},
 		]);
 
@@ -307,13 +308,10 @@ describe('CastService', () => {
 	});
 
 	it('respects the limit parameter in getOtherStreams', async () => {
-		const now = new Date();
-
 		const castItems = Array.from({ length: 10 }, (_, i) => ({
 			url: `https://files.dmm.test/cast${i}.mkv`,
 			link: `https://app.real-debrid.com/d/link${i}`,
 			size: BigInt(1024),
-			updatedAt: new Date(now.getTime() - i * 1000),
 		}));
 
 		prismaMock.available.findMany.mockResolvedValueOnce([]);
@@ -322,5 +320,105 @@ describe('CastService', () => {
 		const otherStreams = await service.getOtherStreams('tt123', 'user1', 3);
 
 		expect(otherStreams.length).toBeLessThanOrEqual(3);
+	});
+
+	it('sorts streams by size descending', async () => {
+		prismaMock.available.findMany.mockResolvedValueOnce([
+			{
+				filename: 'Small Available',
+				files: [
+					{
+						link: 'https://app.real-debrid.com/d/smalllink',
+						path: '/small.mkv',
+						bytes: BigInt(1073741824), // 1 GB
+					},
+				],
+			},
+		]);
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([
+			{
+				url: 'https://files.dmm.test/large.mkv',
+				link: 'https://app.real-debrid.com/d/largelink',
+				size: BigInt(3000), // 3 GB in MB
+			},
+		]);
+
+		const otherStreams = await service.getOtherStreams('tt123', 'user1', 5);
+
+		expect(otherStreams).toHaveLength(2);
+		expect(otherStreams[0].size).toBe(3000);
+		expect(otherStreams[0].filename).toBe('large.mkv');
+		expect(otherStreams[1].size).toBeCloseTo(1024, 0);
+		expect(otherStreams[1].filename).toBe('small.mkv');
+	});
+
+	it('filters streams by maxSize in getOtherStreams', async () => {
+		prismaMock.available.findMany.mockResolvedValueOnce([
+			{
+				filename: 'Small Available',
+				files: [
+					{
+						link: 'https://app.real-debrid.com/d/smalllink',
+						path: '/small.mkv',
+						bytes: BigInt(1073741824), // 1 GB
+					},
+				],
+			},
+		]);
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([]);
+
+		const maxSizeGb = 3;
+		const expectedMb = Math.round(maxSizeGb * 1024);
+		const expectedBytes = BigInt(expectedMb) * BigInt(1024 * 1024);
+
+		const otherStreams = await service.getOtherStreams('tt123', 'user1', 5, maxSizeGb);
+
+		expect(prismaMock.available.findMany).toHaveBeenCalledWith(
+			expect.objectContaining({
+				where: expect.objectContaining({
+					bytes: { lte: expectedBytes },
+				}),
+			})
+		);
+		expect(prismaMock.cast.findMany).toHaveBeenCalledWith(
+			expect.objectContaining({
+				where: expect.objectContaining({
+					size: expect.objectContaining({
+						lte: BigInt(expectedMb),
+					}),
+				}),
+			})
+		);
+		expect(otherStreams).toHaveLength(1);
+	});
+
+	it('skips size filter when maxSize is 0 or undefined', async () => {
+		prismaMock.available.findMany.mockResolvedValueOnce([
+			{
+				filename: 'Large Available',
+				files: [
+					{
+						link: 'https://app.real-debrid.com/d/largelink',
+						path: '/large.mkv',
+						bytes: BigInt(10737418240), // 10 GB
+					},
+				],
+			},
+		]);
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([]);
+
+		const otherStreams = await service.getOtherStreams('tt123', 'user1', 5, 0);
+
+		expect(prismaMock.available.findMany).toHaveBeenCalledWith(
+			expect.not.objectContaining({
+				where: expect.objectContaining({
+					bytes: expect.anything(),
+				}),
+			})
+		);
+		expect(otherStreams).toHaveLength(1);
 	});
 });

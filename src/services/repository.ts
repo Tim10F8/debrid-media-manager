@@ -203,9 +203,18 @@ export class Repository {
 		userId: string,
 		clientId: string,
 		clientSecret: string,
-		refreshToken?: string | null
+		refreshToken?: string | null,
+		movieMaxSize?: number,
+		episodeMaxSize?: number
 	) {
-		return this.castService.saveCastProfile(userId, clientId, clientSecret, refreshToken);
+		return this.castService.saveCastProfile(
+			userId,
+			clientId,
+			clientSecret,
+			refreshToken,
+			movieMaxSize,
+			episodeMaxSize
+		);
 	}
 
 	public getLatestCast(imdbId: string, userId: string) {
@@ -259,8 +268,8 @@ export class Repository {
 		return this.castService.getUserCastStreams(imdbId, userId, limit);
 	}
 
-	public getOtherStreams(imdbId: string, userId: string, limit?: number) {
-		return this.castService.getOtherStreams(imdbId, userId, limit);
+	public getOtherStreams(imdbId: string, userId: string, limit?: number, maxSize?: number) {
+		return this.castService.getOtherStreams(imdbId, userId, limit, maxSize);
 	}
 
 	// Torrent Snapshot Methods

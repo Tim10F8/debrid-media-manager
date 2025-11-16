@@ -109,6 +109,18 @@ export function StremioPage() {
 						</span>
 					</div>
 				</div>
+
+				<div className="mt-6 rounded-lg border border-blue-500/30 bg-blue-900/20 p-4 text-sm text-gray-300">
+					<p className="mb-2 font-semibold text-blue-400">💡 Tip:</p>
+					<p>
+						You can control the maximum file size for streams in the{' '}
+						<Link href="/settings" className="text-blue-400 hover:underline">
+							Settings page
+						</Link>
+						. Your movie and episode size limits will automatically apply to the Stremio
+						Cast addon stream selection.
+					</p>
+				</div>
 			</div>
 
 			<div className="mt-6 flex gap-4">

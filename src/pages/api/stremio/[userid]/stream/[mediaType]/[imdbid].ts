@@ -36,8 +36,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return;
 	}
 
+	let profile;
 	try {
-		const profile = await db.getCastProfile(userid);
+		profile = await db.getCastProfile(userid);
 		if (!profile) {
 			throw new Error(`no profile found for user ${userid}`);
 		}
@@ -71,10 +72,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	];
 
 	try {
+		const maxSize = typeSlug === 'movie' ? profile.movieMaxSize : profile.episodeMaxSize;
+
 		// get urls from db
 		const [userCastItems, otherItems] = await Promise.all([
 			db.getUserCastStreams(imdbidStr, userid, 5),
-			db.getOtherStreams(imdbidStr, userid, 5),
+			db.getOtherStreams(imdbidStr, userid, 5, maxSize > 0 ? maxSize : undefined),
 		]);
 
 		for (const item of userCastItems) {
