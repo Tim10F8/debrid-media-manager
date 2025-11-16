@@ -1,5 +1,4 @@
 import handler from '@/pages/api/stremio/[userid]/stream/[mediaType]/[imdbid]';
-import { getToken } from '@/services/realDebrid';
 import { repository } from '@/services/repository';
 import { createMockRequest, createMockResponse } from '@/test/utils/api';
 import { isLegacyToken } from '@/utils/castApiHelpers';
@@ -7,15 +6,11 @@ import type { Mock } from 'vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/services/repository');
-vi.mock('@/services/realDebrid', () => ({
-	getToken: vi.fn(),
-}));
 vi.mock('@/utils/castApiHelpers', () => ({
 	isLegacyToken: vi.fn(),
 }));
 
 const mockRepository = vi.mocked(repository);
-const mockGetToken = vi.mocked(getToken);
 const mockIsLegacyToken = vi.mocked(isLegacyToken);
 
 describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
@@ -66,18 +61,6 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			{
 				name: 'missing profile',
 				setup: () => mockRepository.getCastProfile.mockResolvedValue(null),
-				query: { userid: 'user', mediaType: 'movie', imdbid: 'tt123' },
-			},
-			{
-				name: 'token error',
-				setup: () => {
-					mockRepository.getCastProfile.mockResolvedValue({
-						clientId: 'id',
-						clientSecret: 'secret',
-						refreshToken: 'refresh',
-					});
-					mockGetToken.mockRejectedValue(new Error('rd down'));
-				},
 				query: { userid: 'user', mediaType: 'movie', imdbid: 'tt123' },
 			},
 		];
@@ -151,46 +134,26 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 		});
 	});
 
-	it('returns 500 when token acquisition fails', async () => {
-		mockRepository.getCastProfile = vi.fn().mockResolvedValue({
-			clientId: 'id',
-			clientSecret: 'secret',
-			refreshToken: 'refresh',
-		});
-		mockGetToken.mockRejectedValue(new Error('rd down'));
-
-		const req = createMockRequest({
-			query: { userid: 'user123', mediaType: 'movie', imdbid: 'tt123' },
-		});
-		const res = createMockResponse();
-
-		await handler(req, res);
-
-		expect(res.status).toHaveBeenCalledWith(500);
-		expect(res.json).toHaveBeenCalledWith({
-			error: 'Failed to get Real-Debrid token for user user123',
-		});
-	});
-
 	it('serves cast streams for shows', async () => {
 		mockRepository.getCastProfile = vi.fn().mockResolvedValue({
 			clientId: 'id',
 			clientSecret: 'secret',
 			refreshToken: 'refresh',
 		});
-		mockGetToken.mockResolvedValue({ access_token: 'token' } as any);
-		mockRepository.getCastURLs = vi.fn().mockResolvedValue([
+		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
 			{
 				url: 'https://files.dmm.test/My%20Show%20S01E01.mkv',
-				size: 2048,
 				link: 'https://app.real-debrid.com/d/abcdefghijklmnopqrstuvwxyz',
+				size: 2048,
+				filename: 'My Show S01E01.mkv',
 			},
 		]);
-		mockRepository.getOtherCastURLs = vi.fn().mockResolvedValue([
+		mockRepository.getOtherStreams = vi.fn().mockResolvedValue([
 			{
 				url: 'https://files.dmm.test/Other.mkv',
-				size: 512,
 				link: 'https://app.real-debrid.com/d/abcdefghijklmnopqrstuvwxyz123',
+				size: 512,
+				filename: 'Other.mkv',
 			},
 		]);
 
@@ -209,7 +172,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 		const payload = (res.json as Mock).mock.calls[0][0] as {
 			streams: Array<{ name: string; url?: string; externalUrl?: string }>;
 		};
-		expect(payload.streams).toHaveLength(4);
+		expect(payload.streams).toHaveLength(3);
 		expect(payload.streams.some((stream) => stream.name.includes('DMM 🧙‍♂️ Yours'))).toBe(true);
 	});
 
@@ -219,8 +182,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			clientSecret: 'secret',
 			refreshToken: 'refresh',
 		});
-		mockGetToken.mockResolvedValue({ access_token: 'token' } as any);
-		mockRepository.getCastURLs = vi.fn().mockRejectedValue(new Error('db'));
+		mockRepository.getUserCastStreams = vi.fn().mockRejectedValue(new Error('db'));
 
 		const req = createMockRequest({
 			query: {

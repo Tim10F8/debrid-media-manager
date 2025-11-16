@@ -291,4 +291,143 @@ export class CastService extends DatabaseClient {
 			size: Number(cast.size),
 		}));
 	}
+
+	public async getUserCastStreams(
+		imdbId: string,
+		userId: string,
+		limit: number = 5
+	): Promise<
+		{
+			url: string;
+			link: string;
+			size: number;
+			filename: string;
+		}[]
+	> {
+		const castItems = await this.prisma.cast.findMany({
+			where: {
+				imdbId: imdbId,
+				userId: userId,
+				link: {
+					not: null,
+				},
+				updatedAt: {
+					gt: new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000),
+				},
+			},
+			orderBy: {
+				updatedAt: 'desc',
+			},
+			select: {
+				url: true,
+				link: true,
+				size: true,
+			},
+			take: limit,
+		});
+
+		return castItems
+			.filter(
+				(item): item is { url: string; link: string; size: bigint } => item.link !== null
+			)
+			.map((item) => ({
+				url: item.url,
+				link: item.link,
+				size: Number(item.size),
+				filename: item.url.split('/').pop() || 'Unknown',
+			}));
+	}
+
+	public async getOtherStreams(
+		imdbId: string,
+		userId: string,
+		limit: number = 5
+	): Promise<
+		{
+			url: string;
+			link: string;
+			size: number;
+			filename: string;
+		}[]
+	> {
+		const [otherCastItems, availableItems] = await Promise.all([
+			this.prisma.cast.findMany({
+				where: {
+					imdbId: imdbId,
+					link: {
+						not: null,
+					},
+					size: {
+						gt: 10,
+					},
+					userId: {
+						not: userId,
+					},
+				},
+				distinct: ['size'],
+				orderBy: {
+					updatedAt: 'desc',
+				},
+				select: {
+					url: true,
+					link: true,
+					size: true,
+					updatedAt: true,
+				},
+				take: limit,
+			}),
+			this.prisma.available.findMany({
+				where: {
+					imdbId: imdbId.split(':')[0],
+					status: 'downloaded',
+				},
+				include: {
+					files: {
+						select: {
+							link: true,
+							path: true,
+							bytes: true,
+						},
+						orderBy: {
+							bytes: 'desc',
+						},
+						take: 1,
+					},
+				},
+				orderBy: {
+					updatedAt: 'desc',
+				},
+				take: limit,
+			}),
+		]);
+
+		const otherCastResults = otherCastItems
+			.filter(
+				(item): item is { url: string; link: string; size: bigint; updatedAt: Date } =>
+					item.link !== null
+			)
+			.map((item) => ({
+				url: item.url,
+				link: item.link,
+				size: Number(item.size),
+				filename: item.url.split('/').pop() || 'Unknown',
+				updatedAt: item.updatedAt,
+			}));
+
+		const availableResults = availableItems
+			.filter((item) => item.files.length > 0 && item.files[0].link)
+			.map((item) => ({
+				url: item.files[0].link,
+				link: item.files[0].link,
+				size: Number(item.files[0].bytes) / 1024 / 1024,
+				filename: item.files[0].path.split('/').pop() || item.filename,
+				updatedAt: item.updatedAt,
+			}));
+
+		const combined = [...otherCastResults, ...availableResults]
+			.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+			.slice(0, limit);
+
+		return combined.map(({ updatedAt, ...item }) => item);
+	}
 }

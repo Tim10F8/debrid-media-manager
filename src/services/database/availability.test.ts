@@ -5,6 +5,7 @@ const findFirstMock = vi.fn();
 const upsertMock = vi.fn();
 const findManyMock = vi.fn();
 const deleteMock = vi.fn();
+const findUniqueMock = vi.fn();
 
 vi.mock('@prisma/client', () => ({
 	PrismaClient: vi.fn().mockImplementation(() => ({
@@ -13,6 +14,9 @@ vi.mock('@prisma/client', () => ({
 			upsert: upsertMock,
 			findMany: findManyMock,
 			delete: deleteMock,
+		},
+		availableFile: {
+			findUnique: findUniqueMock,
 		},
 		$disconnect: vi.fn(),
 	})),
@@ -26,6 +30,7 @@ describe('AvailabilityService', () => {
 		upsertMock.mockReset();
 		findManyMock.mockReset();
 		deleteMock.mockReset();
+		findUniqueMock.mockReset();
 		service = new AvailabilityService();
 	});
 
@@ -108,5 +113,21 @@ describe('AvailabilityService', () => {
 	it('removes availability entries', async () => {
 		await service.removeAvailability('hash');
 		expect(deleteMock).toHaveBeenCalledWith({ where: { hash: 'hash' } });
+	});
+
+	it('retrieves hash by RD link', async () => {
+		findUniqueMock.mockResolvedValue({ hash: 'abc123hash' });
+		const hash = await service.getHashByLink('https://real-debrid.com/d/abcdef123456');
+		expect(hash).toBe('abc123hash');
+		expect(findUniqueMock).toHaveBeenCalledWith({
+			where: { link: 'https://real-debrid.com/d/abcdef123456' },
+			select: { hash: true },
+		});
+	});
+
+	it('returns null when link is not found', async () => {
+		findUniqueMock.mockResolvedValue(null);
+		const hash = await service.getHashByLink('https://real-debrid.com/d/nonexistent');
+		expect(hash).toBeNull();
 	});
 });

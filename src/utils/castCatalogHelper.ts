@@ -71,7 +71,7 @@ export async function getDMMTorrent(userid: string, torrentID: string, token: st
 		title: `${file.path.split('/').pop()} - ${(file.bytes / 1024 / 1024 / 1024).toFixed(2)} GB`,
 		streams: [
 			{
-				url: `${process.env.DMM_ORIGIN}/api/stremio/${userid}/play/${info.links[idx].substring(26)}?token=${token}`,
+				url: `${process.env.DMM_ORIGIN}/api/stremio/${userid}/play/${info.links[idx].substring(26)}`,
 				behaviorHints: {
 					bingeGroup: `dmm:${torrentID}`,
 				},

@@ -229,4 +229,12 @@ export class AvailabilityService extends DatabaseClient {
 			where: { hash },
 		});
 	}
+
+	public async getHashByLink(link: string): Promise<string | null> {
+		const file = await this.prisma.availableFile.findUnique({
+			where: { link },
+			select: { hash: true },
+		});
+		return file?.hash || null;
+	}
 }

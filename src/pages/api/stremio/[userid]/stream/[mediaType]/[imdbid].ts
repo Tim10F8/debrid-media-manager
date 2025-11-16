@@ -1,4 +1,3 @@
-import { getToken } from '@/services/realDebrid';
 import { repository as db } from '@/services/repository';
 import { isLegacyToken } from '@/utils/castApiHelpers';
 import { NextApiRequest, NextApiResponse } from 'next';
@@ -37,13 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return;
 	}
 
-	let profile: {
-		clientId: string;
-		clientSecret: string;
-		refreshToken: string;
-	} | null = null;
 	try {
-		profile = await db.getCastProfile(userid);
+		const profile = await db.getCastProfile(userid);
 		if (!profile) {
 			throw new Error(`no profile found for user ${userid}`);
 		}
@@ -53,26 +47,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			error instanceof Error ? error.message : 'Unknown error'
 		);
 		res.status(500).json({ error: `Failed to get Real-Debrid profile for user ${userid}` });
-		return;
-	}
-
-	let response: { access_token: string } | null = null;
-	try {
-		response = await getToken(
-			profile.clientId,
-			profile.clientSecret,
-			profile.refreshToken,
-			true
-		);
-		if (!response) {
-			throw new Error(`no token found for user ${userid}`);
-		}
-	} catch (error) {
-		console.error(
-			'Failed to get Real-Debrid token:',
-			error instanceof Error ? error.message : 'Unknown error'
-		);
-		res.status(500).json({ error: `Failed to get Real-Debrid token for user ${userid}` });
 		return;
 	}
 
@@ -94,29 +68,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				bingeGroup: `dmm:${imdbidStr}:cast`,
 			},
 		},
-		{
-			name: '​2:Stream🪄',
-			title: 'Stream the latest link you casted',
-			url: `${process.env.DMM_ORIGIN}/api/stremio/${userid}/watch/${imdbidStr}/ping?token=${response.access_token}`,
-			behaviorHints: {
-				bingeGroup: `dmm:${imdbidStr}:stream`,
-			},
-		},
 	];
 
 	try {
 		// get urls from db
-		const [castItems, otherCastItems] = await Promise.all([
-			db.getCastURLs(imdbidStr, userid),
-			db.getOtherCastURLs(imdbidStr, userid),
+		const [userCastItems, otherItems] = await Promise.all([
+			db.getUserCastStreams(imdbidStr, userid, 5),
+			db.getOtherStreams(imdbidStr, userid, 5),
 		]);
 
-		for (const item of castItems) {
-			let title = item.url.split('/').pop() ?? 'Unknown Title';
+		for (const item of userCastItems) {
+			let title = item.filename ?? 'Unknown Title';
 			let sizeStr = '';
 			if (item.size > 1024) {
-				item.size = item.size / 1024;
-				sizeStr = `${item.size.toFixed(2)} GB`;
+				sizeStr = `${(item.size / 1024).toFixed(2)} GB`;
 			} else {
 				sizeStr = `${item.size.toFixed(2)} MB`;
 			}
@@ -126,26 +91,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				title = title.substring(0, mid) + '-\n' + title.substring(mid);
 			}
 			title = title + '\n' + `📦 ${sizeStr}`;
+
 			streams.push({
 				name: 'DMM 🧙‍♂️ Yours',
 				title,
 				url: item.link
-					? `${process.env.DMM_ORIGIN}/api/stremio/${userid}/play/${item.link.substring(26)}?token=${response.access_token}`
+					? `${process.env.DMM_ORIGIN}/api/stremio/${userid}/play/${item.link.substring(26)}`
 					: item.url,
 				behaviorHints: {
 					bingeGroup: `dmm:${imdbidStr}:yours`,
 				},
-			});
+			} as any);
 		}
 
-		const icons = ['🦄', '🐈'];
-		otherCastItems.sort((a, b) => a.size - b.size);
-		for (const item of otherCastItems) {
-			let title = item.url.split('/').pop() ?? 'Unknown Title';
+		const icons = ['🦄', '🐈', '🦊', '🐺', '🦁', '🐯', '🐻'];
+		for (let i = 0; i < otherItems.length; i++) {
+			const item = otherItems[i];
+			let title = item.filename ?? 'Unknown Title';
 			let sizeStr = '';
 			if (item.size > 1024) {
-				item.size = item.size / 1024;
-				sizeStr = `${item.size.toFixed(2)} GB`;
+				sizeStr = `${(item.size / 1024).toFixed(2)} GB`;
 			} else {
 				sizeStr = `${item.size.toFixed(2)} MB`;
 			}
@@ -155,14 +120,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				title = title.substring(0, mid) + '-\n' + title.substring(mid);
 			}
 			title = title + '\n' + `📦 ${sizeStr}`;
+
+			const icon = icons[i % icons.length];
 			streams.push({
-				name: `DMM ${icons.pop()} Other`,
+				name: `DMM ${icon} Other`,
 				title,
-				url: `${process.env.DMM_ORIGIN}/api/stremio/${userid}/play/${item.link.substring(26)}?token=${response.access_token}`,
+				url: item.link
+					? `${process.env.DMM_ORIGIN}/api/stremio/${userid}/play/${item.link.substring(26)}`
+					: item.url,
 				behaviorHints: {
-					bingeGroup: `dmm:${imdbidStr}:other:${icons.length}`,
+					bingeGroup: `dmm:${imdbidStr}:other:${i + 1}`,
 				},
-			});
+			} as any);
 		}
 
 		res.status(200).json({

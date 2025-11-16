@@ -99,6 +99,10 @@ export class Repository {
 		return this.availabilityService.removeAvailability(hash);
 	}
 
+	public getHashByLink(link: string) {
+		return this.availabilityService.getHashByLink(link);
+	}
+
 	// Scraped Service Methods
 	public getScrapedTrueResults<T>(key: string, maxSizeGB?: number, page?: number) {
 		return this.scrapedService.getScrapedTrueResults<T>(key, maxSizeGB, page);
@@ -249,6 +253,14 @@ export class Repository {
 
 	public getAllUserCasts(userId: string) {
 		return this.castService.getAllUserCasts(userId);
+	}
+
+	public getUserCastStreams(imdbId: string, userId: string, limit?: number) {
+		return this.castService.getUserCastStreams(imdbId, userId, limit);
+	}
+
+	public getOtherStreams(imdbId: string, userId: string, limit?: number) {
+		return this.castService.getOtherStreams(imdbId, userId, limit);
 	}
 
 	// Torrent Snapshot Methods

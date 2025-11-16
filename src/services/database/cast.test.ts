@@ -12,6 +12,9 @@ const prismaMock = vi.hoisted(() => ({
 		upsert: vi.fn(),
 		delete: vi.fn(),
 	},
+	available: {
+		findMany: vi.fn(),
+	},
 }));
 
 vi.mock('./client', () => ({
@@ -27,6 +30,7 @@ describe('CastService', () => {
 		service = new CastService();
 		Object.values(prismaMock.castProfile).forEach((fn) => (fn as Mock).mockReset());
 		Object.values(prismaMock.cast).forEach((fn) => (fn as Mock).mockReset());
+		Object.values(prismaMock.available).forEach((fn) => (fn as Mock).mockReset());
 	});
 
 	it('upserts cast profiles', async () => {
@@ -135,5 +139,165 @@ describe('CastService', () => {
 		expect(await service.getAllUserCasts('user')).toEqual([
 			{ imdbId: 'tt', hash: 'hash', url: 'url', link: 'link', size: 5 },
 		]);
+	});
+
+	it('returns user cast streams only', async () => {
+		const now = new Date();
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([
+			{
+				url: 'https://files.dmm.test/cast1.mkv',
+				link: 'https://app.real-debrid.com/d/cast1link',
+				size: BigInt(2048),
+			},
+			{
+				url: 'https://files.dmm.test/cast2.mkv',
+				link: 'https://app.real-debrid.com/d/cast2link',
+				size: BigInt(1024),
+			},
+		]);
+
+		const userStreams = await service.getUserCastStreams('tt123', 'user1', 5);
+
+		expect(userStreams).toHaveLength(2);
+		expect(userStreams[0]).toEqual({
+			url: 'https://files.dmm.test/cast1.mkv',
+			link: 'https://app.real-debrid.com/d/cast1link',
+			size: 2048,
+			filename: 'cast1.mkv',
+		});
+	});
+
+	it('combines other casts and available streams sorted by updatedAt', async () => {
+		const now = new Date();
+		const oneHourAgo = new Date(now.getTime() - 1000 * 60 * 60);
+		const twoHoursAgo = new Date(now.getTime() - 2000 * 60 * 60);
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([
+			{
+				url: 'https://files.dmm.test/othercast.mkv',
+				link: 'https://app.real-debrid.com/d/otherlink',
+				size: BigInt(2048),
+				updatedAt: twoHoursAgo,
+			},
+		]);
+
+		prismaMock.available.findMany.mockResolvedValueOnce([
+			{
+				filename: 'Available Torrent',
+				files: [
+					{
+						link: 'https://app.real-debrid.com/d/availlink',
+						path: '/path/to/available.mkv',
+						bytes: BigInt(3145728000),
+					},
+				],
+				updatedAt: oneHourAgo,
+			},
+		]);
+
+		const otherStreams = await service.getOtherStreams('tt123', 'user1', 5);
+
+		expect(otherStreams).toHaveLength(2);
+		expect(otherStreams[0]).toEqual({
+			url: 'https://app.real-debrid.com/d/availlink',
+			link: 'https://app.real-debrid.com/d/availlink',
+			size: 3000,
+			filename: 'available.mkv',
+		});
+		expect(otherStreams[1]).toEqual({
+			url: 'https://files.dmm.test/othercast.mkv',
+			link: 'https://app.real-debrid.com/d/otherlink',
+			size: 2048,
+			filename: 'othercast.mkv',
+		});
+	});
+
+	it('handles TV show imdbId format in getOtherStreams', async () => {
+		const now = new Date();
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([]);
+
+		prismaMock.available.findMany.mockResolvedValueOnce([
+			{
+				filename: 'Show Season Pack',
+				files: [
+					{
+						link: 'https://app.real-debrid.com/d/packlink',
+						path: '/Show/S01E01.mkv',
+						bytes: BigInt(1073741824),
+					},
+				],
+				updatedAt: now,
+			},
+		]);
+
+		const otherStreams = await service.getOtherStreams('tt123:1:1', 'user1', 5);
+
+		expect(prismaMock.available.findMany).toHaveBeenCalledWith(
+			expect.objectContaining({
+				where: expect.objectContaining({
+					imdbId: 'tt123',
+				}),
+			})
+		);
+	});
+
+	it('filters out items without links in getUserCastStreams', async () => {
+		const now = new Date();
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([
+			{
+				url: 'https://files.dmm.test/withlink.mkv',
+				link: 'https://app.real-debrid.com/d/validlink',
+				size: BigInt(1024),
+			},
+			{
+				url: 'https://files.dmm.test/nolink.mkv',
+				link: null,
+				size: BigInt(2048),
+			},
+		]);
+
+		const userStreams = await service.getUserCastStreams('tt123', 'user1', 5);
+
+		expect(userStreams).toHaveLength(1);
+		expect(userStreams[0].filename).toBe('withlink.mkv');
+	});
+
+	it('filters out available items without files in getOtherStreams', async () => {
+		const now = new Date();
+
+		prismaMock.cast.findMany.mockResolvedValueOnce([]);
+
+		prismaMock.available.findMany.mockResolvedValueOnce([
+			{
+				filename: 'No Files',
+				files: [],
+				updatedAt: now,
+			},
+		]);
+
+		const otherStreams = await service.getOtherStreams('tt123', 'user1', 5);
+
+		expect(otherStreams).toHaveLength(0);
+	});
+
+	it('respects the limit parameter in getOtherStreams', async () => {
+		const now = new Date();
+
+		const castItems = Array.from({ length: 10 }, (_, i) => ({
+			url: `https://files.dmm.test/cast${i}.mkv`,
+			link: `https://app.real-debrid.com/d/link${i}`,
+			size: BigInt(1024),
+			updatedAt: new Date(now.getTime() - i * 1000),
+		}));
+
+		prismaMock.cast.findMany.mockResolvedValueOnce(castItems);
+		prismaMock.available.findMany.mockResolvedValueOnce([]);
+
+		const otherStreams = await service.getOtherStreams('tt123', 'user1', 3);
+
+		expect(otherStreams.length).toBeLessThanOrEqual(3);
 	});
 });
