@@ -1,6 +1,62 @@
 import { TorrentInfoResponse } from '../types';
 import { DatabaseClient } from './client';
 
+type ParsedEpisodeInfo = {
+	season?: number;
+	episode?: number;
+	isSeasonPack?: boolean;
+};
+
+const EPISODE_PATTERNS: Array<{
+	regex: RegExp;
+	seasonIndex: number;
+	episodeIndex: number;
+}> = [
+	{ regex: /s(\d{1,2})e(\d{1,2})/i, seasonIndex: 1, episodeIndex: 2 },
+	{ regex: /(\d{1,2})x(\d{1,2})/i, seasonIndex: 1, episodeIndex: 2 },
+	{
+		regex: /season[^\d]{0,6}(\d{1,2}).*episode[^\d]{0,6}(\d{1,2})/i,
+		seasonIndex: 1,
+		episodeIndex: 2,
+	},
+	{
+		regex: /episode[^\d]{0,6}(\d{1,2}).*season[^\d]{0,6}(\d{1,2})/i,
+		seasonIndex: 2,
+		episodeIndex: 1,
+	},
+];
+
+const SEASON_ONLY_PATTERNS: Array<{ regex: RegExp; captureIndex?: number }> = [
+	{ regex: /season[^\d]{0,6}(\d{1,2})/i, captureIndex: 1 },
+	{ regex: /(^|[^a-z0-9])s(\d{1,2})(?![a-z0-9])/i, captureIndex: 2 },
+];
+
+function extractEpisodeInfo(text: string): ParsedEpisodeInfo | null {
+	for (const pattern of EPISODE_PATTERNS) {
+		const match = pattern.regex.exec(text);
+		if (match) {
+			const season = parseInt(match[pattern.seasonIndex], 10);
+			const episode = parseInt(match[pattern.episodeIndex], 10);
+			if (!Number.isNaN(season) && !Number.isNaN(episode)) {
+				return { season, episode };
+			}
+		}
+	}
+
+	for (const pattern of SEASON_ONLY_PATTERNS) {
+		const match = pattern.regex.exec(text);
+		if (match) {
+			const captureIndex = pattern.captureIndex ?? 1;
+			const season = parseInt(match[captureIndex], 10);
+			if (!Number.isNaN(season)) {
+				return { season, isSeasonPack: true };
+			}
+		}
+	}
+
+	return null;
+}
+
 export class AvailabilityService extends DatabaseClient {
 	public async getIMDBIdByHash(hash: string): Promise<string | null> {
 		const available = await this.prisma.available.findFirst({
@@ -30,6 +86,21 @@ export class AvailabilityService extends DatabaseClient {
 			torrentInfo.ended = '0';
 		}
 
+		const candidates = [torrentInfo.filename, torrentInfo.original_filename];
+		if (selectedFiles.length > 0) {
+			candidates.push(selectedFiles[0].path);
+		}
+
+		let episodeInfo: ParsedEpisodeInfo | null = null;
+		for (const candidate of candidates) {
+			if (candidate) {
+				episodeInfo = extractEpisodeInfo(candidate);
+				if (episodeInfo) {
+					break;
+				}
+			}
+		}
+
 		const baseData = {
 			hash,
 			imdbId,
@@ -41,6 +112,8 @@ export class AvailabilityService extends DatabaseClient {
 			progress: torrentInfo.progress,
 			status: torrentInfo.status,
 			ended: new Date(torrentInfo.ended),
+			season: episodeInfo?.season,
+			episode: episodeInfo?.episode,
 		};
 
 		await this.prisma.available.upsert({
@@ -51,12 +124,17 @@ export class AvailabilityService extends DatabaseClient {
 					selectedFiles.length > 0
 						? {
 								deleteMany: {},
-								create: selectedFiles.map((file, index) => ({
-									link: torrentInfo.links?.[index] || '',
-									file_id: file.id,
-									path: file.path,
-									bytes: BigInt(file.bytes || 0),
-								})),
+								create: selectedFiles.map((file, index) => {
+									const fileEpisodeInfo = extractEpisodeInfo(file.path);
+									return {
+										link: torrentInfo.links?.[index] || '',
+										file_id: file.id,
+										path: file.path,
+										bytes: BigInt(file.bytes || 0),
+										season: fileEpisodeInfo?.season,
+										episode: fileEpisodeInfo?.episode,
+									};
+								}),
 							}
 						: undefined,
 			},
@@ -65,12 +143,17 @@ export class AvailabilityService extends DatabaseClient {
 				files:
 					selectedFiles.length > 0
 						? {
-								create: selectedFiles.map((file, index) => ({
-									link: torrentInfo.links?.[index] || '',
-									file_id: file.id,
-									path: file.path,
-									bytes: BigInt(file.bytes || 0),
-								})),
+								create: selectedFiles.map((file, index) => {
+									const fileEpisodeInfo = extractEpisodeInfo(file.path);
+									return {
+										link: torrentInfo.links?.[index] || '',
+										file_id: file.id,
+										path: file.path,
+										bytes: BigInt(file.bytes || 0),
+										season: fileEpisodeInfo?.season,
+										episode: fileEpisodeInfo?.episode,
+									};
+								}),
 							}
 						: undefined,
 			},
@@ -104,6 +187,21 @@ export class AvailabilityService extends DatabaseClient {
 		selectedFiles: Array<{ id: number; path: string; bytes: number; selected: number }>;
 		links: string[];
 	}) {
+		const candidates = [filename, originalFilename];
+		if (selectedFiles.length > 0) {
+			candidates.push(selectedFiles[0].path);
+		}
+
+		let episodeInfo: ParsedEpisodeInfo | null = null;
+		for (const candidate of candidates) {
+			if (candidate) {
+				episodeInfo = extractEpisodeInfo(candidate);
+				if (episodeInfo) {
+					break;
+				}
+			}
+		}
+
 		return this.prisma.available.upsert({
 			where: {
 				hash: hash,
@@ -113,14 +211,21 @@ export class AvailabilityService extends DatabaseClient {
 				originalFilename,
 				originalBytes: BigInt(originalBytes),
 				ended: new Date(ended),
+				season: episodeInfo?.season,
+				episode: episodeInfo?.episode,
 				files: {
 					deleteMany: {},
-					create: selectedFiles.map((file, index) => ({
-						link: links[index],
-						file_id: file.id,
-						path: file.path,
-						bytes: BigInt(file.bytes),
-					})),
+					create: selectedFiles.map((file, index) => {
+						const fileEpisodeInfo = extractEpisodeInfo(file.path);
+						return {
+							link: links[index],
+							file_id: file.id,
+							path: file.path,
+							bytes: BigInt(file.bytes),
+							season: fileEpisodeInfo?.season,
+							episode: fileEpisodeInfo?.episode,
+						};
+					}),
 				},
 			},
 			create: {
@@ -134,13 +239,20 @@ export class AvailabilityService extends DatabaseClient {
 				progress,
 				status,
 				ended: new Date(ended),
+				season: episodeInfo?.season,
+				episode: episodeInfo?.episode,
 				files: {
-					create: selectedFiles.map((file, index) => ({
-						link: links[index],
-						file_id: file.id,
-						path: file.path,
-						bytes: BigInt(file.bytes),
-					})),
+					create: selectedFiles.map((file, index) => {
+						const fileEpisodeInfo = extractEpisodeInfo(file.path);
+						return {
+							link: links[index],
+							file_id: file.id,
+							path: file.path,
+							bytes: BigInt(file.bytes),
+							season: fileEpisodeInfo?.season,
+							episode: fileEpisodeInfo?.episode,
+						};
+					}),
 				},
 			},
 		});

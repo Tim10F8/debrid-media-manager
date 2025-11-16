@@ -5,6 +5,117 @@ interface LatestCast {
 	link: string;
 }
 
+type EpisodeFilters = {
+	season?: number;
+	episode?: number;
+};
+
+type ParsedEpisodeInfo = {
+	season?: number;
+	episode?: number;
+	isSeasonPack?: boolean;
+};
+
+const EPISODE_PATTERNS: Array<{
+	regex: RegExp;
+	seasonIndex: number;
+	episodeIndex: number;
+}> = [
+	{ regex: /s(\d{1,2})e(\d{1,2})/i, seasonIndex: 1, episodeIndex: 2 },
+	{ regex: /(\d{1,2})x(\d{1,2})/i, seasonIndex: 1, episodeIndex: 2 },
+	{
+		regex: /season[^\d]{0,6}(\d{1,2}).*episode[^\d]{0,6}(\d{1,2})/i,
+		seasonIndex: 1,
+		episodeIndex: 2,
+	},
+	{
+		regex: /episode[^\d]{0,6}(\d{1,2}).*season[^\d]{0,6}(\d{1,2})/i,
+		seasonIndex: 2,
+		episodeIndex: 1,
+	},
+];
+
+const SEASON_ONLY_PATTERNS: Array<{ regex: RegExp; captureIndex?: number }> = [
+	{ regex: /season[^\d]{0,6}(\d{1,2})/i, captureIndex: 1 },
+	{ regex: /(^|[^a-z0-9])s(\d{1,2})(?![a-z0-9])/i, captureIndex: 2 },
+];
+
+function parseImdbId(imdbId: string): { baseImdbId: string } & EpisodeFilters {
+	const [baseImdbId, seasonPart, episodePart] = imdbId.split(':');
+	const season = seasonPart ? parseInt(seasonPart, 10) : undefined;
+	const episode = episodePart ? parseInt(episodePart, 10) : undefined;
+	return {
+		baseImdbId,
+		season: Number.isNaN(season) ? undefined : season,
+		episode: Number.isNaN(episode) ? undefined : episode,
+	};
+}
+
+function extractEpisodeInfo(text: string): ParsedEpisodeInfo | null {
+	for (const pattern of EPISODE_PATTERNS) {
+		const match = pattern.regex.exec(text);
+		if (match) {
+			const season = parseInt(match[pattern.seasonIndex], 10);
+			const episode = parseInt(match[pattern.episodeIndex], 10);
+			if (!Number.isNaN(season) && !Number.isNaN(episode)) {
+				return { season, episode };
+			}
+		}
+	}
+
+	for (const pattern of SEASON_ONLY_PATTERNS) {
+		const match = pattern.regex.exec(text);
+		if (match) {
+			const captureIndex = pattern.captureIndex ?? 1;
+			const season = parseInt(match[captureIndex], 10);
+			if (!Number.isNaN(season)) {
+				return { season, isSeasonPack: true };
+			}
+		}
+	}
+
+	return null;
+}
+
+function matchesEpisodeFilters(
+	candidates: Array<string | undefined>,
+	filters: EpisodeFilters
+): boolean {
+	if (filters.season === undefined && filters.episode === undefined) {
+		return true;
+	}
+
+	for (const candidate of candidates) {
+		if (!candidate) continue;
+		const info = extractEpisodeInfo(candidate);
+		if (!info) continue;
+
+		if (filters.season !== undefined) {
+			if (info.season === undefined || info.season !== filters.season) {
+				continue;
+			}
+		}
+
+		if (filters.episode !== undefined) {
+			if (info.episode !== undefined && info.episode !== filters.episode) {
+				continue;
+			}
+			if (info.episode === undefined) {
+				if (!info.isSeasonPack) {
+					continue;
+				}
+				if (filters.season === undefined || info.season !== filters.season) {
+					continue;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
 export class CastService extends DatabaseClient {
 	public async saveCastProfile(
 		userId: string,
@@ -361,6 +472,9 @@ export class CastService extends DatabaseClient {
 			filename: string;
 		}[]
 	> {
+		const { baseImdbId, season: seasonFilter, episode: episodeFilter } = parseImdbId(imdbId);
+		const episodeFilters: EpisodeFilters = { season: seasonFilter, episode: episodeFilter };
+		const hasEpisodeFilters = episodeFilter !== undefined || seasonFilter !== undefined;
 		const hasMaxSize = typeof maxSize === 'number' && maxSize > 0;
 		const normalizedMaxSizeMb = hasMaxSize ? Math.round(maxSize * 1024) : undefined;
 		const maxSizeBytes =
@@ -370,11 +484,50 @@ export class CastService extends DatabaseClient {
 		const maxSizeCastLimit =
 			normalizedMaxSizeMb !== undefined ? BigInt(normalizedMaxSizeMb) : undefined;
 
+		const availableFileResults = await this.prisma.availableFile.findMany({
+			where: {
+				available: {
+					imdbId: baseImdbId,
+					status: 'downloaded',
+				},
+				...(maxSizeBytes !== undefined && { bytes: { lte: maxSizeBytes } }),
+				...(seasonFilter !== undefined && { season: seasonFilter }),
+				...(episodeFilter !== undefined && { episode: episodeFilter }),
+			},
+			select: {
+				link: true,
+				path: true,
+				bytes: true,
+			},
+			orderBy: {
+				bytes: 'desc',
+			},
+			take: limit * 2,
+		});
+
+		const fileStreams = availableFileResults
+			.filter((file) => file.link)
+			.map((file) => ({
+				url: file.link,
+				link: file.link,
+				size: Number(file.bytes) / 1024 / 1024,
+				filename: file.path.split('/').pop() || file.path,
+				source: 'file' as const,
+			}));
+
+		if (fileStreams.length >= limit) {
+			return fileStreams.slice(0, limit);
+		}
+
+		const remainingAfterFiles = limit - fileStreams.length;
+
 		const availableItems = await this.prisma.available.findMany({
 			where: {
-				imdbId: imdbId.split(':')[0],
+				imdbId: baseImdbId,
 				status: 'downloaded',
 				...(maxSizeBytes !== undefined && { bytes: { lte: maxSizeBytes } }),
+				...(seasonFilter !== undefined && { season: seasonFilter }),
+				...(episodeFilter !== undefined && { episode: episodeFilter }),
 			},
 			include: {
 				files: {
@@ -382,6 +535,8 @@ export class CastService extends DatabaseClient {
 						link: true,
 						path: true,
 						bytes: true,
+						season: true,
+						episode: true,
 					},
 					orderBy: {
 						bytes: 'desc',
@@ -392,23 +547,38 @@ export class CastService extends DatabaseClient {
 			orderBy: {
 				bytes: 'desc',
 			},
-			take: limit,
+			take: remainingAfterFiles * 2,
 		});
 
-		const availableResults = availableItems
-			.filter((item) => item.files.length > 0 && item.files[0].link)
+		const torrentStreams = availableItems
+			.filter((item) => {
+				if (item.files.length === 0 || !item.files[0]?.link) {
+					return false;
+				}
+				const file = item.files[0];
+				if (!hasEpisodeFilters) {
+					return true;
+				}
+				if (file.season !== null || file.episode !== null) {
+					return false;
+				}
+				return true;
+			})
 			.map((item) => ({
 				url: item.files[0].link,
 				link: item.files[0].link,
 				size: Number(item.files[0].bytes) / 1024 / 1024,
 				filename: item.files[0].path.split('/').pop() || item.filename,
+				source: 'torrent' as const,
 			}));
 
-		if (availableResults.length >= limit) {
-			return availableResults.slice(0, limit);
+		const combinedAvailable = [...fileStreams, ...torrentStreams];
+
+		if (combinedAvailable.length >= limit) {
+			return combinedAvailable.slice(0, limit);
 		}
 
-		const remainingLimit = limit - availableResults.length;
+		const remainingLimit = limit - combinedAvailable.length;
 		const otherCastItems = await this.prisma.cast.findMany({
 			where: {
 				imdbId: imdbId,
@@ -435,7 +605,7 @@ export class CastService extends DatabaseClient {
 			take: remainingLimit,
 		});
 
-		const otherCastResults = otherCastItems
+		const castStreams = otherCastItems
 			.filter(
 				(item): item is { url: string; link: string; size: bigint } => item.link !== null
 			)
@@ -444,12 +614,21 @@ export class CastService extends DatabaseClient {
 				link: item.link,
 				size: Number(item.size),
 				filename: item.url.split('/').pop() || 'Unknown',
+				source: 'cast' as const,
 			}));
 
-		const combined = [...availableResults, ...otherCastResults]
+		const allStreams = [...combinedAvailable, ...castStreams]
 			.sort((a, b) => b.size - a.size)
 			.slice(0, limit);
 
-		return combined;
+		console.log('[CastService] Stream sources breakdown:', {
+			imdbId,
+			total: allStreams.length,
+			fromFiles: allStreams.filter((s) => s.source === 'file').length,
+			fromTorrents: allStreams.filter((s) => s.source === 'torrent').length,
+			fromCast: allStreams.filter((s) => s.source === 'cast').length,
+		});
+
+		return allStreams.map(({ source, ...stream }) => stream);
 	}
 }

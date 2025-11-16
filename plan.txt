@@ -1,0 +1,3 @@
+- Tests for CastService fail because prisma.availableFile.findMany isn't mocked or reset, so getOtherStreams crashes before running expectations.
+- scripts/populate-season-episode.ts skips batches after updates because it uses skip/take with mutable result sets; lots of rows never get processed.
+- Recommendation: mock and reset availableFile.findMany in src/services/database/cast.test.ts (default to [] and override per test) and adjust expectations to cover file-based streams; refactor the population script to use repeated take-based batches without skip so all null rows get processed.
