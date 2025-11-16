@@ -47,7 +47,7 @@ import { BookOpen } from 'lucide-react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import Modal from '../components/modals/modal';
 
@@ -222,53 +222,104 @@ function TorrentsPage() {
 	}, [refreshLibrary]);
 
 	// add hash to library
+	const processingHashRef = useRef<string | null>(null);
+
 	useEffect(() => {
 		const { addMagnet } = router.query;
 		if (!addMagnet) return;
-		router.push(`/library?page=1`);
+
 		const hashes = extractHashes(addMagnet as string);
 		if (hashes.length !== 1) return;
 
-		let isCancelled = false;
+		const hash = hashes[0];
 
-		// Handle both services but only refresh once at the end
+		if (processingHashRef.current === hash) return;
+
+		processingHashRef.current = hash;
+		router.replace('/library?page=1', undefined, { shallow: true });
+
 		const promises: Promise<void>[] = [];
 
 		if (rdKey) {
 			promises.push(
-				new Promise<void>((resolve) => {
-					handleAddMultipleHashesInRd(rdKey, hashes, async () => resolve());
-				})
+				(async () => {
+					try {
+						await handleAddAsMagnetInRd(rdKey, hash, async (info) => {
+							const userTorrent = (
+								await import('@/utils/fetchTorrents')
+							).convertToUserTorrent({
+								...info,
+								id: info.id,
+								filename: info.filename,
+								bytes: info.bytes,
+								status: info.status,
+								added: info.added,
+								links: info.links,
+								hash: info.hash,
+							});
+							addTorrent(userTorrent);
+						});
+					} catch (error) {
+						console.error('Error adding magnet to RealDebrid:', error);
+					}
+				})()
 			);
 		}
 		if (adKey) {
 			promises.push(
-				new Promise<void>((resolve) => {
-					handleAddMultipleHashesInAd(adKey, hashes, async () => resolve());
+				new Promise<void>(async (resolve) => {
+					try {
+						const magnetUri = hash.startsWith('magnet:?')
+							? hash
+							: `magnet:?xt=urn:btih:${hash}`;
+						const { uploadMagnet, getMagnetStatus } = await import(
+							'@/services/allDebrid'
+						);
+						const resp = await uploadMagnet(adKey, [magnetUri]);
+						if (
+							resp.magnets.length > 0 &&
+							!resp.magnets[0].error &&
+							resp.magnets[0].id
+						) {
+							const statusResp = await getMagnetStatus(
+								adKey,
+								String(resp.magnets[0].id)
+							);
+							if (statusResp.data?.magnets?.[0]) {
+								const userTorrent = (
+									await import('@/utils/fetchTorrents')
+								).convertToAllDebridUserTorrent(statusResp.data.magnets[0]);
+								addTorrent(userTorrent);
+							}
+						}
+						resolve();
+					} catch (error) {
+						console.error('Error adding magnet to AllDebrid:', error);
+						resolve();
+					}
 				})
 			);
 		}
 		if (tbKey) {
 			promises.push(
-				new Promise<void>((resolve) => {
-					handleAddMultipleHashesInTb(tbKey, hashes, async () => resolve());
-				})
+				(async () => {
+					try {
+						await handleAddAsMagnetInTb(tbKey, hash, async (userTorrent) => {
+							addTorrent(userTorrent);
+						});
+					} catch (error) {
+						console.error('Error adding magnet to TorBox:', error);
+					}
+				})()
 			);
 		}
 
-		// Wait for all operations to complete, then refresh once
 		Promise.all(promises).then(() => {
-			if (!isCancelled && promises.length > 0) {
-				refreshLibrary();
-			}
+			processingHashRef.current = null;
 		});
 
-		// Cleanup function to prevent refresh if component unmounts
-		return () => {
-			isCancelled = true;
-		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [router]);
+	}, [router.query.addMagnet]);
 
 	const handlePrevPage = useCallback(() => {
 		if (router.query.page === '1') return;
