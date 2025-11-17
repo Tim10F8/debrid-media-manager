@@ -247,7 +247,7 @@ export class CastService extends DatabaseClient {
 		refreshToken: string;
 		movieMaxSize: number;
 		episodeMaxSize: number;
-		otherStreamsLimit: number;
+		otherStreamsLimit?: number;
 	} | null> {
 		const profile = await this.prisma.castProfile.findUnique({
 			where: { userId },
