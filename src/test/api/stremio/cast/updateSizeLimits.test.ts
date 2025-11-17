@@ -170,7 +170,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			clientId: 'client',
 			clientSecret: 'secret',
 			refreshToken: 'refresh',
-			otherStreamsLimit: 10,
+			otherStreamsLimit: 3,
 		};
 
 		vi.spyOn(rdModule, 'getToken').mockResolvedValue(tokenResponse);
@@ -182,7 +182,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 0,
 			episodeMaxSize: 0,
-			otherStreamsLimit: 10,
+			otherStreamsLimit: 3,
 			updatedAt: new Date(),
 		});
 
@@ -195,9 +195,57 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			'refresh',
 			undefined,
 			undefined,
-			10
+			3
 		);
 		expect(res.status).toHaveBeenCalledWith(200);
+	});
+
+	it('rejects otherStreamsLimit greater than 5', async () => {
+		req.body = {
+			clientId: 'client',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			otherStreamsLimit: 10,
+		};
+
+		await handler(req as NextApiRequest, res as NextApiResponse);
+
+		expect(res.status).toHaveBeenCalledWith(400);
+		expect(res.json).toHaveBeenCalledWith({
+			error: 'otherStreamsLimit must be an integer between 0 and 5',
+		});
+	});
+
+	it('rejects negative otherStreamsLimit', async () => {
+		req.body = {
+			clientId: 'client',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			otherStreamsLimit: -1,
+		};
+
+		await handler(req as NextApiRequest, res as NextApiResponse);
+
+		expect(res.status).toHaveBeenCalledWith(400);
+		expect(res.json).toHaveBeenCalledWith({
+			error: 'otherStreamsLimit must be an integer between 0 and 5',
+		});
+	});
+
+	it('rejects non-integer otherStreamsLimit', async () => {
+		req.body = {
+			clientId: 'client',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			otherStreamsLimit: 2.5,
+		};
+
+		await handler(req as NextApiRequest, res as NextApiResponse);
+
+		expect(res.status).toHaveBeenCalledWith(400);
+		expect(res.json).toHaveBeenCalledWith({
+			error: 'otherStreamsLimit must be an integer between 0 and 5',
+		});
 	});
 
 	it('updates all settings successfully', async () => {
@@ -207,7 +255,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 15,
 			episodeMaxSize: 3,
-			otherStreamsLimit: 10,
+			otherStreamsLimit: 4,
 		};
 
 		vi.spyOn(rdModule, 'getToken').mockResolvedValue(tokenResponse);
@@ -219,7 +267,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 15,
 			episodeMaxSize: 3,
-			otherStreamsLimit: 10,
+			otherStreamsLimit: 4,
 			updatedAt: new Date(),
 		});
 
@@ -232,7 +280,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			'refresh',
 			15,
 			3,
-			10
+			4
 		);
 		expect(res.status).toHaveBeenCalledWith(200);
 	});

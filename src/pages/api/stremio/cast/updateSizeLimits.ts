@@ -34,6 +34,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			});
 		}
 
+		if (otherStreamsLimit !== undefined) {
+			const limit = Number(otherStreamsLimit);
+			if (!Number.isInteger(limit) || limit < 0 || limit > 5) {
+				return res.status(400).json({
+					error: 'otherStreamsLimit must be an integer between 0 and 5',
+				});
+			}
+		}
+
 		let response: { access_token: string } | null = null;
 		try {
 			response = await getToken(clientId, clientSecret, refreshToken, true);
