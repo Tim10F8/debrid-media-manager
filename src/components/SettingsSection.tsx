@@ -369,279 +369,326 @@ export const SettingsSection = () => {
 										<option value="5">5 GB (~35 Mbps)</option>
 										<option value="0">Biggest available</option>
 									</select>
-								</div>
-
-								<div className="flex flex-col gap-1">
-									<label className="font-semibold">Other streams limit</label>
-									<select
-										id="dmm-other-streams-limit"
-										className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
-										value={otherStreamsLimit}
-										onChange={handleOtherStreamsLimitChange}
-									>
-										<option value="0">Don&apos;t show other streams</option>
-										<option value="1">1 stream</option>
-										<option value="2">2 streams</option>
-										<option value="3">3 streams</option>
-										<option value="5">5 streams</option>
-										<option value="10">10 streams</option>
-									</select>
 									<p className="mt-1 text-xs text-gray-400">
-										💡 These settings also apply to the Stremio Cast addon
+										💡 These size limits also apply to the Stremio Cast addon
 										stream selection
 									</p>
 								</div>
 							</div>
 						</div>
 
-						<div className="flex flex-col gap-1">
-							<label className="font-semibold">Video player</label>
-							<select
-								id="dmm-player"
-								className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
-								value={storedPlayer}
-								onChange={handlePlayerChange}
-							>
-								<optgroup label="Web">
-									<option value="web/rd">Real-Debrid Stream</option>
-								</optgroup>
-								<optgroup label="Android">
-									<option value="android/chooser">App chooser</option>
-									<option value="android/org.videolan.vlc">VLC</option>
-									<option value="android/com.mxtech.videoplayer.ad">
-										MX Player
-									</option>
-									<option value="android/com.mxtech.videoplayer.pro">
-										MX Player Pro
-									</option>
-									<option value="android/com.brouken.player">JustPlayer</option>
-								</optgroup>
-								<optgroup label="iOS">
-									<option value="ios2/open-vidhub">VidHub</option>
-									<option value="ios/infuse">Infuse</option>
-									<option value="ios/vlc">VLC</option>
-									<option value="ios/outplayer">Outplayer</option>
-								</optgroup>
-								<optgroup label="MacOS">
-									<option value="mac4/open-vidhub">VidHub</option>
-									<option value="mac/infuse">Infuse</option>
-									<option value="mac2/iina">IINA</option>
-									<option value="mac2/omniplayer">OmniPlayer</option>
-									<option value="mac2/figplayer">Fig Player</option>
-									<option value="mac3/nplayer-mac">nPlayer</option>
-								</optgroup>
-							</select>
+						<div className="rounded border-2 border-purple-500/30 p-4">
+							<div className="mb-2 text-sm font-semibold text-purple-200">
+								Stremio Cast Settings
+							</div>
+
+							<div className="flex flex-col gap-1">
+								<label className="font-semibold">Other streams limit</label>
+								<select
+									id="dmm-other-streams-limit"
+									className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
+									value={otherStreamsLimit}
+									onChange={handleOtherStreamsLimitChange}
+								>
+									<option value="0">Don&apos;t show other streams</option>
+									<option value="1">1 stream</option>
+									<option value="2">2 streams</option>
+									<option value="3">3 streams</option>
+									<option value="4">4 streams</option>
+									<option value="5">5 streams</option>
+								</select>
+								<p className="mt-1 text-xs text-gray-400">
+									Limits streams from available files, torrents, and other
+									users&apos; casts shown in the Stremio Cast addon
+								</p>
+							</div>
 						</div>
 
-						<div className="flex flex-col gap-1">
-							<label className="font-semibold">Default torrents filter</label>
-							<input
-								id="dmm-default-torrents-filter"
-								type="text"
-								className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
-								placeholder="filter results, supports regex"
-								value={defaultTorrentsFilterValue}
-								onChange={handleTorrentsFilterChange}
-							/>
+						<div className="rounded border-2 border-gray-500/30 p-4">
+							<div className="mb-2 text-sm font-semibold text-gray-200">Playback</div>
+
+							<div className="flex flex-col gap-1">
+								<label className="font-semibold">Video player</label>
+								<select
+									id="dmm-player"
+									className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
+									value={storedPlayer}
+									onChange={handlePlayerChange}
+								>
+									<optgroup label="Web">
+										<option value="web/rd">Real-Debrid Stream</option>
+									</optgroup>
+									<optgroup label="Android">
+										<option value="android/chooser">App chooser</option>
+										<option value="android/org.videolan.vlc">VLC</option>
+										<option value="android/com.mxtech.videoplayer.ad">
+											MX Player
+										</option>
+										<option value="android/com.mxtech.videoplayer.pro">
+											MX Player Pro
+										</option>
+										<option value="android/com.brouken.player">
+											JustPlayer
+										</option>
+									</optgroup>
+									<optgroup label="iOS">
+										<option value="ios2/open-vidhub">VidHub</option>
+										<option value="ios/infuse">Infuse</option>
+										<option value="ios/vlc">VLC</option>
+										<option value="ios/outplayer">Outplayer</option>
+									</optgroup>
+									<optgroup label="MacOS">
+										<option value="mac4/open-vidhub">VidHub</option>
+										<option value="mac/infuse">Infuse</option>
+										<option value="mac2/iina">IINA</option>
+										<option value="mac2/omniplayer">OmniPlayer</option>
+										<option value="mac2/figplayer">Fig Player</option>
+										<option value="mac3/nplayer-mac">nPlayer</option>
+									</optgroup>
+								</select>
+							</div>
 						</div>
 
-						<div className="flex items-center gap-2">
-							<input
-								id="dmm-only-trusted-torrents"
-								type="checkbox"
-								className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-								checked={onlyTrustedTorrents}
-								onChange={handleTrustedTorrentsChange}
-							/>
-							<label className="font-semibold">Only trusted torrents</label>
+						<div className="rounded border-2 border-gray-500/30 p-4">
+							<div className="mb-2 text-sm font-semibold text-gray-200">
+								Torrent Search &amp; Discovery
+							</div>
+
+							<div className="flex flex-col gap-4">
+								<div className="flex flex-col gap-1">
+									<label className="font-semibold">Default torrents filter</label>
+									<input
+										id="dmm-default-torrents-filter"
+										type="text"
+										className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
+										placeholder="filter results, supports regex"
+										value={defaultTorrentsFilterValue}
+										onChange={handleTorrentsFilterChange}
+									/>
+								</div>
+
+								<div className="flex items-center gap-2">
+									<input
+										id="dmm-only-trusted-torrents"
+										type="checkbox"
+										className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+										checked={onlyTrustedTorrents}
+										onChange={handleTrustedTorrentsChange}
+									/>
+									<label className="font-semibold">Only trusted torrents</label>
+								</div>
+
+								<div className="flex flex-col gap-2 rounded border-2 border-blue-500/30 p-3">
+									<div className="text-sm font-semibold text-blue-200">
+										External Sources
+									</div>
+
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-enable-torrentio"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={enableTorrentio}
+											onChange={handleEnableTorrentioChange}
+										/>
+										<label className="font-semibold">Enable Torrentio</label>
+									</div>
+
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-enable-comet"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={enableComet}
+											onChange={handleEnableCometChange}
+										/>
+										<label className="font-semibold">Enable Comet</label>
+									</div>
+
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-enable-mediafusion"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={enableMediaFusion}
+											onChange={handleEnableMediaFusionChange}
+										/>
+										<label className="font-semibold">Enable MediaFusion</label>
+									</div>
+
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-enable-peerflix"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={enablePeerflix}
+											onChange={handleEnablePeerflixChange}
+										/>
+										<label className="font-semibold">Enable Peerflix</label>
+									</div>
+
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-enable-torrentsdb"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={enableTorrentsDB}
+											onChange={handleEnableTorrentsDBChange}
+										/>
+										<label className="font-semibold">Enable TorrentsDB</label>
+									</div>
+
+									<span className="text-xs text-gray-400">
+										External sources provide additional cached torrents from
+										Real-Debrid. Disable if you want to use only DMM&apos;s own
+										search results.
+									</span>
+								</div>
+
+								<div className="flex flex-col gap-2 rounded border-2 border-orange-500/30 p-3">
+									<div className="text-sm font-semibold text-orange-200">
+										Tor Proxy Options (bypasses rate limits)
+									</div>
+
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-enable-torrentio-tor"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={enableTorrentioTor}
+											onChange={handleEnableTorrentioTorChange}
+										/>
+										<label className="font-semibold">
+											Enable Torrentio (Tor)
+										</label>
+									</div>
+
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-enable-comet-tor"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={enableCometTor}
+											onChange={handleEnableCometTorChange}
+										/>
+										<label className="font-semibold">Enable Comet (Tor)</label>
+									</div>
+
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-enable-mediafusion-tor"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={enableMediaFusionTor}
+											onChange={handleEnableMediaFusionTorChange}
+										/>
+										<label className="font-semibold">
+											Enable MediaFusion (Tor)
+										</label>
+									</div>
+
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-enable-peerflix-tor"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={enablePeerflixTor}
+											onChange={handleEnablePeerflixTorChange}
+										/>
+										<label className="font-semibold">
+											Enable Peerflix (Tor)
+										</label>
+									</div>
+
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-enable-torrentsdb-tor"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={enableTorrentsDBTor}
+											onChange={handleEnableTorrentsDBTorChange}
+										/>
+										<label className="font-semibold">
+											Enable TorrentsDB (Tor)
+										</label>
+									</div>
+								</div>
+							</div>
 						</div>
 
-						<div className="flex items-center gap-2">
-							<input
-								id="dmm-download-magnets"
-								type="checkbox"
-								className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-								checked={downloadMagnets}
-								onChange={handleDownloadMagnetsChange}
-							/>
-							<label className="font-semibold">
-								Download .magnet files instead of copy
-							</label>
+						<div className="rounded border-2 border-gray-500/30 p-4">
+							<div className="mb-2 text-sm font-semibold text-gray-200">
+								Torrent Management
+							</div>
+
+							<div className="flex flex-col gap-4">
+								<div className="flex items-center gap-2">
+									<input
+										id="dmm-download-magnets"
+										type="checkbox"
+										className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+										checked={downloadMagnets}
+										onChange={handleDownloadMagnetsChange}
+									/>
+									<label className="font-semibold">
+										Download .magnet files instead of copy
+									</label>
+								</div>
+
+								<div className="flex flex-col gap-1">
+									<label className="font-semibold">
+										Availability check limit
+									</label>
+									<input
+										id="dmm-availability-check-limit"
+										type="number"
+										min="0"
+										className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
+										placeholder="0 for no limit"
+										value={availabilityCheckLimit}
+										onChange={handleAvailabilityCheckLimitChange}
+									/>
+									<span className="text-xs text-gray-400">
+										Maximum torrents to check when using &quot;Check
+										Available&quot; button (0 = no limit)
+									</span>
+								</div>
+
+								<div className="flex flex-col gap-1">
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-include-tracker-stats"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={includeTrackerStats}
+											onChange={handleIncludeTrackerStatsChange}
+										/>
+										<label className="font-semibold">
+											Include tracker stats in availability check
+										</label>
+									</div>
+									<span className="text-xs text-gray-400">
+										When enabled, also fetches seeders, leechers, and download
+										counts from trackers during availability checks. This
+										provides more detailed information but may slow down the
+										check process.
+									</span>
+								</div>
+							</div>
 						</div>
 
-						<div className="flex items-center gap-2">
-							<input
-								id="dmm-show-mass-report-buttons"
-								type="checkbox"
-								className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-								checked={showMassReportButtons}
-								onChange={handleMassReportButtonsChange}
-							/>
-							<label className="font-semibold">Show mass report buttons</label>
-						</div>
-
-						<div className="flex flex-col gap-1">
-							<label className="font-semibold">Availability check limit</label>
-							<input
-								id="dmm-availability-check-limit"
-								type="number"
-								min="0"
-								className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
-								placeholder="0 for no limit"
-								value={availabilityCheckLimit}
-								onChange={handleAvailabilityCheckLimitChange}
-							/>
-							<span className="text-xs text-gray-400">
-								Maximum torrents to check when using &quot;Check Available&quot;
-								button (0 = no limit)
-							</span>
-						</div>
-
-						<div className="flex flex-col gap-1">
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-include-tracker-stats"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={includeTrackerStats}
-									onChange={handleIncludeTrackerStatsChange}
-								/>
-								<label className="font-semibold">
-									Include tracker stats in availability check
-								</label>
-							</div>
-							<span className="text-xs text-gray-400">
-								When enabled, also fetches seeders, leechers, and download counts
-								from trackers during availability checks. This provides more
-								detailed information but may slow down the check process.
-							</span>
-						</div>
-
-						<div className="flex flex-col gap-2 rounded border-2 border-blue-500/30 p-3">
-							<div className="text-sm font-semibold text-blue-200">
-								External Sources
-							</div>
+						<div className="rounded border-2 border-gray-500/30 p-4">
+							<div className="mb-2 text-sm font-semibold text-gray-200">Advanced</div>
 
 							<div className="flex items-center gap-2">
 								<input
-									id="dmm-enable-torrentio"
+									id="dmm-show-mass-report-buttons"
 									type="checkbox"
 									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={enableTorrentio}
-									onChange={handleEnableTorrentioChange}
+									checked={showMassReportButtons}
+									onChange={handleMassReportButtonsChange}
 								/>
-								<label className="font-semibold">Enable Torrentio</label>
-							</div>
-
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-enable-comet"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={enableComet}
-									onChange={handleEnableCometChange}
-								/>
-								<label className="font-semibold">Enable Comet</label>
-							</div>
-
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-enable-mediafusion"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={enableMediaFusion}
-									onChange={handleEnableMediaFusionChange}
-								/>
-								<label className="font-semibold">Enable MediaFusion</label>
-							</div>
-
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-enable-peerflix"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={enablePeerflix}
-									onChange={handleEnablePeerflixChange}
-								/>
-								<label className="font-semibold">Enable Peerflix</label>
-							</div>
-
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-enable-torrentsdb"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={enableTorrentsDB}
-									onChange={handleEnableTorrentsDBChange}
-								/>
-								<label className="font-semibold">Enable TorrentsDB</label>
-							</div>
-
-							<span className="text-xs text-gray-400">
-								External sources provide additional cached torrents from
-								Real-Debrid. Disable if you want to use only DMM&apos;s own search
-								results.
-							</span>
-						</div>
-
-						<div className="flex flex-col gap-2 rounded border-2 border-orange-500/30 p-3">
-							<div className="text-sm font-semibold text-orange-200">
-								Tor Proxy Options (bypasses rate limits)
-							</div>
-
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-enable-torrentio-tor"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={enableTorrentioTor}
-									onChange={handleEnableTorrentioTorChange}
-								/>
-								<label className="font-semibold">Enable Torrentio (Tor)</label>
-							</div>
-
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-enable-comet-tor"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={enableCometTor}
-									onChange={handleEnableCometTorChange}
-								/>
-								<label className="font-semibold">Enable Comet (Tor)</label>
-							</div>
-
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-enable-mediafusion-tor"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={enableMediaFusionTor}
-									onChange={handleEnableMediaFusionTorChange}
-								/>
-								<label className="font-semibold">Enable MediaFusion (Tor)</label>
-							</div>
-
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-enable-peerflix-tor"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={enablePeerflixTor}
-									onChange={handleEnablePeerflixTorChange}
-								/>
-								<label className="font-semibold">Enable Peerflix (Tor)</label>
-							</div>
-
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-enable-torrentsdb-tor"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={enableTorrentsDBTor}
-									onChange={handleEnableTorrentsDBTorChange}
-								/>
-								<label className="font-semibold">Enable TorrentsDB (Tor)</label>
+								<label className="font-semibold">Show mass report buttons</label>
 							</div>
 						</div>
 					</div>
