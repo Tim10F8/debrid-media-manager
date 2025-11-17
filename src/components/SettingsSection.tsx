@@ -7,6 +7,7 @@ import {
 	defaultEpisodeSize,
 	defaultMagnetHandlerEnabled,
 	defaultMovieSize,
+	defaultOtherStreamsLimit,
 	defaultPlayer,
 	defaultTorrentsFilter,
 } from '../utils/settings';
@@ -24,6 +25,9 @@ export const SettingsSection = () => {
 	);
 	const [episodeMaxSize, setEpisodeMaxSize] = useState(() =>
 		getLocalStorageItemOrDefault('settings:episodeMaxSize', defaultEpisodeSize)
+	);
+	const [otherStreamsLimit, setOtherStreamsLimit] = useState(() =>
+		getLocalStorageItemOrDefault('settings:otherStreamsLimit', defaultOtherStreamsLimit)
 	);
 	const [onlyTrustedTorrents, setOnlyTrustedTorrents] = useState(() =>
 		getLocalStorageBoolean('settings:onlyTrustedTorrents', false)
@@ -83,7 +87,11 @@ export const SettingsSection = () => {
 		if (typeof localStorage !== 'undefined') localStorage.setItem('settings:player', value);
 	};
 
-	const updateCastSizeLimits = async (movieSize?: string, episodeSize?: string) => {
+	const updateCastSizeLimits = async (
+		movieSize?: string,
+		episodeSize?: string,
+		streamsLimit?: string
+	) => {
 		if (typeof localStorage === 'undefined') return;
 
 		const castToken = localStorage.getItem('rd:castToken');
@@ -103,6 +111,8 @@ export const SettingsSection = () => {
 					refreshToken,
 					movieMaxSize: movieSize !== undefined ? Number(movieSize) : undefined,
 					episodeMaxSize: episodeSize !== undefined ? Number(episodeSize) : undefined,
+					otherStreamsLimit:
+						streamsLimit !== undefined ? Number(streamsLimit) : undefined,
 				}),
 			});
 		} catch (error) {
@@ -115,7 +125,7 @@ export const SettingsSection = () => {
 		setMovieMaxSize(value);
 		if (typeof localStorage !== 'undefined') {
 			localStorage.setItem('settings:movieMaxSize', value);
-			updateCastSizeLimits(value, undefined);
+			updateCastSizeLimits(value, undefined, undefined);
 		}
 	};
 
@@ -124,7 +134,16 @@ export const SettingsSection = () => {
 		setEpisodeMaxSize(value);
 		if (typeof localStorage !== 'undefined') {
 			localStorage.setItem('settings:episodeMaxSize', value);
-			updateCastSizeLimits(undefined, value);
+			updateCastSizeLimits(undefined, value, undefined);
+		}
+	};
+
+	const handleOtherStreamsLimitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+		const value = e.target.value;
+		setOtherStreamsLimit(value);
+		if (typeof localStorage !== 'undefined') {
+			localStorage.setItem('settings:otherStreamsLimit', value);
+			updateCastSizeLimits(undefined, undefined, value);
 		}
 	};
 
@@ -350,8 +369,25 @@ export const SettingsSection = () => {
 										<option value="5">5 GB (~35 Mbps)</option>
 										<option value="0">Biggest available</option>
 									</select>
+								</div>
+
+								<div className="flex flex-col gap-1">
+									<label className="font-semibold">Other streams limit</label>
+									<select
+										id="dmm-other-streams-limit"
+										className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
+										value={otherStreamsLimit}
+										onChange={handleOtherStreamsLimitChange}
+									>
+										<option value="0">Don&apos;t show other streams</option>
+										<option value="1">1 stream</option>
+										<option value="2">2 streams</option>
+										<option value="3">3 streams</option>
+										<option value="5">5 streams</option>
+										<option value="10">10 streams</option>
+									</select>
 									<p className="mt-1 text-xs text-gray-400">
-										💡 These size limits also apply to the Stremio Cast addon
+										💡 These settings also apply to the Stremio Cast addon
 										stream selection
 									</p>
 								</div>

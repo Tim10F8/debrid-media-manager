@@ -78,11 +78,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	try {
 		const maxSize = typeSlug === 'movie' ? profile.movieMaxSize : profile.episodeMaxSize;
+		const otherStreamsLimit = profile.otherStreamsLimit ?? 5;
 
 		// get urls from db
 		const [userCastItems, otherItems] = await Promise.all([
 			db.getUserCastStreams(imdbidStr, userid, 5),
-			db.getOtherStreams(imdbidStr, userid, 5, maxSize > 0 ? maxSize : undefined),
+			db.getOtherStreams(
+				imdbidStr,
+				userid,
+				otherStreamsLimit,
+				maxSize > 0 ? maxSize : undefined
+			),
 		]);
 
 		const allHashes = [

@@ -11,14 +11,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 
 	try {
-		const { clientId, clientSecret, refreshToken, movieMaxSize, episodeMaxSize } = req.body;
+		const {
+			clientId,
+			clientSecret,
+			refreshToken,
+			movieMaxSize,
+			episodeMaxSize,
+			otherStreamsLimit,
+		} = req.body;
 
 		if (!clientId || !clientSecret) {
 			return res.status(400).json({ error: 'Missing required fields' });
 		}
 
-		if (movieMaxSize === undefined && episodeMaxSize === undefined) {
-			return res.status(400).json({ error: 'At least one size limit must be provided' });
+		if (
+			movieMaxSize === undefined &&
+			episodeMaxSize === undefined &&
+			otherStreamsLimit === undefined
+		) {
+			return res.status(400).json({
+				error: 'At least one setting (size limit or streams limit) must be provided',
+			});
 		}
 
 		let response: { access_token: string } | null = null;
@@ -41,7 +54,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			clientSecret,
 			refreshToken || null,
 			movieMaxSize !== undefined ? Number(movieMaxSize) : undefined,
-			episodeMaxSize !== undefined ? Number(episodeMaxSize) : undefined
+			episodeMaxSize !== undefined ? Number(episodeMaxSize) : undefined,
+			otherStreamsLimit !== undefined ? Number(otherStreamsLimit) : undefined
 		);
 
 		return res.status(200).json(profile);

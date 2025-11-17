@@ -123,7 +123,8 @@ export class CastService extends DatabaseClient {
 		clientSecret: string,
 		refreshToken: string | null = null,
 		movieMaxSize?: number,
-		episodeMaxSize?: number
+		episodeMaxSize?: number,
+		otherStreamsLimit?: number
 	) {
 		return this.prisma.castProfile.upsert({
 			where: {
@@ -135,6 +136,7 @@ export class CastService extends DatabaseClient {
 				refreshToken: refreshToken ?? undefined,
 				...(movieMaxSize !== undefined && { movieMaxSize }),
 				...(episodeMaxSize !== undefined && { episodeMaxSize }),
+				...(otherStreamsLimit !== undefined && { otherStreamsLimit }),
 				updatedAt: new Date(),
 			},
 			create: {
@@ -144,6 +146,7 @@ export class CastService extends DatabaseClient {
 				refreshToken: refreshToken ?? '',
 				movieMaxSize: movieMaxSize ?? 0,
 				episodeMaxSize: episodeMaxSize ?? 0,
+				otherStreamsLimit: otherStreamsLimit ?? 5,
 				updatedAt: new Date(),
 			},
 		});
@@ -244,6 +247,7 @@ export class CastService extends DatabaseClient {
 		refreshToken: string;
 		movieMaxSize: number;
 		episodeMaxSize: number;
+		otherStreamsLimit: number;
 	} | null> {
 		const profile = await this.prisma.castProfile.findUnique({
 			where: { userId },
@@ -253,6 +257,7 @@ export class CastService extends DatabaseClient {
 				refreshToken: true,
 				movieMaxSize: true,
 				episodeMaxSize: true,
+				otherStreamsLimit: true,
 			},
 		});
 		return profile;

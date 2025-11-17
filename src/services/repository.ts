@@ -205,7 +205,8 @@ export class Repository {
 		clientSecret: string,
 		refreshToken?: string | null,
 		movieMaxSize?: number,
-		episodeMaxSize?: number
+		episodeMaxSize?: number,
+		otherStreamsLimit?: number
 	) {
 		return this.castService.saveCastProfile(
 			userId,
@@ -213,7 +214,8 @@ export class Repository {
 			clientSecret,
 			refreshToken,
 			movieMaxSize,
-			episodeMaxSize
+			episodeMaxSize,
+			otherStreamsLimit
 		);
 	}
 

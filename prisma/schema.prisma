@@ -47,13 +47,14 @@ model Cast {
 }
 
 model CastProfile {
-  userId          String   @id
-  clientId        String
-  clientSecret    String
-  updatedAt       DateTime @updatedAt
-  refreshToken    String
-  movieMaxSize    Float    @default(0)
-  episodeMaxSize  Float    @default(0)
+  userId             String   @id
+  clientId           String
+  clientSecret       String
+  updatedAt          DateTime @updatedAt
+  refreshToken       String
+  movieMaxSize       Float    @default(0)
+  episodeMaxSize     Float    @default(0)
+  otherStreamsLimit  Int      @default(5)
 }
 
 model Titles {

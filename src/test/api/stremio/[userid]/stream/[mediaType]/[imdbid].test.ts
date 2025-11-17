@@ -145,6 +145,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 10,
 			episodeMaxSize: 3,
+			otherStreamsLimit: 5,
 		});
 		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
 			{
@@ -199,6 +200,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 10,
 			episodeMaxSize: 3,
+			otherStreamsLimit: 5,
 		});
 		mockRepository.getUserCastStreams = vi.fn().mockRejectedValue(new Error('db'));
 
@@ -224,6 +226,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 10,
 			episodeMaxSize: 3,
+			otherStreamsLimit: 5,
 		});
 		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
 			{
@@ -285,6 +288,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 10,
 			episodeMaxSize: 3,
+			otherStreamsLimit: 5,
 		});
 		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
 			{
@@ -362,6 +366,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 10,
 			episodeMaxSize: 3,
+			otherStreamsLimit: 5,
 		});
 		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
 			{
@@ -403,6 +408,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 10,
 			episodeMaxSize: 3,
+			otherStreamsLimit: 5,
 		});
 		mockRepository.getUserCastStreams = vi.fn().mockResolvedValue([
 			{

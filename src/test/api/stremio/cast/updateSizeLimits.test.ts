@@ -41,13 +41,13 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 		expect(res.json).toHaveBeenCalledWith({ error: 'Missing required fields' });
 	});
 
-	it('returns 400 if no size limits are provided', async () => {
+	it('returns 400 if no settings are provided', async () => {
 		req.body = { clientId: 'client', clientSecret: 'secret' };
 		await handler(req as NextApiRequest, res as NextApiResponse);
 
 		expect(res.status).toHaveBeenCalledWith(400);
 		expect(res.json).toHaveBeenCalledWith({
-			error: 'At least one size limit must be provided',
+			error: 'At least one setting (size limit or streams limit) must be provided',
 		});
 	});
 
@@ -75,6 +75,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 15,
 			episodeMaxSize: 0,
+			otherStreamsLimit: 5,
 			updatedAt: new Date(),
 		});
 
@@ -87,6 +88,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			'secret',
 			'refresh',
 			15,
+			undefined,
 			undefined
 		);
 		expect(res.status).toHaveBeenCalledWith(200);
@@ -109,6 +111,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 0,
 			episodeMaxSize: 3,
+			otherStreamsLimit: 5,
 			updatedAt: new Date(),
 		});
 
@@ -120,7 +123,8 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			'secret',
 			'refresh',
 			undefined,
-			3
+			3,
+			undefined
 		);
 		expect(res.status).toHaveBeenCalledWith(200);
 	});
@@ -143,6 +147,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			refreshToken: 'refresh',
 			movieMaxSize: 15,
 			episodeMaxSize: 3,
+			otherStreamsLimit: 5,
 			updatedAt: new Date(),
 		});
 
@@ -154,7 +159,80 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			'secret',
 			'refresh',
 			15,
-			3
+			3,
+			undefined
+		);
+		expect(res.status).toHaveBeenCalledWith(200);
+	});
+
+	it('updates other streams limit successfully', async () => {
+		req.body = {
+			clientId: 'client',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			otherStreamsLimit: 10,
+		};
+
+		vi.spyOn(rdModule, 'getToken').mockResolvedValue(tokenResponse);
+		vi.spyOn(castHelpersModule, 'generateUserId').mockResolvedValue('user123');
+		vi.spyOn(repoModule.repository, 'saveCastProfile').mockResolvedValue({
+			userId: 'user123',
+			clientId: 'client',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			movieMaxSize: 0,
+			episodeMaxSize: 0,
+			otherStreamsLimit: 10,
+			updatedAt: new Date(),
+		});
+
+		await handler(req as NextApiRequest, res as NextApiResponse);
+
+		expect(repoModule.repository.saveCastProfile).toHaveBeenCalledWith(
+			'user123',
+			'client',
+			'secret',
+			'refresh',
+			undefined,
+			undefined,
+			10
+		);
+		expect(res.status).toHaveBeenCalledWith(200);
+	});
+
+	it('updates all settings successfully', async () => {
+		req.body = {
+			clientId: 'client',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			movieMaxSize: 15,
+			episodeMaxSize: 3,
+			otherStreamsLimit: 10,
+		};
+
+		vi.spyOn(rdModule, 'getToken').mockResolvedValue(tokenResponse);
+		vi.spyOn(castHelpersModule, 'generateUserId').mockResolvedValue('user123');
+		vi.spyOn(repoModule.repository, 'saveCastProfile').mockResolvedValue({
+			userId: 'user123',
+			clientId: 'client',
+			clientSecret: 'secret',
+			refreshToken: 'refresh',
+			movieMaxSize: 15,
+			episodeMaxSize: 3,
+			otherStreamsLimit: 10,
+			updatedAt: new Date(),
+		});
+
+		await handler(req as NextApiRequest, res as NextApiResponse);
+
+		expect(repoModule.repository.saveCastProfile).toHaveBeenCalledWith(
+			'user123',
+			'client',
+			'secret',
+			'refresh',
+			15,
+			3,
+			10
 		);
 		expect(res.status).toHaveBeenCalledWith(200);
 	});
