@@ -95,11 +95,15 @@ export const SettingsSection = () => {
 		if (typeof localStorage === 'undefined') return;
 
 		const castToken = localStorage.getItem('rd:castToken');
-		const clientId = localStorage.getItem('rd:clientId');
-		const clientSecret = localStorage.getItem('rd:clientSecret');
-		const refreshToken = localStorage.getItem('rd:refreshToken');
+		const clientIdRaw = localStorage.getItem('rd:clientId');
+		const clientSecretRaw = localStorage.getItem('rd:clientSecret');
+		const refreshTokenRaw = localStorage.getItem('rd:refreshToken');
 
-		if (!castToken || !clientId || !clientSecret) return;
+		if (!castToken || !clientIdRaw || !clientSecretRaw) return;
+
+		const clientId = JSON.parse(clientIdRaw);
+		const clientSecret = JSON.parse(clientSecretRaw);
+		const refreshToken = refreshTokenRaw ? JSON.parse(refreshTokenRaw) : null;
 
 		try {
 			await fetch('/api/stremio/cast/updateSizeLimits', {
