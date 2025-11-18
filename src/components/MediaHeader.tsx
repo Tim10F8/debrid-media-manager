@@ -1,5 +1,6 @@
 import Poster from '@/components/poster';
 import RelatedMedia from '@/components/RelatedMedia';
+import { Info } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import React from 'react';
@@ -74,9 +75,18 @@ const MediaHeader: React.FC<MediaHeaderProps> = ({
 				</Link>
 			</div>
 
-			<h2 className="text-xl font-bold [text-shadow:_0_2px_0_rgb(0_0_0_/_80%)]">
-				{displayTitle}
-			</h2>
+			<div className="flex items-center gap-2">
+				<h2 className="text-xl font-bold [text-shadow:_0_2px_0_rgb(0_0_0_/_80%)]">
+					{displayTitle}
+				</h2>
+				<Link
+					href={`/${mediaType === 'movie' ? 'movie' : 'show'}/${imdbId}/info`}
+					className="rounded border border-indigo-500 bg-indigo-900/30 p-1 text-indigo-100 transition-colors hover:bg-indigo-800/50"
+					title="View detailed information"
+				>
+					<Info size={18} />
+				</Link>
+			</div>
 
 			<div className="h-fit w-fit bg-slate-900/75" onClick={onDescToggle}>
 				{descLimit > 0 ? description.substring(0, descLimit) + '..' : description}{' '}
