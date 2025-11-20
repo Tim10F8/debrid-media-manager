@@ -107,6 +107,10 @@ const MediaHeader: React.FC<MediaHeaderProps> = ({
 							<Play size={18} />
 						</button>
 					)}
+					<RelatedMedia
+						imdbId={imdbId}
+						mediaType={mediaType === 'tv' ? 'show' : 'movie'}
+					/>
 				</div>
 
 				<div className="h-fit w-fit bg-slate-900/75" onClick={onDescToggle}>
@@ -122,13 +126,7 @@ const MediaHeader: React.FC<MediaHeaderProps> = ({
 
 				{additionalInfo}
 
-				<div className="flex flex-wrap items-center gap-2">
-					{actionButtons}
-					<RelatedMedia
-						imdbId={imdbId}
-						mediaType={mediaType === 'tv' ? 'show' : 'movie'}
-					/>
-				</div>
+				<div className="flex flex-wrap items-center gap-2">{actionButtons}</div>
 			</div>
 		</>
 	);
