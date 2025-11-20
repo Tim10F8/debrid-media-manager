@@ -22,14 +22,14 @@ describe('RelatedMedia', () => {
 
 	it('navigates to the related movie page on click', async () => {
 		render(<RelatedMedia imdbId="tt1234567" mediaType="movie" />);
-		await userEvent.click(screen.getByRole('button', { name: /show related/i }));
+		await userEvent.click(screen.getByRole('button', { name: /show related media/i }));
 
 		expect(pushMock).toHaveBeenCalledWith('/movie/tt1234567/related');
 	});
 
 	it('opens a new tab when modifier keys are pressed', async () => {
 		render(<RelatedMedia imdbId="tt7654321" mediaType="show" />);
-		fireEvent.click(screen.getByRole('button', { name: /show related/i }), {
+		fireEvent.click(screen.getByRole('button', { name: /show related media/i }), {
 			metaKey: true,
 		});
 

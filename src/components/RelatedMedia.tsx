@@ -23,14 +23,12 @@ export default function RelatedMedia({ imdbId, mediaType }: RelatedMediaProps) {
 
 	return (
 		<button
-			className="mb-1 mr-2 mt-0 rounded border-2 border-indigo-500 bg-indigo-900/30 p-1 text-xs text-indigo-100 transition-colors hover:bg-indigo-800/50"
+			className="rounded border border-purple-500 bg-purple-900/30 p-1 text-purple-100 transition-colors hover:bg-purple-800/50"
 			onClick={handleNavigate}
 			type="button"
+			title="Show related media"
 		>
-			<b className="flex items-center justify-center">
-				<Popcorn className="mr-1 h-3 w-3" />
-				Show Related
-			</b>
+			<Popcorn size={18} />
 		</button>
 	);
 }
