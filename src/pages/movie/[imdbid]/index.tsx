@@ -41,6 +41,7 @@ type MovieInfo = {
 	backdrop: string;
 	year: string;
 	imdb_score: number;
+	trailer: string;
 };
 
 const torrentDB = new UserTorrentDB();
@@ -72,6 +73,7 @@ const MovieSearch: FunctionComponent = () => {
 		backdrop: '',
 		year: '',
 		imdb_score: 0,
+		trailer: '',
 	});
 
 	// Settings
@@ -690,6 +692,7 @@ const MovieSearch: FunctionComponent = () => {
 				descLimit={descLimit}
 				onDescToggle={() => setDescLimit(0)}
 				actionButtons={handleActionButtons()}
+				trailer={movieInfo.trailer}
 			/>
 
 			{searchState === 'loading' && (

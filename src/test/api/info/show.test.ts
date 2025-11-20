@@ -88,6 +88,7 @@ describe('/api/info/show', () => {
 				2: 10,
 				3: 3,
 			},
+			trailer: '',
 		});
 	});
 

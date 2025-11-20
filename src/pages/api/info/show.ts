@@ -131,6 +131,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			});
 		}
 
+		let trailer = mdbResponse?.trailer ?? '';
+
+		if (!trailer && cinemetaResponse.meta?.trailers?.[0]?.source) {
+			trailer = `https://youtube.com/watch?v=${cinemetaResponse.meta.trailers[0].source}`;
+		}
+
+		if (!trailer && mdbResponse?.tmdbid) {
+			try {
+				const tmdbKey = process.env.TMDB_KEY;
+				if (tmdbKey) {
+					const tmdbResponse = await axios.get(
+						`https://api.themoviedb.org/3/tv/${mdbResponse.tmdbid}/videos?api_key=${tmdbKey}`
+					);
+					const tmdbTrailer = tmdbResponse.data.results?.find(
+						(v: any) => v.type === 'Trailer' && v.site === 'YouTube'
+					);
+					if (tmdbTrailer?.key) {
+						trailer = `https://youtube.com/watch?v=${tmdbTrailer.key}`;
+					}
+				}
+			} catch (error) {
+				console.error('Error fetching TMDB trailer:', error);
+			}
+		}
+
 		const responseData = {
 			title,
 			description: mdbResponse?.description ?? cinemetaResponse?.meta?.description ?? 'n/a',
@@ -143,6 +168,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			season_names,
 			imdb_score: imdb_score ?? 0,
 			season_episode_counts,
+			trailer,
 		};
 
 		console.log(`[show.ts] Final response for ${imdbid}:`, {

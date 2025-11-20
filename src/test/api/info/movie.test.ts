@@ -91,6 +91,7 @@ describe('/api/info/movie', () => {
 			backdrop: 'mdb-backdrop',
 			year: 2020,
 			imdb_score: 75,
+			trailer: '',
 		});
 	});
 
@@ -114,6 +115,7 @@ describe('/api/info/movie', () => {
 			backdrop: 'https://source.unsplash.com/random/1800x300?movie',
 			year: '????',
 			imdb_score: 0,
+			trailer: '',
 		});
 		consoleSpy.mockRestore();
 	});

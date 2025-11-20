@@ -48,6 +48,7 @@ type ShowInfo = {
 	season_names: string[];
 	imdb_score: number;
 	season_episode_counts: Record<number, number>;
+	trailer: string;
 };
 
 const torrentDB = new UserTorrentDB();
@@ -948,6 +949,7 @@ const TvSearch: FunctionComponent = () => {
 				onDescToggle={() => setDescLimit(0)}
 				actionButtons={headerActionButtons}
 				additionalInfo={seasonNavigation}
+				trailer={showInfo.trailer}
 			/>
 
 			{searchState === 'loading' && (
