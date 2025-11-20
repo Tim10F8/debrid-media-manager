@@ -1,5 +1,7 @@
+import TrailerModal from '@/components/TrailerModal';
 import { formatGenreForUrl, mapTmdbGenreToTrakt } from '@/utils/genreMapping';
 import axios from 'axios';
+import { Play, Popcorn } from 'lucide-react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -43,6 +45,8 @@ export default function MovieInfoPage() {
 	const [movieDetails, setMovieDetails] = useState<MovieDetails | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
+	const [trailerUrl, setTrailerUrl] = useState<string>('');
+	const [showTrailer, setShowTrailer] = useState(false);
 
 	const fetchDetails = useCallback(async () => {
 		if (!imdbId) return;
@@ -50,10 +54,16 @@ export default function MovieInfoPage() {
 		setIsLoading(true);
 		setStatusMessage(null);
 		try {
-			const response = await axios.get<MovieDetails>(`/api/info/movie-details`, {
-				params: { imdbId },
-			});
-			setMovieDetails(response.data);
+			const [detailsResponse, infoResponse] = await Promise.all([
+				axios.get<MovieDetails>(`/api/info/movie-details`, {
+					params: { imdbId },
+				}),
+				axios.get<{ trailer: string }>(`/api/info/movie`, {
+					params: { imdbid: imdbId },
+				}),
+			]);
+			setMovieDetails(detailsResponse.data);
+			setTrailerUrl(infoResponse.data.trailer || '');
 		} catch (requestError) {
 			console.error('Failed to load movie details', { imdbId, requestError });
 			setStatusMessage('Failed to load movie details.');
@@ -88,12 +98,36 @@ export default function MovieInfoPage() {
 				/>
 			)}
 
+			{showTrailer && trailerUrl && (
+				<TrailerModal
+					trailerUrl={trailerUrl}
+					onClose={() => setShowTrailer(false)}
+					title={movieDetails?.title || ''}
+				/>
+			)}
+
 			<main className="mx-auto max-w-6xl px-4 py-4">
 				<div className="mb-4 flex items-end justify-between gap-3">
-					<div>
+					<div className="flex items-center gap-2">
 						<h1 className="text-3xl font-bold">
 							{movieDetails?.title || 'Loading...'}
 						</h1>
+						{trailerUrl && (
+							<button
+								onClick={() => setShowTrailer(true)}
+								className="rounded border border-red-500 bg-red-900/30 p-1 text-red-100 transition-colors hover:bg-red-800/50"
+								title="Watch trailer"
+							>
+								<Play size={18} />
+							</button>
+						)}
+						<button
+							onClick={() => router.push(`/movie/${imdbId}/related`)}
+							className="rounded border border-purple-500 bg-purple-900/30 p-1 text-purple-100 transition-colors hover:bg-purple-800/50"
+							title="Show related media"
+						>
+							<Popcorn size={18} />
+						</button>
 					</div>
 					<Link
 						href={`/movie/${imdbId}`}
