@@ -16,7 +16,7 @@ To make this process even easier, I've developed this **free** and open source w
 
 ## Features
 
-This builds on top of the amazing service brought by [Real-Debrid](http://real-debrid.com/?id=440161) and [AllDebrid](https://alldebrid.com/?uid=1kk5i&lang=en).
+This builds on top of the amazing service brought by [Real-Debrid](http://real-debrid.com/?id=440161), [AllDebrid](https://alldebrid.com/?uid=1kk5i&lang=en), and [TorBox](https://torbox.app/subscription?referral=74ffa560-7381-4a18-adb1-cef97378c670).
 
 ### Library management
 
@@ -24,7 +24,19 @@ You can see all your torrents in one page, sort them by name, by size, by "quali
 
 ### Torrent search
 
-You can add more content to your library by searching the DHT (powered by BtDigg). It detects what you already have downloaded and currently downloading in your library too.
+You can add more content to your library by searching the DHT (powered by BtDigg) or via Jackett/Prowlarr integration. It detects what you already have downloaded and currently downloading in your library too.
+
+### Movie and TV show info pages
+
+Browse detailed information about movies and TV shows including cast, crew, trailers, and related content. View comprehensive person filmography pages to explore an actor's or director's complete work.
+
+### Stremio integration
+
+Use DMM as a Stremio addon to stream your debrid library directly through Stremio. Includes a Cast addon for sharing your library streams.
+
+### Trakt integration
+
+Sync with your Trakt watchlist, collection, and custom lists to easily add content to your library.
 
 ### Share your library and mirror other libraries
 
@@ -33,15 +45,21 @@ You can share your whole collection or select specific items you want to share. 
 ## Setup
 
 0. Signup for a free tier plan at [PlanetScale](https://planetscale.com/) - this is a serverless MySQL database hosted in the cloud
-1. Have Tor running at `127.0.0.1:9050` (needed for DHT search; if you don't need your own search database then refer to the secion `External Search API`)
+1. Have Tor running at `127.0.0.1:9050` (needed for DHT search; if you don't need your own search database then refer to the section `External Search API`)
 2. Clone this repository and go to the directory
 3. Create a copy of the `.env` file `cp .env .env.local` and fill in the details
-4. Fill in required settings in `.env.local` (e.g. `PROXY=socks5h://127.0.0.1:9050` if tor is running on your host machine)
-5. Get your Prisma database connection string from PlanetScale console and put that in your `.env.local` file
-6. Set `ZURGTORRENT_SYNC_SECRET` in `.env.local` (or your deployment environment); this must match the `DMM_SNAPSHOT_TOKEN` secret configured on the zurgtorrent Cloudflare Worker so snapshot ingest requests are accepted and is also used to derive read passwords for stored snapshots
-7. Install the dependencies `npm i`
-8. This is a Next.js project so either go with `npm run dev` or `npm run build && npm run start`
-9. Head to `localhost:3000` and login
+4. Fill in required settings in `.env.local`:
+   - `PROXY=socks5h://127.0.0.1:9050` (if tor is running on your host machine)
+   - `DATABASE_URL` - Get your Prisma database connection string from PlanetScale console
+   - `ZURGTORRENT_SYNC_SECRET` - Must match the `DMM_SNAPSHOT_TOKEN` secret configured on the zurgtorrent Cloudflare Worker
+5. (Optional) Configure additional integrations in `.env.local`:
+   - `TMDB_KEY`, `OMDB_KEY`, `MDBLIST_KEY` - For enhanced movie/show metadata and info pages
+   - `JACKETT` and `JACKETT_KEY` or `PROWLARR` and `PROWLARR_KEY` - For torrent search
+   - `TRAKT_CLIENT_ID` and `TRAKT_CLIENT_SECRET` - For Trakt integration
+   - `PATREON_*`, `GITHUB_*`, `DISCORD_*` - For authentication providers
+6. Install the dependencies `npm i`
+7. This is a Next.js project so either go with `npm run dev` or `npm run build && npm run start`
+8. Head to `localhost:3000` and login
 
 ### External Search API
 
@@ -52,7 +70,7 @@ If you don't want to build your own library, edit the config `EXTERNAL_SEARCH_AP
 ```
 cp .env .env.local
 docker swarm init
-docker stack deploy -c docker-compose.yml
+docker stack deploy -c docker-compose.yml dmm
 ```
 
 The website will be accessible at `http://localhost:3000`
