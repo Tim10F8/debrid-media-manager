@@ -1,4 +1,3 @@
-import type { Env } from '@next/env';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { vi } from 'vitest';
 
@@ -67,7 +66,7 @@ export function createMockRequest(overrides: Partial<NextApiRequest> = {}): Next
 		body: {},
 		headers: {},
 		url: '/api/test',
-		env: process.env as Env,
+		env: process.env as NodeJS.ProcessEnv,
 		draftMode: false,
 		preview: false,
 		previewData: undefined,
