@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import getConfig from 'next/config';
 
+import { getMdblistCacheService } from '@/services/database/mdblistCache';
 import { getTmdbKey } from '@/utils/freekeys';
 
 const TRAKT_BASE_URL = 'https://api.trakt.tv';
@@ -30,11 +31,41 @@ type CalendarEvent = {
 	source: 'trakt';
 	ids: Record<string, string | number>;
 	network?: string;
+	country?: string;
 };
 
 type CalendarDay = {
 	date: string;
 	items: CalendarEvent[];
+};
+
+type CalendarResponse = {
+	range: { start: string; days: number };
+	days: CalendarDay[];
+	tmdb: {
+		airingToday: {
+			id: number;
+			name: string;
+			first_air_date?: string;
+			poster_path?: string;
+			next_episode_to_air?: {
+				season_number?: number;
+				episode_number?: number;
+				air_date?: string;
+			};
+		}[];
+		onTheAir: {
+			id: number;
+			name: string;
+			first_air_date?: string;
+			poster_path?: string;
+			next_episode_to_air?: {
+				season_number?: number;
+				episode_number?: number;
+				air_date?: string;
+			};
+		}[];
+	};
 };
 
 const makeEventKey = (event: CalendarEvent, dateOverride?: string) => {
@@ -95,6 +126,7 @@ const mapTraktItems = (items: TraktCalendarItem[], isPremiere: boolean) => {
 			source: 'trakt',
 			ids: item.show?.ids || {},
 			network: item.show?.network || item.show?.country,
+			country: item.show?.country?.toLowerCase(),
 		};
 
 		addEventToDay(grouped, day, event);
@@ -109,6 +141,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	const startDate =
 		typeof start === 'string' && start ? start : new Date().toISOString().slice(0, 10);
 	const dayCount = Math.min(Math.max(parseInt(String(days ?? ''), 10) || 7, 1), 31);
+	const cacheKey = `calendar_${startDate}_${dayCount}`;
+	const cacheTtlMs = 60 * 60 * 1000; // 1 hour
+	const cache = getMdblistCacheService();
+
+	try {
+		const cached = await cache.getWithMetadata(cacheKey);
+		if (cached) {
+			const ageMs = Date.now() - cached.updatedAt.getTime();
+			if (ageMs < cacheTtlMs) {
+				res.setHeader('Cache-Control', 'public, max-age=3600');
+				return res.status(200).json(cached.data as CalendarResponse);
+			}
+		}
+	} catch (err) {
+		console.error('Calendar cache read failed', err);
+	}
 
 	const traktClientId = resolveTraktClientId();
 	if (!traktClientId) {
@@ -129,12 +177,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				`${TRAKT_BASE_URL}/calendars/all/shows/${startDate}/${dayCount}`,
 				{
 					headers: traktHeaders,
+					params: { extended: 'full' },
 				}
 			),
 			axios.get<TraktCalendarItem[]>(
 				`${TRAKT_BASE_URL}/calendars/all/shows/premieres/${startDate}/${dayCount}`,
 				{
 					headers: traktHeaders,
+					params: { extended: 'full' },
 				}
 			),
 			axios.get(`https://api.themoviedb.org/3/tv/airing_today`, {
@@ -183,11 +233,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				}))
 			: [];
 
-		return res.status(200).json({
+		const payload: CalendarResponse = {
 			range: { start: startDate, days: dayCount },
 			days: daysArray,
 			tmdb: { airingToday: tmdbAiringToday, onTheAir: tmdbOnTheAir },
-		});
+		};
+
+		try {
+			await cache.set(cacheKey, 'calendar', payload);
+		} catch (err) {
+			console.error('Calendar cache write failed', err);
+		}
+
+		res.setHeader('Cache-Control', 'public, max-age=3600');
+		return res.status(200).json(payload);
 	} catch (error: any) {
 		console.error('Calendar fetch failed', error?.response?.status, error?.message);
 		return res.status(500).json({ error: 'Failed to load calendar data' });

@@ -11,6 +11,7 @@ type CalendarEvent = {
 	isPremiere: boolean;
 	ids: Record<string, string | number>;
 	network?: string;
+	country?: string;
 };
 
 type CalendarDay = {
@@ -211,9 +212,8 @@ function CalendarPage() {
 
 	const queryTerms = useMemo(() => query.toLowerCase().split(/\s+/).filter(Boolean), [query]);
 
-	const dayColumns = useMemo(() => {
+	const searchFilteredDays = useMemo(() => {
 		if (!data) return [];
-		if (queryTerms.length === 0) return data.days;
 
 		return data.days
 			.map((day) => {
@@ -224,6 +224,11 @@ function CalendarPage() {
 			})
 			.filter((day) => day.items.length > 0);
 	}, [data, queryTerms]);
+
+	const dayColumns = useMemo(() => {
+		if (!searchFilteredDays.length) return [];
+		return searchFilteredDays;
+	}, [searchFilteredDays]);
 
 	const filteredEvents = useMemo(() => {
 		return dayColumns.flatMap((day) =>
@@ -334,9 +339,6 @@ function CalendarPage() {
 					<div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 						<div className="space-y-0.5">
 							<h1 className="text-xl font-semibold text-white">Episode Calendar</h1>
-							<p className="text-xs text-gray-300 sm:text-sm">
-								Trakt calendar: past 7 days and next 7 days for quick planning.
-							</p>
 							<p className="text-xs text-gray-500">
 								{calendarWindow
 									? `Window: ${calendarWindow}`
@@ -382,10 +384,6 @@ function CalendarPage() {
 							/>
 						</div>
 						<div className="flex flex-col gap-2 sm:flex-1 sm:flex-row sm:items-center sm:justify-between">
-							<p className="text-xs text-gray-400 sm:max-w-xs">
-								Filters the 14-day window like the library quick search; supports
-								multiple terms and regex.
-							</p>
 							{hasSearch && filteredEvents.length > 0 && (
 								<button
 									onClick={handleExportFilteredIcs}
@@ -395,14 +393,6 @@ function CalendarPage() {
 								</button>
 							)}
 						</div>
-					</div>
-					<div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-gray-300">
-						<span className={`${badgeClasses} bg-cyan-900/50 text-cyan-200`}>
-							Trakt
-						</span>
-						<span className={`${badgeClasses} bg-amber-900/60 text-amber-200`}>
-							Premiere
-						</span>
 					</div>
 				</section>
 
