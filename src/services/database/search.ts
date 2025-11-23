@@ -13,16 +13,17 @@ export class SearchService extends DatabaseClient {
 		const cacheEntry = await this.prisma.search.findUnique({ where: { key } });
 
 		if (cacheEntry) {
-			const updatedAt = cacheEntry.updatedAt;
-			const now = new Date();
-			const differenceInHours =
-				Math.abs(now.getTime() - updatedAt.getTime()) / 1000 / 60 / 60;
+			const updatedAt = cacheEntry.updatedAt.getTime();
+			const now = Date.now();
+			const ageMs = now - updatedAt;
+			const maxAgeMs = 48 * 60 * 60 * 1000;
+			const allowedBoundaryDriftMs = 1000; // Allow tiny timing drift right at the cutoff
 
-			if (differenceInHours > 48) {
+			if (ageMs > maxAgeMs + allowedBoundaryDriftMs) {
 				return undefined;
-			} else {
-				return cacheEntry.value as T;
 			}
+
+			return cacheEntry.value as T;
 		}
 
 		return undefined;

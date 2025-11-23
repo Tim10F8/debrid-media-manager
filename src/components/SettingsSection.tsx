@@ -9,6 +9,8 @@ import {
 	defaultMovieSize,
 	defaultOtherStreamsLimit,
 	defaultPlayer,
+	defaultShowCalendarAddButtonsApple,
+	defaultShowCalendarAddButtonsGoogle,
 	defaultTorrentsFilter,
 } from '../utils/settings';
 
@@ -49,6 +51,18 @@ export const SettingsSection = () => {
 	);
 	const [includeTrackerStats, setIncludeTrackerStats] = useState(() =>
 		getLocalStorageBoolean('settings:includeTrackerStats', false)
+	);
+	const [showCalendarAddButtonsGoogle, setShowCalendarAddButtonsGoogle] = useState(() =>
+		getLocalStorageBoolean(
+			'settings:showCalendarAddButtonsGoogle',
+			defaultShowCalendarAddButtonsGoogle
+		)
+	);
+	const [showCalendarAddButtonsApple, setShowCalendarAddButtonsApple] = useState(() =>
+		getLocalStorageBoolean(
+			'settings:showCalendarAddButtonsApple',
+			defaultShowCalendarAddButtonsApple
+		)
 	);
 	const [enableTorrentio, setEnableTorrentio] = useState(() =>
 		getLocalStorageBoolean('settings:enableTorrentio', true)
@@ -177,6 +191,20 @@ export const SettingsSection = () => {
 		setShowMassReportButtons(checked);
 		if (typeof localStorage !== 'undefined')
 			localStorage.setItem('settings:showMassReportButtons', String(checked));
+	};
+
+	const handleShowCalendarAddButtonsGoogleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const checked = e.target.checked;
+		setShowCalendarAddButtonsGoogle(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:showCalendarAddButtonsGoogle', String(checked));
+	};
+
+	const handleShowCalendarAddButtonsAppleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const checked = e.target.checked;
+		setShowCalendarAddButtonsApple(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:showCalendarAddButtonsApple', String(checked));
 	};
 
 	const handleAvailabilityCheckLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -684,15 +712,53 @@ export const SettingsSection = () => {
 						<div className="rounded border-2 border-gray-500/30 p-4">
 							<div className="mb-2 text-sm font-semibold text-gray-200">Advanced</div>
 
-							<div className="flex items-center gap-2">
-								<input
-									id="dmm-show-mass-report-buttons"
-									type="checkbox"
-									className="h-5 w-5 rounded border-gray-600 bg-gray-800"
-									checked={showMassReportButtons}
-									onChange={handleMassReportButtonsChange}
-								/>
-								<label className="font-semibold">Show mass report buttons</label>
+							<div className="flex flex-col gap-3">
+								<div className="flex flex-col gap-2 rounded border border-cyan-500/30 p-3">
+									<div className="text-sm font-semibold text-cyan-200">
+										Episode Calendar buttons
+									</div>
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-show-calendar-add-buttons-google"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={showCalendarAddButtonsGoogle}
+											onChange={handleShowCalendarAddButtonsGoogleChange}
+										/>
+										<label className="font-semibold">
+											Show Google Calendar button
+										</label>
+									</div>
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-show-calendar-add-buttons-apple"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={showCalendarAddButtonsApple}
+											onChange={handleShowCalendarAddButtonsAppleChange}
+										/>
+										<label className="font-semibold">
+											Show Apple / .ics button
+										</label>
+									</div>
+									<span className="text-xs text-gray-400">
+										Toggle quick-add actions on the calendar page. Changes apply
+										immediately; default is hidden.
+									</span>
+								</div>
+
+								<div className="flex items-center gap-2">
+									<input
+										id="dmm-show-mass-report-buttons"
+										type="checkbox"
+										className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+										checked={showMassReportButtons}
+										onChange={handleMassReportButtonsChange}
+									/>
+									<label className="font-semibold">
+										Show mass report buttons
+									</label>
+								</div>
 							</div>
 						</div>
 					</div>
