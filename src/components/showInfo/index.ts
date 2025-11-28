@@ -44,7 +44,7 @@ export const showInfoForRD = async (
 
 	if (info.progress === 100 && !isIntact) {
 		if (info.links.length === 1) {
-			warning = `<div class="text-sm text-red-400">Warning: This torrent appears to have been rar'ed by Real-Debrid<br/></div>`;
+			warning = `<div class="text-sm text-red-400">Warning: This torrent appears to have been rar'ed by Real-Debrid (<a class="underline text-red-200" href="https://www.patreon.com/posts/that-annoying-rd-144564359" target="_blank" rel="noreferrer">zurg supports rar files</a>)<br/></div>`;
 		} else {
 			warning = `<div class="text-sm text-red-400">Warning: Some files have expired</div>`;
 		}
@@ -115,33 +115,33 @@ export const showInfoForRD = async (
 		? (() => {
 				return `
                 <div class="m-2 text-center">
-                    <div id="selection-count" class="mb-2 inline-flex items-center justify-center rounded border border-cyan-500/40 bg-gray-900 px-2 py-1 text-sm font-semibold text-cyan-200">
-                        ${info.files.filter((f: ApiTorrentFile) => f.selected === 1).length}/${info.files.length} files selected
-                    </div>
-                    <div class="flex flex-wrap justify-center gap-1 sm:gap-2">
+                    <div class="mb-2 flex flex-wrap items-center justify-center gap-2 rounded border border-cyan-500/40 bg-gray-900 px-2 py-1 text-sm font-semibold text-cyan-200">
+						<span id="selection-count">
+                        	${info.files.filter((f: ApiTorrentFile) => f.selected === 1).length}/${info.files.length} files selected
+						</span>
+						<button id="btn-toggle-selection"
+							class="px-2 bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+							title="Toggle selection"
+						>
+							<span class="inline-flex items-center">${icons.unselectAll}<span class="hidden sm:inline ml-1">Unselect All</span></span>
+						</button>
                         <button id="btn-only-videos"
                             class="px-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
                             title="Only Videos"
                         >
                             <span class="inline-flex items-center">${icons.selectVideos}<span class="hidden sm:inline ml-1">Only Videos</span></span>
                         </button>
-                        <button id="btn-unselect-all"
-                            class="px-2 bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
-                            title="Unselect All"
-                        >
-                            <span class="inline-flex items-center">${icons.unselectAll}<span class="hidden sm:inline ml-1">Unselect All</span></span>
-                        </button>
-                        <button id="btn-reset-selection"
+						<button id="btn-reset-selection"
                             class="px-2 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white font-medium rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
                             title="Reset Selection"
                         >
                             <span class="inline-flex items-center">${icons.reset}<span class="hidden sm:inline ml-1">Reset</span></span>
                         </button>
-                        <button id="btn-save-selection"
+						<button id="btn-save-selection"
                             class="px-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-sm shadow-lg transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
                             title="Save File Selection"
                         >
-                            <span class="inline-flex items-center">${icons.saveSelection}<span class="hidden sm:inline ml-1">Save Selection</span></span>
+                            <span class="inline-flex items-center">${icons.saveSelection}<span class="hidden sm:inline ml-1">Save</span></span>
                         </button>
                     </div>
                 </div>
@@ -219,15 +219,52 @@ export const showInfoForRD = async (
 			// Selection helpers
 			const checkboxes = () =>
 				Array.from(document.querySelectorAll<HTMLInputElement>('.file-selector'));
-			const updateSelectionCount = () => {
+			const initialSelection: Record<string, boolean> = {};
+			info.files.forEach((f: ApiTorrentFile) => (initialSelection[f.id] = f.selected === 1));
+			const saveSelectionBtn = document.getElementById(
+				'btn-save-selection'
+			) as HTMLButtonElement | null;
+			const updateSelectionState = () => {
 				const total = checkboxes().length;
 				const checked = checkboxes().filter((cb) => cb.checked).length;
+				const hasChanged = checkboxes().some((cb) => {
+					const fileId = cb.dataset.fileId;
+					const initiallyChecked = fileId ? !!initialSelection[fileId] : false;
+					return cb.checked !== initiallyChecked;
+				});
 				const el = document.getElementById('selection-count');
 				if (el) el.textContent = `${checked}/${total} files selected`;
+				const toggleBtn = document.getElementById(
+					'btn-toggle-selection'
+				) as HTMLButtonElement | null;
+				if (toggleBtn) {
+					const isUnselect = checked === total && total > 0;
+					toggleBtn.title = isUnselect ? 'Unselect All' : 'Select All';
+					toggleBtn.innerHTML = `<span class="inline-flex items-center">${isUnselect ? icons.unselectAll : icons.selectAll}<span class="hidden sm:inline ml-1">${isUnselect ? 'Unselect All' : 'Select All'}</span></span>`;
+				}
+				const resetBtn = document.getElementById(
+					'btn-reset-selection'
+				) as HTMLButtonElement | null;
+				if (saveSelectionBtn) {
+					const canSave = hasChanged && checked > 0;
+					saveSelectionBtn.hidden = !canSave;
+					saveSelectionBtn.disabled = !canSave;
+					saveSelectionBtn.classList.toggle('opacity-50', !canSave);
+					saveSelectionBtn.classList.toggle('pointer-events-none', !canSave);
+				}
+				if (resetBtn) {
+					resetBtn.hidden = !hasChanged;
+					resetBtn.disabled = !hasChanged;
+					resetBtn.classList.toggle('opacity-50', !hasChanged);
+					resetBtn.classList.toggle('pointer-events-none', !hasChanged);
+				}
 			};
-			checkboxes().forEach((cb) => cb.addEventListener('change', updateSelectionCount));
+			checkboxes().forEach((cb) => cb.addEventListener('change', updateSelectionState));
 			const unselectAll = () => {
 				checkboxes().forEach((cb) => (cb.checked = false));
+			};
+			const selectAll = () => {
+				checkboxes().forEach((cb) => (cb.checked = true));
 			};
 
 			const onlyVideosBtn = document.getElementById('btn-only-videos');
@@ -244,24 +281,34 @@ export const showInfoForRD = async (
 					const filePath = cb.dataset.filePath;
 					if (filePath && isVideo({ path: filePath })) cb.checked = true;
 				});
-				updateSelectionCount();
+				updateSelectionState();
 			});
 
-			const unselectAllBtn = document.getElementById('btn-unselect-all');
-			logAction('binding unselect-all button (RD)', {
-				exists: Boolean(unselectAllBtn),
+			const toggleSelectionBtn = document.getElementById('btn-toggle-selection');
+			logAction('binding toggle-selection button (RD)', {
+				exists: Boolean(toggleSelectionBtn),
 				hash: info.hash,
 			});
-			unselectAllBtn?.addEventListener('click', () => {
-				logAction('unselect-all clicked (RD)', {
+			toggleSelectionBtn?.addEventListener('click', () => {
+				const total = checkboxes().length;
+				const checked = checkboxes().filter((cb) => cb.checked).length;
+				const shouldSelectAll = checked !== total;
+				logAction('toggle-selection clicked (RD)', {
 					hash: info.hash,
+					checked,
+					total,
+					action: shouldSelectAll ? 'select-all' : 'unselect-all',
 				});
-				unselectAll();
-				updateSelectionCount();
+				if (shouldSelectAll) {
+					selectAll();
+				} else {
+					unselectAll();
+				}
+				updateSelectionState();
 			});
 
-			const initialSelection: Record<string, boolean> = {};
-			info.files.forEach((f: ApiTorrentFile) => (initialSelection[f.id] = f.selected === 1));
+			updateSelectionState();
+
 			const resetSelectionBtn = document.getElementById('btn-reset-selection');
 			logAction('binding reset-selection button (RD)', {
 				exists: Boolean(resetSelectionBtn),
@@ -275,10 +322,9 @@ export const showInfoForRD = async (
 					const fileId = cb.dataset.fileId;
 					cb.checked = fileId ? !!initialSelection[fileId] : false;
 				});
-				updateSelectionCount();
+				updateSelectionState();
 			});
 
-			const saveSelectionBtn = document.getElementById('btn-save-selection');
 			logAction('binding save-selection button (RD)', {
 				exists: Boolean(saveSelectionBtn),
 				hash: info.hash,
