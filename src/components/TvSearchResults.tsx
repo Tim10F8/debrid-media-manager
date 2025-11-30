@@ -35,6 +35,7 @@ type TvSearchResultsProps = {
 	deleteAd: (hash: string) => Promise<void>;
 	deleteTb: (hash: string) => Promise<void>;
 	imdbId?: string;
+	isCheckingAvailability?: boolean;
 };
 
 const TvSearchResults: React.FC<TvSearchResultsProps> = ({
@@ -58,6 +59,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 	deleteAd,
 	deleteTb,
 	imdbId,
+	isCheckingAvailability = false,
 }) => {
 	const [loadingHashes, setLoadingHashes] = useState<Set<string>>(new Set());
 	const [castingHashes, setCastingHashes] = useState<Set<string>>(new Set());
@@ -436,11 +438,15 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 											!r.adAvailable &&
 											!r.tbAvailable && (
 												<button
-													className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${checkingHashes.has(r.hash) ? 'cursor-not-allowed opacity-50' : ''}`}
+													className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${isCheckingAvailability || checkingHashes.has(r.hash) ? 'cursor-not-allowed opacity-50' : ''}`}
 													onClick={() => handleCheckWithLoading(r)}
-													disabled={checkingHashes.has(r.hash)}
+													disabled={
+														isCheckingAvailability ||
+														checkingHashes.has(r.hash)
+													}
 												>
-													{checkingHashes.has(r.hash) ? (
+													{isCheckingAvailability ||
+													checkingHashes.has(r.hash) ? (
 														<>
 															<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
 															Checking...

@@ -210,6 +210,22 @@ const TvSearch: FunctionComponent = () => {
 		let externalSourcesActive = 0;
 		let pendingAvailabilityChecks = 0;
 		let allSourcesCompleted = false;
+		let finalResultCount = 0;
+		let toastShown = false;
+
+		// Helper to check if everything is done and show toast only once
+		const checkAndShowFinalToast = () => {
+			if (toastShown) return;
+			if (!allSourcesCompleted || pendingAvailabilityChecks > 0) return;
+
+			toastShown = true;
+			setSearchCompleteInfo({
+				finalResults: finalResultCount,
+				totalAvailableCount,
+				allSourcesCompleted: true,
+				pendingAvailabilityChecks: 0,
+			});
+		};
 
 		// Helper to process results from any source
 		const processSourceResults = async (sourceResults: SearchResult[], sourceName: string) => {
@@ -227,14 +243,9 @@ const TvSearch: FunctionComponent = () => {
 					// Check if all done
 					if (completedSources === totalSources) {
 						allSourcesCompleted = true;
-						const finalCount = prevResults.length;
+						finalResultCount = prevResults.length;
 						setSearchState('loaded');
-						setSearchCompleteInfo({
-							finalResults: finalCount,
-							totalAvailableCount,
-							allSourcesCompleted,
-							pendingAvailabilityChecks,
-						});
+						checkAndShowFinalToast();
 					}
 					return prevResults;
 				}
@@ -287,22 +298,7 @@ const TvSearch: FunctionComponent = () => {
 
 							// Decrement pending checks
 							pendingAvailabilityChecks--;
-
-							// If all sources completed and this was the last availability check
-							if (
-								allSourcesCompleted &&
-								pendingAvailabilityChecks === 0 &&
-								totalAvailableCount > 0
-							) {
-								// Trigger the toast notification through state
-								setSearchCompleteInfo({
-									finalResults: 0,
-									totalAvailableCount,
-									allSourcesCompleted,
-									pendingAvailabilityChecks,
-									isAvailabilityOnly: true,
-								});
-							}
+							checkAndShowFinalToast();
 						})();
 					}
 
@@ -324,22 +320,7 @@ const TvSearch: FunctionComponent = () => {
 
 							// Decrement pending checks
 							pendingAvailabilityChecks--;
-
-							// If all sources completed and this was the last availability check
-							if (
-								allSourcesCompleted &&
-								pendingAvailabilityChecks === 0 &&
-								totalAvailableCount > 0
-							) {
-								// Trigger the toast notification through state
-								setSearchCompleteInfo({
-									finalResults: 0,
-									totalAvailableCount,
-									allSourcesCompleted,
-									pendingAvailabilityChecks,
-									isAvailabilityOnly: true,
-								});
-							}
+							checkAndShowFinalToast();
 						})();
 					}
 				}
@@ -347,14 +328,9 @@ const TvSearch: FunctionComponent = () => {
 				// Check if all sources completed
 				if (completedSources === totalSources) {
 					allSourcesCompleted = true;
-					const finalCount = sorted.length;
+					finalResultCount = sorted.length;
 					setSearchState('loaded');
-					setSearchCompleteInfo({
-						finalResults: finalCount,
-						totalAvailableCount,
-						allSourcesCompleted,
-						pendingAvailabilityChecks,
-					});
+					checkAndShowFinalToast();
 				}
 
 				return sorted;
@@ -429,12 +405,8 @@ const TvSearch: FunctionComponent = () => {
 								allSourcesCompleted = true;
 								setSearchState('loaded');
 								setSearchResults((prevResults) => {
-									setSearchCompleteInfo({
-										finalResults: prevResults.length,
-										totalAvailableCount: 0, // No availability count from external sources
-										allSourcesCompleted,
-										pendingAvailabilityChecks: 0,
-									});
+									finalResultCount = prevResults.length;
+									checkAndShowFinalToast();
 									return prevResults;
 								});
 							}
@@ -1084,6 +1056,7 @@ const TvSearch: FunctionComponent = () => {
 				deleteAd={deleteAd}
 				deleteTb={deleteTb}
 				imdbId={imdbid as string}
+				isCheckingAvailability={isCheckingAvailability}
 			/>
 
 			{searchResults.length > 0 && searchState === 'loaded' && hasMoreResults && (

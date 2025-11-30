@@ -261,6 +261,22 @@ const MovieSearch: FunctionComponent = () => {
 		let totalAvailableCount = 0;
 		let pendingAvailabilityChecks = 0;
 		let allSourcesCompleted = false;
+		let finalResultCount = 0;
+		let toastShown = false;
+
+		// Helper to check if everything is done and show toast only once
+		const checkAndShowFinalToast = () => {
+			if (toastShown) return;
+			if (!allSourcesCompleted || pendingAvailabilityChecks > 0) return;
+
+			toastShown = true;
+			setSearchCompleteInfo({
+				finalResults: finalResultCount,
+				totalAvailableCount,
+				allSourcesCompleted: true,
+				pendingAvailabilityChecks: 0,
+			});
+		};
 
 		const processSourceResults = async (sourceResults: SearchResult[], sourceName: string) => {
 			if (!isMounted.current) return;
@@ -275,14 +291,9 @@ const MovieSearch: FunctionComponent = () => {
 					completedSources++;
 					if (completedSources === totalSources) {
 						allSourcesCompleted = true;
-						const finalResults = prevResults.length;
+						finalResultCount = prevResults.length;
 						setSearchState('loaded');
-						setSearchCompleteInfo({
-							finalResults,
-							totalAvailableCount,
-							allSourcesCompleted,
-							pendingAvailabilityChecks,
-						});
+						checkAndShowFinalToast();
 					}
 					return prevResults;
 				}
@@ -327,21 +338,7 @@ const MovieSearch: FunctionComponent = () => {
 							);
 							totalAvailableCount += count;
 							pendingAvailabilityChecks--;
-
-							if (
-								allSourcesCompleted &&
-								pendingAvailabilityChecks === 0 &&
-								totalAvailableCount > 0
-							) {
-								// Trigger the toast notification through state
-								setSearchCompleteInfo({
-									finalResults: 0,
-									totalAvailableCount,
-									allSourcesCompleted,
-									pendingAvailabilityChecks,
-									isAvailabilityOnly: true,
-								});
-							}
+							checkAndShowFinalToast();
 						})();
 					}
 
@@ -358,35 +355,16 @@ const MovieSearch: FunctionComponent = () => {
 							);
 							totalAvailableCount += count;
 							pendingAvailabilityChecks--;
-
-							if (
-								allSourcesCompleted &&
-								pendingAvailabilityChecks === 0 &&
-								totalAvailableCount > 0
-							) {
-								// Trigger the toast notification through state
-								setSearchCompleteInfo({
-									finalResults: 0,
-									totalAvailableCount,
-									allSourcesCompleted,
-									pendingAvailabilityChecks,
-									isAvailabilityOnly: true,
-								});
-							}
+							checkAndShowFinalToast();
 						})();
 					}
 				}
 
 				if (completedSources === totalSources) {
 					allSourcesCompleted = true;
-					const finalResults = sorted.length;
+					finalResultCount = sorted.length;
 					setSearchState('loaded');
-					setSearchCompleteInfo({
-						finalResults,
-						totalAvailableCount,
-						allSourcesCompleted,
-						pendingAvailabilityChecks,
-					});
+					checkAndShowFinalToast();
 				}
 
 				return sorted;
@@ -426,14 +404,9 @@ const MovieSearch: FunctionComponent = () => {
 							if (completedSources === totalSources) {
 								allSourcesCompleted = true;
 								setSearchResults((prevResults) => {
-									const finalResults = prevResults.length;
+									finalResultCount = prevResults.length;
 									setSearchState('loaded');
-									setSearchCompleteInfo({
-										finalResults,
-										totalAvailableCount,
-										allSourcesCompleted,
-										pendingAvailabilityChecks,
-									});
+									checkAndShowFinalToast();
 									return prevResults;
 								});
 							}
@@ -765,6 +738,7 @@ const MovieSearch: FunctionComponent = () => {
 						deleteAd={deleteAd}
 						deleteTb={deleteTb}
 						imdbId={imdbid as string}
+						isCheckingAvailability={isCheckingAvailability}
 					/>
 
 					{searchResults.length > 0 && searchState === 'loaded' && hasMoreResults && (
