@@ -47,6 +47,34 @@ const CACHE_BACKOFF_TIME = 6000; // Slightly longer than the service worker cach
 let globalRequestQueue: Promise<void> = Promise.resolve();
 let globalLastRequestTime = 0;
 
+// Delay function using MessageChannel to avoid browser throttling in background tabs
+// Unlike setTimeout which gets throttled to 1s+ in inactive tabs, MessageChannel
+// uses the browser's message queue which maintains timing accuracy
+function delayWithMessageChannel(ms: number): Promise<void> {
+	// Fall back to setTimeout for server-side rendering or if MessageChannel is unavailable
+	if (typeof MessageChannel === 'undefined') {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
+
+	return new Promise((resolve) => {
+		const start = performance.now();
+		const channel = new MessageChannel();
+
+		const check = () => {
+			if (performance.now() - start >= ms) {
+				channel.port1.close();
+				channel.port2.close();
+				resolve();
+			} else {
+				channel.port2.postMessage(null);
+			}
+		};
+
+		channel.port1.onmessage = check;
+		channel.port2.postMessage(null);
+	});
+}
+
 // Shared rate limiting function that serializes all requests
 async function enforceRateLimit(): Promise<void> {
 	// Chain onto the global queue to ensure serialization
@@ -55,9 +83,7 @@ async function enforceRateLimit(): Promise<void> {
 		const timeSinceLastRequest = now - globalLastRequestTime;
 
 		if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-			await new Promise((resolve) =>
-				setTimeout(resolve, MIN_REQUEST_INTERVAL - timeSinceLastRequest)
-			);
+			await delayWithMessageChannel(MIN_REQUEST_INTERVAL - timeSinceLastRequest);
 		}
 
 		globalLastRequestTime = Date.now();
@@ -208,8 +234,8 @@ realDebridAxios.interceptors.response.use(
 			`RealDebrid API request failed with ${error.response?.status} ${errorType} error. Retrying (attempt ${originalConfig.__retryCount}/7) after ${Math.round(delay)}ms delay...`
 		);
 
-		// Wait for the calculated delay
-		await new Promise((resolve) => setTimeout(resolve, delay));
+		// Wait for the calculated delay (using MessageChannel to avoid background tab throttling)
+		await delayWithMessageChannel(delay);
 
 		try {
 			return await realDebridAxios.request(originalConfig);
@@ -286,8 +312,8 @@ function getGenericAxios(timeout: number = REQUEST_TIMEOUT) {
 				`Custom axios request failed with ${error.response?.status} ${errorType} error. Retrying (attempt ${originalConfig.__retryCount}/7) after ${Math.round(delay)}ms delay...`
 			);
 
-			// Wait for the calculated delay
-			await new Promise((resolve) => setTimeout(resolve, delay));
+			// Wait for the calculated delay (using MessageChannel to avoid background tab throttling)
+			await delayWithMessageChannel(delay);
 
 			try {
 				// Add cache-busting parameter for retries
@@ -363,8 +389,8 @@ genericAxios.interceptors.response.use(
 			`Generic API request failed with ${error.response?.status} ${errorType} error. Retrying (attempt ${originalConfig.__retryCount}/7) after ${Math.round(delay)}ms delay...`
 		);
 
-		// Wait for the calculated delay
-		await new Promise((resolve) => setTimeout(resolve, delay));
+		// Wait for the calculated delay (using MessageChannel to avoid background tab throttling)
+		await delayWithMessageChannel(delay);
 
 		try {
 			// Add cache-busting parameter for retries
