@@ -52,6 +52,9 @@ export const SettingsSection = () => {
 	const [includeTrackerStats, setIncludeTrackerStats] = useState(() =>
 		getLocalStorageBoolean('settings:includeTrackerStats', false)
 	);
+	const [disableAutoAvailabilityCheck, setDisableAutoAvailabilityCheck] = useState(() =>
+		getLocalStorageBoolean('settings:disableAutoAvailabilityCheck', false)
+	);
 	const [showCalendarAddButtonsGoogle, setShowCalendarAddButtonsGoogle] = useState(() =>
 		getLocalStorageBoolean(
 			'settings:showCalendarAddButtonsGoogle',
@@ -222,6 +225,13 @@ export const SettingsSection = () => {
 		setIncludeTrackerStats(checked);
 		if (typeof localStorage !== 'undefined')
 			localStorage.setItem('settings:includeTrackerStats', String(checked));
+	};
+
+	const handleDisableAutoAvailabilityCheckChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const checked = e.target.checked;
+		setDisableAutoAvailabilityCheck(checked);
+		if (typeof localStorage !== 'undefined')
+			localStorage.setItem('settings:disableAutoAvailabilityCheck', String(checked));
 	};
 
 	const handleEnableTorrentioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -704,6 +714,25 @@ export const SettingsSection = () => {
 										counts from trackers during availability checks. This
 										provides more detailed information but may slow down the
 										check process.
+									</span>
+								</div>
+
+								<div className="flex flex-col gap-1">
+									<div className="flex items-center gap-2">
+										<input
+											id="dmm-disable-auto-availability-check"
+											type="checkbox"
+											className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+											checked={disableAutoAvailabilityCheck}
+											onChange={handleDisableAutoAvailabilityCheckChange}
+										/>
+										<label className="font-semibold">
+											Disable auto availability check
+										</label>
+									</div>
+									<span className="text-xs text-gray-400">
+										When enabled, disables the automatic availability check that
+										triggers when no cached torrents are found after a search.
 									</span>
 								</div>
 							</div>

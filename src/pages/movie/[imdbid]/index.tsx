@@ -480,19 +480,40 @@ const MovieSearch: FunctionComponent = () => {
 			}
 		}
 
-		// Show availability toast
-		if (
-			allSourcesCompleted &&
-			pendingAvailabilityChecks === 0 &&
-			rdKey &&
-			totalAvailableCount > 0
-		) {
-			toast(`${totalAvailableCount} RD torrents available`, searchToastOptions);
+		// Show availability toast or auto-trigger availability check
+		if (allSourcesCompleted && pendingAvailabilityChecks === 0 && rdKey) {
+			if (totalAvailableCount > 0) {
+				toast(`${totalAvailableCount} RD torrents available`, searchToastOptions);
+			} else if (finalResults > 0 && !isCheckingAvailability) {
+				// No cached torrents found but we have results - auto-trigger availability check
+				const autoCheckDisabled =
+					window.localStorage.getItem('settings:disableAutoAvailabilityCheck') === 'true';
+				const autoCheckKey = `autoAvailabilityChecked:${imdbid}`;
+				const alreadyChecked = window.localStorage.getItem(autoCheckKey) === 'true';
+				if (!autoCheckDisabled && !alreadyChecked) {
+					// Mark as checked to prevent re-triggering
+					window.localStorage.setItem(autoCheckKey, 'true');
+					toast(
+						'No cached torrents found. Checking availability in 3 secs...',
+						searchToastOptions
+					);
+					setTimeout(() => {
+						handleAvailabilityTest(filteredResults);
+					}, 3000);
+				}
+			}
 		}
 
 		// Clear the info after handling
 		setSearchCompleteInfo(null);
-	}, [searchCompleteInfo, rdKey]);
+	}, [
+		searchCompleteInfo,
+		rdKey,
+		isCheckingAvailability,
+		handleAvailabilityTest,
+		filteredResults,
+		imdbid,
+	]);
 
 	const handleShowInfo = (result: SearchResult) => {
 		let files = result.files
