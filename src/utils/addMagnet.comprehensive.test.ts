@@ -138,6 +138,48 @@ describe('addMagnet utilities', () => {
 				expect.any(Object)
 			);
 		});
+
+		it('should delete torrent when deleteIfNotInstant is true and status is not downloaded', async () => {
+			vi.mocked(addHashAsMagnet).mockResolvedValue('torrent-456');
+			vi.mocked(getTorrentInfo).mockResolvedValue({
+				id: 'torrent-456',
+				status: 'downloading',
+				progress: 50,
+				files: [],
+				links: [],
+			} as any);
+			vi.mocked(selectFiles).mockResolvedValue({} as any);
+			vi.mocked(handleDeleteRdTorrent).mockResolvedValue(undefined);
+
+			const callback = vi.fn();
+			await handleAddAsMagnetInRd(rdKey, hash, callback, true);
+
+			expect(handleDeleteRdTorrent).toHaveBeenCalledWith(rdKey, 'rd:torrent-456', true);
+			expect(toast.error).toHaveBeenCalledWith(
+				'Torrent not instant; removed.',
+				expect.any(Object)
+			);
+			expect(callback).not.toHaveBeenCalled();
+		});
+
+		it('should not delete torrent when deleteIfNotInstant is true but status is downloaded', async () => {
+			vi.mocked(addHashAsMagnet).mockResolvedValue('torrent-456');
+			vi.mocked(getTorrentInfo).mockResolvedValue({
+				id: 'torrent-456',
+				status: 'downloaded',
+				progress: 100,
+				files: [{ id: 1, path: 'video.mkv', selected: 1, bytes: 1000000 }],
+				links: ['https://example.com/file1'],
+			} as any);
+			vi.mocked(selectFiles).mockResolvedValue({} as any);
+
+			const callback = vi.fn();
+			await handleAddAsMagnetInRd(rdKey, hash, callback, true);
+
+			expect(handleDeleteRdTorrent).not.toHaveBeenCalled();
+			expect(toast.success).toHaveBeenCalledWith('Torrent added.', expect.any(Object));
+			expect(callback).toHaveBeenCalled();
+		});
 	});
 
 	describe('handleAddTorrentFileInRd', () => {

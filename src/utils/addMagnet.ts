@@ -21,7 +21,8 @@ const retryDelay = process.env.VITEST_WORKER_ID ? 0 : 5000;
 export const handleAddAsMagnetInRd = async (
 	rdKey: string,
 	hash: string,
-	callback?: (info: TorrentInfoResponse) => Promise<void>
+	callback?: (info: TorrentInfoResponse) => Promise<void>,
+	deleteIfNotInstant: boolean = false
 ) => {
 	try {
 		const id = await addHashAsMagnet(rdKey, hash);
@@ -29,10 +30,14 @@ export const handleAddAsMagnetInRd = async (
 		const response = await getTorrentInfo(rdKey, id);
 		if (response.status === 'downloaded') {
 			toast.success('Torrent added.', magnetToastOptions);
+			if (callback) await callback(response);
+		} else if (deleteIfNotInstant) {
+			await handleDeleteRdTorrent(rdKey, `rd:${id}`, true);
+			toast.error(`Torrent not instant; removed.`, magnetToastOptions);
 		} else {
 			toast.error(`Torrent added with status ${response.status}.`, magnetToastOptions);
+			if (callback) await callback(response);
 		}
-		if (callback) await callback(response);
 	} catch (error: unknown) {
 		if (error instanceof AxiosError && error.response?.status === 509) {
 			toast.error('RD slots full. Retrying in 5s...', {
@@ -40,7 +45,7 @@ export const handleAddAsMagnetInRd = async (
 				duration: 5000,
 			});
 			await delay(retryDelay);
-			await handleAddAsMagnetInRd(rdKey, hash, callback);
+			await handleAddAsMagnetInRd(rdKey, hash, callback, deleteIfNotInstant);
 			return;
 		} else if (error instanceof AxiosError && error.response?.status === 503) {
 			toast.error('RD blocked infringing files; cannot add.', {

@@ -1,11 +1,12 @@
 import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { useAllDebridApiKey, useRealDebridAccessToken } from '@/hooks/auth';
+import { adInstantCheck, getMagnetStatus, uploadMagnet } from '@/services/allDebrid';
 import { EnrichedHashlistTorrent, Hashlist, HashlistTorrent } from '@/services/mediasearch';
 import UserTorrentDB from '@/torrent/db';
-import { handleAddAsMagnetInAd, handleAddAsMagnetInRd } from '@/utils/addMagnet';
+import { handleAddAsMagnetInRd } from '@/utils/addMagnet';
 import { runConcurrentFunctions } from '@/utils/batch';
 import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorrent';
-import { fetchAllDebrid, fetchRealDebrid } from '@/utils/fetchTorrents';
+import { convertToAllDebridUserTorrent, convertToUserTorrent } from '@/utils/fetchTorrents';
 import { instantCheckInAd2, instantCheckInRd2, wrapLoading } from '@/utils/instantChecks';
 import { getMediaId } from '@/utils/mediaId';
 import { getTypeByName } from '@/utils/mediaType';
@@ -392,34 +393,59 @@ function HashlistPage() {
 	}
 
 	async function addRd(hash: string) {
-		await handleAddAsMagnetInRd(rdKey!, hash);
-		await fetchRealDebrid(
+		await handleAddAsMagnetInRd(
 			rdKey!,
-			async (torrents) => {
-				await torrentDB.addAll(torrents);
-				// Update global cache with new torrents
-				torrents.forEach((torrent) => addToCache(torrent));
+			hash,
+			async (info) => {
+				const userTorrent = convertToUserTorrent({
+					...info,
+					id: info.id,
+					filename: info.filename,
+					bytes: info.bytes,
+					status: info.status,
+					added: info.added,
+					links: info.links,
+					hash: info.hash,
+				});
+				await torrentDB.addAll([userTorrent]);
+				addToCache(userTorrent);
 				await fetchHashAndProgress(hash);
 			},
-			2
+			true
 		);
 	}
 
 	async function addAd(hash: string) {
-		console.log('[Hashlist] addAd start', { hash });
-		await handleAddAsMagnetInAd(adKey!, hash);
-		console.log('[Hashlist] addAd queued fetchAllDebrid', { hash });
-		await fetchAllDebrid(adKey!, async (torrents) => {
-			console.log('[Hashlist] fetchAllDebrid callback', {
-				hash,
-				count: torrents.length,
-			});
-			await torrentDB.addAll(torrents);
-			// Update global cache with new torrents
-			torrents.forEach((torrent) => addToCache(torrent));
-			await fetchHashAndProgress(hash);
-		});
-		console.log('[Hashlist] addAd end', { hash });
+		try {
+			// Check if instant first
+			const instantResp = await adInstantCheck(adKey!, [hash]);
+			const magnetInfo = instantResp.data?.magnets?.[0];
+			if (!magnetInfo?.instant) {
+				toast.error('Torrent not instant in AD; skipped.', genericToastOptions);
+				return;
+			}
+
+			// Add the magnet
+			const magnetUri = hash.startsWith('magnet:?') ? hash : `magnet:?xt=urn:btih:${hash}`;
+			const resp = await uploadMagnet(adKey!, [magnetUri]);
+			if (resp.magnets.length === 0 || resp.magnets[0].error) {
+				toast.error('Failed to add hash to AD.', genericToastOptions);
+				return;
+			}
+			if (resp.magnets[0].id) {
+				const statusResp = await getMagnetStatus(adKey!, String(resp.magnets[0].id));
+				if (statusResp.data?.magnets?.[0]) {
+					const userTorrent = convertToAllDebridUserTorrent(statusResp.data.magnets[0]);
+					await torrentDB.addAll([userTorrent]);
+					addToCache(userTorrent);
+					await fetchHashAndProgress(hash);
+					toast.success('Torrent added to AD.', genericToastOptions);
+				}
+			}
+		} catch (error) {
+			console.error('Error adding magnet to AllDebrid:', error);
+			toast.error('Failed to add hash to AD.', genericToastOptions);
+		}
 	}
 
 	async function deleteRd(hash: string) {
