@@ -3,11 +3,14 @@ import {
 	AnimeService,
 	AvailabilityService,
 	CastService,
+	HashSearchService,
 	ReportService,
 	ScrapedService,
 	SearchService,
 	TorrentSnapshotService,
+	ZurgKeysService,
 } from './database';
+import { HashSearchParams } from './database/hashSearch';
 import { ScrapeSearchResult } from './mediasearch';
 import { TorrentInfoResponse } from './types';
 
@@ -19,6 +22,8 @@ export type RepositoryDependencies = Partial<{
 	castService: CastService;
 	reportService: ReportService;
 	torrentSnapshotService: TorrentSnapshotService;
+	hashSearchService: HashSearchService;
+	zurgKeysService: ZurgKeysService;
 }>;
 
 export class Repository {
@@ -29,6 +34,8 @@ export class Repository {
 	private castService: CastService;
 	private reportService: ReportService;
 	private torrentSnapshotService: TorrentSnapshotService;
+	private hashSearchService: HashSearchService;
+	private zurgKeysService: ZurgKeysService;
 
 	constructor({
 		availabilityService,
@@ -38,6 +45,8 @@ export class Repository {
 		castService,
 		reportService,
 		torrentSnapshotService,
+		hashSearchService,
+		zurgKeysService,
 	}: RepositoryDependencies = {}) {
 		this.availabilityService = availabilityService ?? new AvailabilityService();
 		this.scrapedService = scrapedService ?? new ScrapedService();
@@ -46,6 +55,8 @@ export class Repository {
 		this.castService = castService ?? new CastService();
 		this.reportService = reportService ?? new ReportService();
 		this.torrentSnapshotService = torrentSnapshotService ?? new TorrentSnapshotService();
+		this.hashSearchService = hashSearchService ?? new HashSearchService();
+		this.zurgKeysService = zurgKeysService ?? new ZurgKeysService();
 	}
 
 	// Ensure connection is properly closed when repository is no longer needed
@@ -58,6 +69,8 @@ export class Repository {
 			this.castService.disconnect(),
 			this.reportService.disconnect(),
 			this.torrentSnapshotService.disconnect(),
+			this.hashSearchService.disconnect(),
+			this.zurgKeysService.disconnect(),
 		]);
 	}
 
@@ -331,6 +344,36 @@ export class Repository {
 
 	public getRequestedCount() {
 		return this.scrapedService.getRequestedCount();
+	}
+
+	// Hash Search Service Methods
+	public getHashesByImdbId(params: HashSearchParams) {
+		return this.hashSearchService.getHashesByImdbId(params);
+	}
+
+	// Zurg Keys Service Methods
+	public createZurgApiKey(validUntilDate: Date) {
+		return this.zurgKeysService.createApiKey(validUntilDate);
+	}
+
+	public validateZurgApiKey(apiKey: string) {
+		return this.zurgKeysService.validateApiKey(apiKey);
+	}
+
+	public getZurgApiKey(apiKey: string) {
+		return this.zurgKeysService.getApiKey(apiKey);
+	}
+
+	public deleteZurgApiKey(apiKey: string) {
+		return this.zurgKeysService.deleteApiKey(apiKey);
+	}
+
+	public deleteExpiredZurgKeys() {
+		return this.zurgKeysService.deleteExpiredKeys();
+	}
+
+	public listZurgApiKeys() {
+		return this.zurgKeysService.listApiKeys();
 	}
 }
 

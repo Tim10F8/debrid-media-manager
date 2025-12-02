@@ -47,14 +47,14 @@ model Cast {
 }
 
 model CastProfile {
-  userId             String   @id
-  clientId           String
-  clientSecret       String
-  updatedAt          DateTime @updatedAt
-  refreshToken       String
-  movieMaxSize       Float    @default(0)
-  episodeMaxSize     Float    @default(0)
-  otherStreamsLimit  Int      @default(5)
+  userId            String   @id
+  clientId          String
+  clientSecret      String
+  updatedAt         DateTime @updatedAt
+  refreshToken      String
+  movieMaxSize      Float    @default(0)
+  episodeMaxSize    Float    @default(0)
+  otherStreamsLimit Int      @default(5)
 }
 
 model Titles {
@@ -126,22 +126,22 @@ model AvailableFile {
 }
 
 model User {
-  id                  Int                  @id @default(autoincrement())
-  patreonId           String?              @unique
-  githubId            String?              @unique
-  discordId           String?              @unique
+  id        Int     @id @default(autoincrement())
+  patreonId String? @unique
+  githubId  String? @unique
+  discordId String? @unique
 
   patreonSubscription PatreonSubscription?
 }
 
 model PatreonSubscription {
-  id            Int      @id @default(autoincrement())
-  tier          String
-  perks         String
+  id               Int      @id @default(autoincrement())
+  tier             String
+  perks            String
   subscriptionDate DateTime @default(now())
 
-  userId        Int      @unique
-  user          User     @relation(fields: [userId], references: [id])
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id])
 }
 
 model Report {
@@ -149,7 +149,7 @@ model Report {
   hash      String
   imdbId    String
   userId    String
-  type      String   // "porn" or "wrong_imdb" or "wrong_season"
+  type      String // "porn" or "wrong_imdb" or "wrong_season"
   createdAt DateTime @default(now())
 
   @@unique([hash, userId])
@@ -183,11 +183,19 @@ model TorrentSnapshot {
 
 model MdblistCache {
   id        String   @id
-  type      String   // "movie", "show", "search", "list", etc.
+  type      String // "movie", "show", "search", "list", etc.
   data      Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([type])
   @@index([updatedAt])
+}
+
+model ZurgKeys {
+  apiKey     String   @id
+  validUntil DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([validUntil])
 }
