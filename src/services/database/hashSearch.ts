@@ -30,10 +30,11 @@ function getSizeInBytes(sizeGB: number): bigint {
 	return BigInt(Math.floor(sizeGB * 1024 * 1024 * 1024));
 }
 
-function getSizeInMB(sizeGB: number): number {
-	return sizeGB * 1024;
+function getSizeInMB(sizeGB: number): bigint {
+	return BigInt(Math.floor(sizeGB * 1024));
 }
 
+// For Available table (bytes column stores actual bytes)
 function buildSizeCondition(filters?: SizeFilters): Record<string, bigint> {
 	if (!filters) return {};
 
@@ -44,6 +45,23 @@ function buildSizeCondition(filters?: SizeFilters): Record<string, bigint> {
 	}
 	if (filters.max !== undefined) {
 		condition.lte = getSizeInBytes(filters.max);
+	}
+
+	return condition;
+}
+
+// For Cast table (size column stores MEGABYTES, not bytes)
+// See SIZE_UNITS_ANALYSIS.md for details
+function buildSizeConditionMB(filters?: SizeFilters): Record<string, bigint> {
+	if (!filters) return {};
+
+	const condition: Record<string, bigint> = {};
+
+	if (filters.min !== undefined) {
+		condition.gte = getSizeInMB(filters.min);
+	}
+	if (filters.max !== undefined) {
+		condition.lte = getSizeInMB(filters.max);
 	}
 
 	return condition;
@@ -167,13 +185,15 @@ export class HashSearchService extends DatabaseClient {
 		sizeFilters?: SizeFilters,
 		substringFilters?: SubstringFilters
 	): Promise<HashResult[]> {
-		const sizeCondition = buildSizeCondition(sizeFilters);
+		// IMPORTANT: Cast.size stores MEGABYTES, not bytes!
+		// See SIZE_UNITS_ANALYSIS.md for details on why this field stores MB
+		const sizeCondition = buildSizeConditionMB(sizeFilters);
 
 		const results = await this.prisma.cast.findMany({
 			where: {
 				imdbId,
 				link: { not: null },
-				size: sizeCondition,
+				size: sizeCondition, // Filter using MB values
 				updatedAt: {
 					gt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
 				},
@@ -199,8 +219,10 @@ export class HashSearchService extends DatabaseClient {
 				hash: r.hash,
 				source: 'cast' as const,
 				filename: r.filename,
-				size: r.sizeNum,
-				sizeGB: r.sizeNum / (1024 * 1024 * 1024),
+				// Cast.size is in MB, convert to bytes for consistent API output
+				size: r.sizeNum * 1024 * 1024,
+				// Cast.size is in MB, convert to GB
+				sizeGB: r.sizeNum / 1024,
 				imdbId: r.imdbId,
 			}));
 	}
