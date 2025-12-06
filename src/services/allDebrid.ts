@@ -445,11 +445,16 @@ export const getMagnetFiles = async (
 	}
 
 	try {
-		const response = await axios.post<ApiResponse<MagnetFilesData>>(
-			endpoint,
-			{ id: validIds },
-			getAxiosConfig(apikey)
-		);
+		// AllDebrid expects form-encoded data with repeated id[] fields
+		const params = new URLSearchParams();
+		validIds.forEach((id) => params.append('id[]', id.toString()));
+
+		const response = await axios.post<ApiResponse<MagnetFilesData>>(endpoint, params, {
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Authorization: `Bearer ${apikey}`,
+			},
+		});
 
 		if (response.data.status === 'error') {
 			throw new Error(response.data.error?.message || 'Unknown error');
@@ -468,11 +473,16 @@ export const getMagnetFiles = async (
 export const deleteMagnet = async (apikey: string, id: string): Promise<MagnetDeleteData> => {
 	const endpoint = `${config.allDebridHostname}/v4/magnet/delete`;
 	try {
-		const response = await axios.post<ApiResponse<MagnetDeleteData>>(
-			endpoint,
-			{ id },
-			getAxiosConfig(apikey)
-		);
+		// AllDebrid expects form-encoded data
+		const params = new URLSearchParams();
+		params.append('id', id);
+
+		const response = await axios.post<ApiResponse<MagnetDeleteData>>(endpoint, params, {
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Authorization: `Bearer ${apikey}`,
+			},
+		});
 
 		if (response.data.status === 'error') {
 			throw new Error(response.data.error?.message || 'Unknown error');
@@ -488,14 +498,19 @@ export const deleteMagnet = async (apikey: string, id: string): Promise<MagnetDe
 export const restartMagnet = async (apikey: string, id: string): Promise<MagnetRestartData> => {
 	const endpoint = `${config.allDebridHostname}/v4/magnet/restart`;
 	try {
-		const response = await axios.post<ApiResponse<MagnetRestartData>>(
-			endpoint,
-			{ id },
-			getAxiosConfig(apikey)
-		);
+		// AllDebrid expects form-encoded data
+		const params = new URLSearchParams();
+		params.append('id', id);
 
-		if (response.data.status === 'error') {
-			throw new Error(response.data.error?.message || 'Unknown error');
+		const response = await axios.post<ApiResponse<MagnetRestartData>>(endpoint, params, {
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Authorization: `Bearer ${apikey}`,
+			},
+		});
+
+		if (!response.data || response.data.status === 'error') {
+			throw new Error(response.data?.error?.message || 'Unknown error');
 		}
 
 		return response.data.data!;
