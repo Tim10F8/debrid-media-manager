@@ -1,4 +1,14 @@
-import { restartMagnet, uploadMagnet } from '@/services/allDebrid';
+import {
+	deleteMagnetAd,
+	getMagnetFiles,
+	getMagnetStatusAd,
+	isAdMagnetInstant,
+	isAdStatusReady,
+	MagnetStatus,
+	restartMagnet,
+	uploadMagnet,
+	uploadMagnetAd,
+} from '@/services/allDebrid';
 import {
 	addHashAsMagnet,
 	addTorrentFile,
@@ -242,17 +252,110 @@ export const handleReinsertTorrentinRd = async (
 export const handleAddAsMagnetInAd = async (
 	adKey: string,
 	hash: string,
-	callback?: () => Promise<void>
+	callback?: (magnetStatus: MagnetStatus | null) => Promise<void>,
+	deleteIfNotInstant: boolean = false,
+	keepInLibrary: boolean = false
 ) => {
 	try {
-		// Convert hash to magnet URI if it's just a hash
-		const magnetUri = hash.startsWith('magnet:?') ? hash : `magnet:?xt=urn:btih:${hash}`;
+		// Step 1: Upload magnet and check if it's instant
+		const upload = await uploadMagnetAd(adKey, hash);
 
-		const resp = await uploadMagnet(adKey, [magnetUri]);
-		if (resp.magnets.length === 0 || resp.magnets[0].error) throw new Error('no_magnets');
-		if (callback) await callback();
-		toast('Hash added.', magnetToastOptions);
+		if (upload.error) {
+			// Handle "not available" errors gracefully (no peers, not cached, etc.)
+			const notAvailableErrors = [
+				'file not available due to no peer',
+				'no peer',
+				'not available',
+				'no server',
+			];
+
+			const errorMsg = upload.error.message?.toLowerCase() || '';
+			const isNotAvailableError = notAvailableErrors.some((msg) => errorMsg.includes(msg));
+
+			if (isNotAvailableError) {
+				// Treat as not instant/not cached
+				if (deleteIfNotInstant) {
+					toast.error('Torrent not available (no peers).', magnetToastOptions);
+				} else {
+					toast.error('Torrent not cached in AllDebrid.', magnetToastOptions);
+				}
+
+				if (callback) await callback(null);
+				return;
+			}
+
+			// For other errors, throw
+			throw new Error(upload.error.message || 'Upload failed');
+		}
+
+		if (!upload.id) {
+			throw new Error('Upload succeeded but no magnet ID returned');
+		}
+
+		// Step 2: Check if magnet is instantly available
+		const isInstant = isAdMagnetInstant(upload);
+
+		if (!isInstant) {
+			// Not instant - delete and optionally notify
+			await deleteMagnetAd(adKey, upload.id);
+
+			if (deleteIfNotInstant) {
+				toast.error('Torrent not instant; removed.', magnetToastOptions);
+			} else {
+				toast.error('Torrent not cached in AllDebrid.', magnetToastOptions);
+			}
+
+			if (callback) await callback(null);
+			return;
+		}
+
+		// Step 3: Get full status with files (for instant torrents)
+		const magnetStatus = await getMagnetStatusAd(adKey, upload.id);
+
+		// Step 3.5: Fetch files separately (AllDebrid requires separate API call)
+		// Only fetch files for cached/ready torrents (statusCode 4 + status "Ready")
+		if (isAdStatusReady(magnetStatus)) {
+			try {
+				const filesResponse = await getMagnetFiles(adKey, [upload.id]);
+				if (filesResponse.magnets && filesResponse.magnets.length > 0) {
+					magnetStatus.files = filesResponse.magnets[0].files;
+				}
+			} catch (error) {
+				console.error('Error fetching magnet files:', error);
+				// Continue without files rather than failing completely
+			}
+		}
+
+		// Step 4: Call callback with status data (for storage/processing)
+		if (callback) {
+			await callback(magnetStatus);
+		}
+
+		// Step 5: Delete from AllDebrid after storing availability data (only for service checks)
+		// When keepInLibrary is true, we want to keep the torrent for actual download
+		if (!keepInLibrary) {
+			// We only need the metadata, not the actual download
+			// Make this non-fatal - if delete fails, we still got the availability data
+			try {
+				// Small delay to avoid race conditions with AllDebrid's API
+				await delay(1000);
+				await deleteMagnetAd(adKey, upload.id);
+			} catch (deleteError) {
+				console.warn('Failed to delete magnet from AllDebrid (non-fatal):', deleteError);
+				// Continue - the availability data was already stored successfully
+			}
+		}
+
+		if (keepInLibrary) {
+			toast.success('Torrent added to library.', magnetToastOptions);
+		} else {
+			toast.success('Torrent cached and available.', magnetToastOptions);
+		}
 	} catch (error) {
+		console.error(
+			'Error adding hash to AllDebrid:',
+			error instanceof Error ? error.message : 'Unknown error'
+		);
 		toast.error('Failed to add hash. Try again.');
 		throw error;
 	}

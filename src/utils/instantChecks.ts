@@ -3,7 +3,7 @@ import { EnrichedHashlistTorrent, FileData, SearchResult } from '@/services/medi
 import { checkCachedStatus } from '@/services/torbox';
 import { Dispatch, SetStateAction } from 'react';
 import { toast } from 'react-hot-toast';
-import { checkAvailability, checkAvailabilityByHashes } from './availability';
+import { checkAvailability, checkAvailabilityAd, checkAvailabilityByHashes } from './availability';
 import { runConcurrentFunctions } from './batch';
 import { groupBy } from './groupBy';
 import { isVideo } from './selectable';
@@ -266,6 +266,97 @@ const processAdInstantCheck = async <T extends SearchResult | EnrichedHashlistTo
 	return instantCount;
 };
 
+// Database-backed AD instant check function (similar to RD)
+const processAdInstantCheckDb = async <T extends SearchResult | EnrichedHashlistTorrent>(
+	dmmProblemKey: string,
+	solution: string,
+	imdbId: string,
+	hashes: string[],
+	batchSize: number,
+	setTorrentList: Dispatch<SetStateAction<T[]>>,
+	sortFn?: (results: T[]) => T[],
+	shouldUpdateTitleAndSize = false
+): Promise<number> => {
+	let instantCount = 0;
+	const funcs = [];
+
+	// AD rate limiter - 500 requests per minute (buffer from 600)
+	const adRequestTimestamps: number[] = [];
+	const AD_MAX_REQUESTS = 500;
+	const AD_TIME_WINDOW = 60000; // 1 minute
+
+	async function waitForAdRateLimit() {
+		const now = Date.now();
+		// Remove timestamps older than the time window
+		while (adRequestTimestamps.length > 0 && adRequestTimestamps[0] < now - AD_TIME_WINDOW) {
+			adRequestTimestamps.shift();
+		}
+
+		// If we've hit the rate limit, wait until we can make another request
+		if (adRequestTimestamps.length >= AD_MAX_REQUESTS) {
+			const oldestTimestamp = adRequestTimestamps[0];
+			const waitTime = oldestTimestamp + AD_TIME_WINDOW - now;
+			if (waitTime > 0) {
+				await new Promise((resolve) => setTimeout(resolve, waitTime));
+				return waitForAdRateLimit(); // Recheck after waiting
+			}
+		}
+
+		// Add current timestamp
+		adRequestTimestamps.push(now);
+	}
+
+	for (const hashGroup of groupBy(batchSize, hashes)) {
+		funcs.push(async () => {
+			await waitForAdRateLimit();
+			const resp = await checkAvailabilityAd(dmmProblemKey, solution, imdbId, hashGroup);
+			setTorrentList((prevSearchResults) => {
+				const newSearchResults = [...prevSearchResults];
+				for (const torrent of newSearchResults) {
+					if (torrent.noVideos) continue;
+					const availableTorrent = resp.available.find(
+						(t: { hash: string }) => t.hash === torrent.hash
+					);
+					if (!availableTorrent) continue;
+
+					torrent.files = availableTorrent.files.map(
+						(file: { file_id: number; path: string; bytes: number }) => ({
+							fileId: file.file_id,
+							filename: file.path,
+							filesize: file.bytes,
+						})
+					);
+
+					if (shouldUpdateTitleAndSize) {
+						updateTorrentTitle(torrent as SearchResult, torrent.files);
+						(torrent as SearchResult).fileSize =
+							torrent.files.reduce((acc, curr) => acc + curr.filesize, 0) /
+							1024 /
+							1024;
+					}
+
+					const videoFiles = torrent.files.filter((f) => isVideo({ path: f.filename }));
+					const stats = calculateFileStats(videoFiles);
+					Object.assign(torrent, stats);
+
+					torrent.noVideos = !torrent.files.some((file) =>
+						isVideo({ path: file.filename })
+					);
+					if (!torrent.noVideos) {
+						torrent.adAvailable = true;
+						instantCount += 1;
+					} else {
+						torrent.adAvailable = false;
+					}
+				}
+				return sortFn ? sortFn(newSearchResults) : newSearchResults;
+			});
+		});
+	}
+	await runConcurrentFunctions(funcs, 4, 0);
+	return instantCount;
+};
+
 // Generic TB instant check function
 const processTbInstantCheck = async <T extends SearchResult | EnrichedHashlistTorrent>(
 	tbKey: string,
@@ -345,7 +436,8 @@ export const wrapLoading = async function (debrid: string, checkAvailability: Pr
 	);
 };
 
-export const instantCheckInRd = (
+// Database availability checks - query local cache
+export const checkDatabaseAvailabilityRd = (
 	dmmProblemKey: string,
 	solution: string,
 	imdbId: string,
@@ -354,7 +446,7 @@ export const instantCheckInRd = (
 	sortFn: (searchResults: SearchResult[]) => SearchResult[]
 ) => processRdInstantCheck(dmmProblemKey, solution, imdbId, hashes, 100, setTorrentList, sortFn);
 
-export const instantCheckInRd2 = (
+export const checkDatabaseAvailabilityRd2 = (
 	dmmProblemKey: string,
 	solution: string,
 	rdKey: string,
@@ -362,20 +454,29 @@ export const instantCheckInRd2 = (
 	setTorrentList: Dispatch<SetStateAction<EnrichedHashlistTorrent[]>>
 ) => processRdInstantCheckByHashes(dmmProblemKey, solution, hashes, 100, setTorrentList);
 
-export const instantCheckInAd2 = (
+export const checkDatabaseAvailabilityAd = (
+	dmmProblemKey: string,
+	solution: string,
+	imdbId: string,
+	hashes: string[],
+	setTorrentList: Dispatch<SetStateAction<SearchResult[]>>,
+	sortFn: (searchResults: SearchResult[]) => SearchResult[]
+) => processAdInstantCheckDb(dmmProblemKey, solution, imdbId, hashes, 100, setTorrentList, sortFn);
+
+export const checkDatabaseAvailabilityAd2 = (
 	adKey: string,
 	hashes: string[],
 	setTorrentList: Dispatch<SetStateAction<EnrichedHashlistTorrent[]>>
 ) => processAdInstantCheck(adKey, hashes, setTorrentList);
 
-export const instantCheckInTb = (
+export const checkDatabaseAvailabilityTb = (
 	tbKey: string,
 	hashes: string[],
 	setTorrentList: Dispatch<SetStateAction<SearchResult[]>>,
 	sortFn: (searchResults: SearchResult[]) => SearchResult[]
 ) => processTbInstantCheck(tbKey, hashes, setTorrentList, sortFn);
 
-export const instantCheckInTb2 = (
+export const checkDatabaseAvailabilityTb2 = (
 	tbKey: string,
 	hashes: string[],
 	setTorrentList: Dispatch<SetStateAction<EnrichedHashlistTorrent[]>>

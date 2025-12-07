@@ -90,29 +90,22 @@ describe('AllDebrid service helpers', () => {
 		await expect(uploadMagnet('token', ['invalid'])).rejects.toThrow('invalid magnet');
 	});
 
-	it('retrieves magnet status and merges fetched files', async () => {
-		postMock
-			.mockResolvedValueOnce({
+	it('retrieves magnet status and converts files to links', async () => {
+		postMock.mockResolvedValueOnce({
+			data: {
+				status: 'success',
 				data: {
-					status: 'success',
-					data: {
-						magnets: [{ id: 10, statusCode: 4, links: [] }],
-					},
+					magnets: [
+						{
+							id: 10,
+							statusCode: 4,
+							links: [],
+							files: [{ n: 'file.mkv', l: 'https://link', s: 100 }],
+						},
+					],
 				},
-			})
-			.mockResolvedValueOnce({
-				data: {
-					status: 'success',
-					data: {
-						magnets: [
-							{
-								id: '10',
-								files: [{ n: 'file.mkv', l: 'https://link', s: 100 }],
-							},
-						],
-					},
-				},
-			});
+			},
+		});
 
 		const response = await getMagnetStatus('token');
 		expect(response.data.magnets[0].links?.[0].filename).toContain('file.mkv');

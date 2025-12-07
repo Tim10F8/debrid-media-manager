@@ -323,9 +323,10 @@ export const getMagnetStatus = async (
 	counter?: number
 ): Promise<MagnetStatusResponse> => {
 	const endpoint = `${config.allDebridHostname}/v4.1/magnet/status`;
-	const params: any = {
-		_fresh: Date.now(), // Add cache-busting parameter for fresh uncached results
-	};
+
+	// Use URLSearchParams for form-urlencoded as required by AllDebrid API
+	const params = new URLSearchParams();
+	params.append('_fresh', Date.now().toString()); // Add cache-busting parameter for fresh uncached results
 
 	const requestMeta = {
 		hasMagnetId: Boolean(magnetId),
@@ -337,31 +338,32 @@ export const getMagnetStatus = async (
 	console.log('[AllDebridAPI] getMagnetStatus start', requestMeta);
 
 	if (magnetId) {
-		params.id = magnetId;
+		params.append('id', magnetId);
 	} else if (statusFilter) {
-		params.status = statusFilter;
+		params.append('status', statusFilter);
 	}
 
 	if (session !== undefined) {
-		params.session = session;
+		params.append('session', session.toString());
 	}
 
 	if (counter !== undefined) {
-		params.counter = counter;
+		params.append('counter', counter.toString());
 	}
 
 	try {
-		const response = await axios.post<ApiResponse<MagnetStatusData>>(
-			endpoint,
-			params,
-			getAxiosConfig(apikey)
-		);
+		const response = await axios.post<ApiResponse<MagnetStatusData>>(endpoint, params, {
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Authorization: `Bearer ${apikey}`,
+			},
+		});
 
 		if (response.data.status === 'error') {
 			throw new Error(response.data.error?.message || 'Unknown error');
 		}
 
-		// Get files for ready magnets if needed (for backward compatibility)
+		// v4.1 status endpoint includes files in the response
 		const magnets = response.data.data!.magnets;
 		const durationMs = Date.now() - requestStartedAt;
 		console.log('[AllDebridAPI] getMagnetStatus success', {
@@ -371,43 +373,16 @@ export const getMagnetStatus = async (
 			elapsedMs: durationMs,
 		});
 
-		// Initialize empty links array for all magnets first
+		// Convert files to links for backward compatibility
 		magnets.forEach((m) => {
+			// Initialize links array
 			if (!m.links) m.links = [];
-		});
 
-		const readyMagnets = magnets.filter((m) => m.statusCode === 4);
-
-		if (readyMagnets.length > 0 && !magnetId) {
-			// Batch fetch files for ready magnets
-			// Filter out magnets with invalid IDs
-			const validMagnets = readyMagnets.filter((m) => m.id && m.id > 0);
-
-			if (validMagnets.length > 0) {
-				try {
-					const filesResponse = await getMagnetFiles(
-						apikey,
-						validMagnets.map((m) => m.id)
-					);
-
-					// Map files back to magnets
-					if (filesResponse?.magnets) {
-						filesResponse.magnets.forEach((fileData) => {
-							const magnet = magnets.find((m) => m.id === parseInt(fileData.id));
-							if (magnet && fileData.files) {
-								magnet.files = fileData.files;
-								magnet.links = convertFilesToLinks(fileData.files);
-							}
-						});
-					}
-				} catch (error: any) {
-					// Only log error if it's not about invalid magnet IDs
-					if (!error?.message?.includes('magnet ID does not exists')) {
-						console.warn('Failed to fetch magnet files:', error);
-					}
-				}
+			// If magnet has files (v4.1 includes them), convert to links format
+			if (m.files && m.files.length > 0) {
+				m.links = convertFilesToLinks(m.files);
 			}
-		}
+		});
 
 		// Return in old format for backward compatibility
 		return {
@@ -538,3 +513,202 @@ export const adInstantCheck = async (
 		throw error;
 	}
 };
+
+// ====================================================================
+// Availability Checking Functions (Simplified for availability checks)
+// ====================================================================
+
+/**
+ * Upload a single magnet hash for availability checking
+ * Simplified version of uploadMagnet for single hash use case
+ * Returns the upload result with 'ready' field indicating instant availability
+ */
+export const uploadMagnetAd = async (apiKey: string, hash: string): Promise<MagnetObject> => {
+	const hashRegex = /^[a-f0-9]{40}$/i;
+	if (!hashRegex.test(hash)) {
+		throw new Error(`Invalid SHA40 hash: ${hash}`);
+	}
+
+	const endpoint = `${config.allDebridHostname}/v4/magnet/upload`;
+	const params = new URLSearchParams();
+	params.append('magnets[]', `magnet:?xt=urn:btih:${hash}`);
+
+	try {
+		const response = await axios.post<ApiResponse<MagnetUploadData>>(endpoint, params, {
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Authorization: `Bearer ${apiKey}`,
+			},
+			timeout: 10000,
+		});
+
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Upload failed');
+		}
+
+		return response.data.data!.magnets[0];
+	} catch (error: any) {
+		console.error('Error uploading magnet for availability check:', error.message);
+		throw error;
+	}
+};
+
+/**
+ * Get magnet status including files for a specific magnet ID
+ * Simplified version of getMagnetStatus for single magnet queries
+ * Returns status with files array (no need for separate /files call)
+ */
+export const getMagnetStatusAd = async (
+	apiKey: string,
+	magnetId: number
+): Promise<MagnetStatus> => {
+	const endpoint = `${config.allDebridHostname}/v4.1/magnet/status`;
+	const params = new URLSearchParams();
+	params.append('id', magnetId.toString());
+
+	try {
+		const response = await axios.post<ApiResponse<{ magnets: MagnetStatus }>>(
+			endpoint,
+			params,
+			{
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+					Authorization: `Bearer ${apiKey}`,
+				},
+				timeout: 10000,
+			}
+		);
+
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Status check failed');
+		}
+
+		// Note: Status endpoint returns magnets as OBJECT (not array) when querying by ID
+		return response.data.data!.magnets;
+	} catch (error: any) {
+		console.error('Error fetching magnet status:', error.message);
+		throw error;
+	}
+};
+
+/**
+ * Delete a magnet by ID
+ * Simplified wrapper around deleteMagnet for consistency with other AD availability functions
+ * Includes retry logic for transient errors (503, network issues)
+ */
+export const deleteMagnetAd = async (apiKey: string, magnetId: number): Promise<void> => {
+	const endpoint = `${config.allDebridHostname}/v4/magnet/delete`;
+	const params = new URLSearchParams();
+	params.append('id', magnetId.toString());
+
+	const maxRetries = 3;
+	const retryDelay = 2000; // 2 seconds
+
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			const response = await axios.post<ApiResponse<MagnetDeleteData>>(endpoint, params, {
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+					Authorization: `Bearer ${apiKey}`,
+				},
+				timeout: 10000,
+			});
+
+			if (response.data.status === 'error') {
+				throw new Error(response.data.error?.message || 'Delete failed');
+			}
+
+			// Success - exit function
+			return;
+		} catch (error: any) {
+			const isTransientError =
+				error.response?.status === 503 || // Service Unavailable
+				error.code === 'ECONNRESET' ||
+				error.code === 'ETIMEDOUT';
+
+			const isLastAttempt = attempt === maxRetries;
+
+			if (isTransientError && !isLastAttempt) {
+				console.warn(
+					`Error deleting magnet (attempt ${attempt}/${maxRetries}), retrying in ${retryDelay}ms:`,
+					error.message
+				);
+				await new Promise((resolve) => setTimeout(resolve, retryDelay * attempt));
+				continue; // Retry
+			}
+
+			// Non-transient error or last attempt - throw
+			console.error('Error deleting magnet:', error.message);
+			throw error;
+		}
+	}
+};
+
+// ====================================================================
+// Helper Functions
+// ====================================================================
+
+/**
+ * Check if a magnet upload indicates instant availability
+ * @param upload Upload response from uploadMagnetAd
+ * @returns true if the magnet is instantly available (cached)
+ */
+export function isAdMagnetInstant(upload: MagnetObject): boolean {
+	return upload.ready === true;
+}
+
+/**
+ * Check if a magnet status indicates it's ready/cached
+ * @param status Status response from getMagnetStatusAd
+ * @returns true if the magnet is ready (statusCode 4)
+ */
+export function isAdStatusReady(status: MagnetStatus): boolean {
+	return status.statusCode === 4 && status.status === 'Ready';
+}
+
+/**
+ * Validate if a string is a valid SHA-1 hash (40 hex characters)
+ * @param hash Hash string to validate
+ * @returns true if valid SHA-1 hash format
+ */
+export function isValidSHA40Hash(hash: string): boolean {
+	return /^[a-fA-F0-9]{40}$/i.test(hash);
+}
+
+// ====================================================================
+// Rate Limiting
+// ====================================================================
+
+// AllDebrid: 600 req/min documented, use 500 for safety buffer
+const adRequestTimestamps: number[] = [];
+const AD_MAX_REQUESTS = 500;
+const AD_TIME_WINDOW = 60000; // 1 minute in milliseconds
+
+/**
+ * Wait if AllDebrid rate limit would be exceeded
+ * Implements a sliding window rate limiter
+ * AllDebrid allows 600 requests per minute, we use 500 for safety
+ */
+export async function waitForAdRateLimit(): Promise<void> {
+	const now = Date.now();
+
+	// Remove timestamps older than the time window
+	while (adRequestTimestamps.length > 0 && adRequestTimestamps[0] < now - AD_TIME_WINDOW) {
+		adRequestTimestamps.shift();
+	}
+
+	// If we've hit the limit, wait until the oldest request expires
+	if (adRequestTimestamps.length >= AD_MAX_REQUESTS) {
+		const oldestTimestamp = adRequestTimestamps[0];
+		const waitTime = oldestTimestamp + AD_TIME_WINDOW - now;
+
+		if (waitTime > 0) {
+			await new Promise((resolve) => setTimeout(resolve, waitTime));
+			// Recursively call to clean up and check again
+			return waitForAdRateLimit();
+		}
+	}
+
+	// Record this request
+	adRequestTimestamps.push(now);
+}

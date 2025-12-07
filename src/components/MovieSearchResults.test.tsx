@@ -43,7 +43,7 @@ const renderComponent = (override?: Partial<React.ComponentProps<typeof MovieSea
 		handleShowInfo: vi.fn(),
 		handleCast: vi.fn().mockResolvedValue(undefined),
 		handleCopyMagnet: vi.fn(),
-		handleCheckAvailability: vi.fn().mockResolvedValue(undefined),
+		checkServiceAvailability: vi.fn().mockResolvedValue(undefined),
 		addRd: vi.fn().mockResolvedValue(undefined),
 		addAd: vi.fn().mockResolvedValue(undefined),
 		addTb: vi.fn().mockResolvedValue(undefined),
@@ -95,8 +95,8 @@ describe('MovieSearchResults', () => {
 		await userEvent.click(screen.getByRole('button', { name: /RD \(75%\)/i }));
 		await waitFor(() => expect(props.deleteRd).toHaveBeenCalledWith('hash2'));
 
-		await userEvent.click(screen.getByRole('button', { name: /Check/i }));
-		await waitFor(() => expect(props.handleCheckAvailability).toHaveBeenCalled());
+		await userEvent.click(screen.getByRole('button', { name: /Check RD/i }));
+		await waitFor(() => expect(props.checkServiceAvailability).toHaveBeenCalled());
 	});
 
 	it('downloads magnets when the setting is enabled', async () => {

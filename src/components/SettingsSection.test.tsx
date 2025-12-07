@@ -99,7 +99,7 @@ describe('SettingsSection', () => {
 		expect(reportCheckbox).not.toBeChecked();
 		expect(localStorage.getItem('settings:showMassReportButtons')).toBe('false');
 
-		const limitContainer = screen.getByText('Availability check limit').closest('div')!;
+		const limitContainer = screen.getByText('Service check limit').closest('div')!;
 		const limitInput = within(limitContainer).getByRole('spinbutton');
 		expect(limitInput).toHaveValue(5);
 		await user.clear(limitInput);
@@ -107,7 +107,7 @@ describe('SettingsSection', () => {
 		expect(localStorage.getItem('settings:availabilityCheckLimit')).toBe('10');
 
 		const trackerContainer = screen
-			.getByText('Include tracker stats in availability check')
+			.getByText('Include tracker stats in service check')
 			.closest('div')!;
 		const trackerCheckbox = within(trackerContainer).getByRole('checkbox');
 		expect(trackerCheckbox).toBeChecked();

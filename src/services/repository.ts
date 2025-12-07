@@ -116,6 +116,32 @@ export class Repository {
 		return this.availabilityService.getHashByLink(link);
 	}
 
+	// AllDebrid Availability Service Methods
+	public upsertAvailabilityAd(data: {
+		hash: string;
+		imdbId: string;
+		filename: string;
+		size: number;
+		status: string;
+		statusCode: number;
+		completionDate: number;
+		files: Array<{ n: string; s: number; l: string }>;
+	}) {
+		return this.availabilityService.upsertAvailabilityAd(data);
+	}
+
+	public checkAvailabilityAd(imdbId: string, hashes: string[]) {
+		return this.availabilityService.checkAvailabilityAd(imdbId, hashes);
+	}
+
+	public removeAvailabilityAd(hash: string) {
+		return this.availabilityService.removeAvailabilityAd(hash);
+	}
+
+	public getIMDBIdByHashAd(hash: string) {
+		return this.availabilityService.getIMDBIdByHashAd(hash);
+	}
+
 	// Scraped Service Methods
 	public getScrapedTrueResults<T>(key: string, maxSizeGB?: number, page?: number) {
 		return this.scrapedService.getScrapedTrueResults<T>(key, maxSizeGB, page);

@@ -64,8 +64,8 @@ vi.mock('@/hooks/useExternalSources', () => ({
 vi.mock('@/hooks/useAvailabilityCheck', () => ({
 	useAvailabilityCheck: () => ({
 		isCheckingAvailability: false,
-		handleCheckAvailability: vi.fn(),
-		handleAvailabilityTest: vi.fn(),
+		checkServiceAvailability: vi.fn(),
+		checkServiceAvailabilityBulk: vi.fn(),
 	}),
 }));
 

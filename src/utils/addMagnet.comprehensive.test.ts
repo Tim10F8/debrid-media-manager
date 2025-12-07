@@ -1,4 +1,10 @@
-import { restartMagnet, uploadMagnet } from '@/services/allDebrid';
+import {
+	getMagnetStatusAd,
+	isAdMagnetInstant,
+	restartMagnet,
+	uploadMagnet,
+	uploadMagnetAd,
+} from '@/services/allDebrid';
 import {
 	addHashAsMagnet,
 	addTorrentFile,
@@ -552,33 +558,58 @@ describe('addMagnet utilities', () => {
 		const hash = 'test-hash';
 
 		it('should successfully add magnet to AllDebrid', async () => {
-			vi.mocked(uploadMagnet).mockResolvedValue({
-				magnets: [{ id: '123', error: null }],
+			vi.mocked(uploadMagnetAd).mockResolvedValue({
+				magnet: `magnet:?xt=urn:btih:${hash}`,
+				id: 123,
+				ready: true,
+			} as any);
+			vi.mocked(isAdMagnetInstant).mockReturnValue(true);
+			vi.mocked(getMagnetStatusAd).mockResolvedValue({
+				id: 123,
+				filename: 'test.mkv',
+				size: 1000000,
+				status: 'Ready',
+				statusCode: 4,
 			} as any);
 
 			const callback = vi.fn();
 			await handleAddAsMagnetInAd(adKey, hash, callback);
 
-			expect(uploadMagnet).toHaveBeenCalledWith(adKey, [`magnet:?xt=urn:btih:${hash}`]);
+			expect(uploadMagnetAd).toHaveBeenCalledWith(adKey, hash);
 			expect(callback).toHaveBeenCalled();
-			expect(toast).toHaveBeenCalledWith('Hash added.', expect.any(Object));
+			expect(toast.success).toHaveBeenCalledWith(
+				'Torrent cached and available.',
+				expect.any(Object)
+			);
 		});
 
-		it('should handle empty magnets response', async () => {
-			vi.mocked(uploadMagnet).mockResolvedValue({
-				magnets: [],
+		it('should handle upload errors gracefully', async () => {
+			vi.mocked(uploadMagnetAd).mockResolvedValue({
+				magnet: `magnet:?xt=urn:btih:${hash}`,
+				error: {
+					code: 'NO_SERVER',
+					message: 'file not available due to no peer',
+				},
 			} as any);
 
-			await expect(handleAddAsMagnetInAd(adKey, hash)).rejects.toThrow('no_magnets');
-			expect(toast.error).toHaveBeenCalledWith('Failed to add hash. Try again.');
+			const callback = vi.fn();
+			await handleAddAsMagnetInAd(adKey, hash, callback);
+
+			expect(uploadMagnetAd).toHaveBeenCalledWith(adKey, hash);
+			// Callback should be called with null for not-available errors
+			expect(callback).toHaveBeenCalledWith(null);
 		});
 
-		it('should handle magnet with error', async () => {
-			vi.mocked(uploadMagnet).mockResolvedValue({
-				magnets: [{ id: '123', error: 'Invalid magnet' }],
+		it('should handle non-availability errors', async () => {
+			vi.mocked(uploadMagnetAd).mockResolvedValue({
+				magnet: `magnet:?xt=urn:btih:${hash}`,
+				error: {
+					code: 'INVALID_MAGNET',
+					message: 'Invalid magnet',
+				},
 			} as any);
 
-			await expect(handleAddAsMagnetInAd(adKey, hash)).rejects.toThrow('no_magnets');
+			await expect(handleAddAsMagnetInAd(adKey, hash)).rejects.toThrow();
 			expect(toast.error).toHaveBeenCalledWith('Failed to add hash. Try again.');
 		});
 	});

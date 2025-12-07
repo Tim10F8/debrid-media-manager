@@ -3,7 +3,7 @@ import MovieSearchResults from '@/components/MovieSearchResults';
 import SearchControls from '@/components/SearchControls';
 import { showInfoForRD } from '@/components/showInfo';
 import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
-import { useAvailabilityCheck } from '@/hooks/useAvailabilityCheck';
+import { useAvailabilityCheck, type DebridService } from '@/hooks/useAvailabilityCheck';
 import { useExternalSources } from '@/hooks/useExternalSources';
 import { useMassReport } from '@/hooks/useMassReport';
 import { useTorrentManagement } from '@/hooks/useTorrentManagement';
@@ -13,7 +13,11 @@ import UserTorrentDB from '@/torrent/db';
 import { getLocalStorageBoolean, getLocalStorageItemOrDefault } from '@/utils/browserStorage';
 import { handleCastMovie } from '@/utils/castApiClient';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
-import { instantCheckInRd, instantCheckInTb } from '@/utils/instantChecks';
+import {
+	checkDatabaseAvailabilityAd,
+	checkDatabaseAvailabilityRd,
+	checkDatabaseAvailabilityTb,
+} from '@/utils/instantChecks';
 import { quickSearch } from '@/utils/quickSearch';
 import { sortByBiggest } from '@/utils/results';
 import { isVideo } from '@/utils/selectable';
@@ -98,6 +102,9 @@ const MovieSearch: FunctionComponent = () => {
 	const [searchCompleteInfo, setSearchCompleteInfo] = useState<{
 		finalResults: number;
 		totalAvailableCount: number;
+		rdAvailableCount?: number;
+		adAvailableCount?: number;
+		tbAvailableCount?: number;
 		allSourcesCompleted: boolean;
 		pendingAvailabilityChecks: number;
 		isAvailabilityOnly?: boolean;
@@ -140,17 +147,20 @@ const MovieSearch: FunctionComponent = () => {
 
 	const { fetchMovieFromExternalSource, getEnabledSources } = useExternalSources(rdKey);
 
-	const { isCheckingAvailability, handleCheckAvailability, handleAvailabilityTest } =
+	const { isCheckingAvailability, checkServiceAvailability, checkServiceAvailabilityBulk } =
 		useAvailabilityCheck(
 			rdKey,
+			adKey,
 			torboxKey,
 			imdbid as string,
 			searchResults,
 			setSearchResults,
 			hashAndProgress,
 			addRd,
+			addAd,
 			addTb,
 			deleteRd,
+			deleteAd,
 			deleteTb,
 			sortByBiggest
 		);
@@ -258,7 +268,9 @@ const MovieSearch: FunctionComponent = () => {
 		let completedSources = 0;
 		let totalSources = 1; // DMM
 		const allSourcesResults: SearchResult[][] = [];
-		let totalAvailableCount = 0;
+		let rdAvailableCount = 0;
+		let adAvailableCount = 0;
+		let tbAvailableCount = 0;
 		let pendingAvailabilityChecks = 0;
 		let allSourcesCompleted = false;
 		let finalResultCount = 0;
@@ -272,7 +284,10 @@ const MovieSearch: FunctionComponent = () => {
 			toastShown = true;
 			setSearchCompleteInfo({
 				finalResults: finalResultCount,
-				totalAvailableCount,
+				totalAvailableCount: rdAvailableCount + adAvailableCount + tbAvailableCount,
+				rdAvailableCount,
+				adAvailableCount,
+				tbAvailableCount,
 				allSourcesCompleted: true,
 				pendingAvailabilityChecks: 0,
 			});
@@ -322,13 +337,13 @@ const MovieSearch: FunctionComponent = () => {
 				if (nonCachedNew.length > 0) {
 					const hashArr = nonCachedNew.map((r) => r.hash);
 
-					// Check RD availability
+					// Check RD database for cached availability
 					if (rdKey) {
 						pendingAvailabilityChecks++;
 
 						(async () => {
 							const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
-							const count = await instantCheckInRd(
+							const count = await checkDatabaseAvailabilityRd(
 								tokenWithTimestamp,
 								tokenHash,
 								imdbId,
@@ -336,24 +351,44 @@ const MovieSearch: FunctionComponent = () => {
 								setSearchResults,
 								sortByBiggest
 							);
-							totalAvailableCount += count;
+							rdAvailableCount += count;
 							pendingAvailabilityChecks--;
 							checkAndShowFinalToast();
 						})();
 					}
 
-					// Check TorBox availability
+					// Check AllDebrid database for cached availability
+					if (adKey) {
+						pendingAvailabilityChecks++;
+
+						(async () => {
+							const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
+							const count = await checkDatabaseAvailabilityAd(
+								tokenWithTimestamp,
+								tokenHash,
+								imdbId,
+								hashArr,
+								setSearchResults,
+								sortByBiggest
+							);
+							adAvailableCount += count;
+							pendingAvailabilityChecks--;
+							checkAndShowFinalToast();
+						})();
+					}
+
+					// Check TorBox database for cached availability
 					if (torboxKey) {
 						pendingAvailabilityChecks++;
 
 						(async () => {
-							const count = await instantCheckInTb(
+							const count = await checkDatabaseAvailabilityTb(
 								torboxKey,
 								hashArr,
 								setSearchResults,
 								sortByBiggest
 							);
-							totalAvailableCount += count;
+							tbAvailableCount += count;
 							pendingAvailabilityChecks--;
 							checkAndShowFinalToast();
 						})();
@@ -466,6 +501,9 @@ const MovieSearch: FunctionComponent = () => {
 		const {
 			finalResults,
 			totalAvailableCount,
+			rdAvailableCount,
+			adAvailableCount,
+			tbAvailableCount,
 			allSourcesCompleted,
 			pendingAvailabilityChecks,
 			isAvailabilityOnly,
@@ -480,25 +518,49 @@ const MovieSearch: FunctionComponent = () => {
 			}
 		}
 
-		// Show availability toast or auto-trigger availability check
-		if (allSourcesCompleted && pendingAvailabilityChecks === 0 && rdKey) {
+		// Show availability toast and/or auto-trigger availability check per service
+		if (allSourcesCompleted && pendingAvailabilityChecks === 0) {
+			// Build service-specific availability message
+			const servicesWithCache = [];
+			if (rdKey && (rdAvailableCount ?? 0) > 0)
+				servicesWithCache.push(`RD: ${rdAvailableCount}`);
+			if (adKey && (adAvailableCount ?? 0) > 0)
+				servicesWithCache.push(`AD: ${adAvailableCount}`);
+			if (torboxKey && (tbAvailableCount ?? 0) > 0)
+				servicesWithCache.push(`TB: ${tbAvailableCount}`);
+
+			// Show toast for cached torrents if any found
 			if (totalAvailableCount > 0) {
-				toast(`${totalAvailableCount} RD torrents available`, searchToastOptions);
-			} else if (finalResults > 0 && !isCheckingAvailability) {
-				// No cached torrents found but we have results - auto-trigger availability check
+				const message =
+					servicesWithCache.length > 0
+						? `${totalAvailableCount} cached (${servicesWithCache.join(', ')})`
+						: `${totalAvailableCount} cached torrents available`;
+				toast(message, searchToastOptions);
+			}
+
+			// Auto-trigger availability check for services that have no cached torrents
+			if (finalResults > 0 && !isCheckingAvailability) {
 				const autoCheckDisabled =
 					window.localStorage.getItem('settings:disableAutoAvailabilityCheck') === 'true';
 				const autoCheckKey = `autoAvailabilityChecked:${imdbid}`;
 				const alreadyChecked = window.localStorage.getItem(autoCheckKey) === 'true';
-				if (!autoCheckDisabled && !alreadyChecked) {
+
+				// Determine which services need checking (independent per service)
+				const servicesNeedingCheck: DebridService[] = [];
+				if (rdKey && (rdAvailableCount ?? 0) === 0) servicesNeedingCheck.push('RD');
+				if (adKey && (adAvailableCount ?? 0) === 0) servicesNeedingCheck.push('AD');
+				if (torboxKey && (tbAvailableCount ?? 0) === 0) servicesNeedingCheck.push('TB');
+
+				if (!autoCheckDisabled && !alreadyChecked && servicesNeedingCheck.length > 0) {
 					// Mark as checked to prevent re-triggering
 					window.localStorage.setItem(autoCheckKey, 'true');
+					const servicesList = servicesNeedingCheck.join(', ');
 					toast(
-						'No cached torrents found. Checking availability in 3 secs...',
+						`No cached in ${servicesList}. Checking availability in 3 secs...`,
 						searchToastOptions
 					);
 					setTimeout(() => {
-						handleAvailabilityTest(filteredResults);
+						checkServiceAvailabilityBulk(searchResults, servicesNeedingCheck);
 					}, 3000);
 				}
 			}
@@ -509,8 +571,10 @@ const MovieSearch: FunctionComponent = () => {
 	}, [
 		searchCompleteInfo,
 		rdKey,
+		adKey,
+		torboxKey,
 		isCheckingAvailability,
-		handleAvailabilityTest,
+		checkServiceAvailabilityBulk,
 		filteredResults,
 		imdbid,
 	]);
@@ -575,27 +639,71 @@ const MovieSearch: FunctionComponent = () => {
 
 	const handleActionButtons = () => (
 		<>
-			{rdKey && (
+			{(rdKey || adKey || torboxKey) && (
 				<>
-					<button
-						className="mb-1 mr-2 mt-0 rounded border-2 border-yellow-500 bg-yellow-900/30 p-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 disabled:cursor-not-allowed disabled:opacity-50"
-						onClick={() => handleAvailabilityTest(filteredResults)}
-						disabled={isCheckingAvailability}
-					>
-						<b className="flex items-center justify-center">
-							{isCheckingAvailability ? (
-								<>
-									<Loader2 className="mr-1 h-3 w-3 animate-spin text-yellow-500" />
-									Checking...
-								</>
-							) : (
-								<>
-									<Search className="mr-1 h-3 w-3 text-yellow-500" />
-									Check Available
-								</>
-							)}
-						</b>
-					</button>
+					{rdKey && (
+						<button
+							className="mb-1 mr-2 mt-0 rounded border-2 border-yellow-500 bg-yellow-900/30 p-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 disabled:cursor-not-allowed disabled:opacity-50"
+							onClick={() => checkServiceAvailabilityBulk(filteredResults, ['RD'])}
+							disabled={isCheckingAvailability}
+						>
+							<b className="flex items-center justify-center">
+								{isCheckingAvailability ? (
+									<>
+										<Loader2 className="mr-1 h-3 w-3 animate-spin text-yellow-500" />
+										Checking RD...
+									</>
+								) : (
+									<>
+										<Search className="mr-1 h-3 w-3 text-yellow-500" />
+										Check RD
+									</>
+								)}
+							</b>
+						</button>
+					)}
+					{adKey && (
+						<button
+							className="mb-1 mr-2 mt-0 rounded border-2 border-orange-500 bg-orange-900/30 p-1 text-xs text-orange-100 transition-colors hover:bg-orange-800/50 disabled:cursor-not-allowed disabled:opacity-50"
+							onClick={() => checkServiceAvailabilityBulk(filteredResults, ['AD'])}
+							disabled={isCheckingAvailability}
+						>
+							<b className="flex items-center justify-center">
+								{isCheckingAvailability ? (
+									<>
+										<Loader2 className="mr-1 h-3 w-3 animate-spin text-orange-500" />
+										Checking AD...
+									</>
+								) : (
+									<>
+										<Search className="mr-1 h-3 w-3 text-orange-500" />
+										Check AD
+									</>
+								)}
+							</b>
+						</button>
+					)}
+					{torboxKey && (
+						<button
+							className="mb-1 mr-2 mt-0 rounded border-2 border-cyan-500 bg-cyan-900/30 p-1 text-xs text-cyan-100 transition-colors hover:bg-cyan-800/50 disabled:cursor-not-allowed disabled:opacity-50"
+							onClick={() => checkServiceAvailabilityBulk(filteredResults, ['TB'])}
+							disabled={isCheckingAvailability}
+						>
+							<b className="flex items-center justify-center">
+								{isCheckingAvailability ? (
+									<>
+										<Loader2 className="mr-1 h-3 w-3 animate-spin text-cyan-500" />
+										Checking TB...
+									</>
+								) : (
+									<>
+										<Search className="mr-1 h-3 w-3 text-cyan-500" />
+										Check TB
+									</>
+								)}
+							</b>
+						</button>
+					)}
 					{getFirstAvailableRdTorrent() && (
 						<>
 							<button
@@ -751,7 +859,7 @@ const MovieSearch: FunctionComponent = () => {
 						handleCopyMagnet={(hash) =>
 							handleCopyOrDownloadMagnet(hash, shouldDownloadMagnets)
 						}
-						handleCheckAvailability={handleCheckAvailability}
+						checkServiceAvailability={checkServiceAvailability}
 						addRd={addRd}
 						addAd={addAd}
 						addTb={addTb}

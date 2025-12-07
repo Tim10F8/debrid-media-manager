@@ -157,7 +157,17 @@ describe('useTorrentManagement', () => {
 		mockHandleAddAsMagnetInRd.mockImplementation(async (_rdKey, hash, cb) => {
 			await cb(makeTorrentInfo(hash));
 		});
-		mockHandleAddAsMagnetInAd.mockResolvedValue(undefined);
+		mockHandleAddAsMagnetInAd.mockImplementation(async (_adKey, hash, cb) => {
+			if (cb) {
+				await cb({
+					id: 123,
+					filename: `${hash}.mkv`,
+					size: 1000000,
+					status: 'Ready',
+					statusCode: 4,
+				} as any);
+			}
+		});
 		mockHandleAddAsMagnetInTb.mockImplementation(async (_tbKey, hash, cb) => {
 			await cb(
 				makeUserTorrent({
@@ -237,17 +247,22 @@ describe('useTorrentManagement', () => {
 		expect(setSearchResults).toHaveBeenCalled();
 	});
 
-	it('adds AD torrents via fetchAllDebrid and refreshes hash progress', async () => {
+	it('adds AD torrents via handleAddAsMagnetInAd', async () => {
 		const { result } = renderManagementHook();
 
 		await act(async () => {
 			await result.current.addAd('hash-ad');
 		});
 
-		expect(mockHandleAddAsMagnetInAd).toHaveBeenCalledWith('ad-key', 'hash-ad');
-		expect(mockFetchAllDebrid).toHaveBeenCalledWith('ad-key', expect.any(Function));
-		expect(mockDb.addAll).toHaveBeenCalled();
-		expect(result.current.hashAndProgress['ad:hash-ad']).toBe(80);
+		expect(mockHandleAddAsMagnetInAd).toHaveBeenCalledWith(
+			'ad-key',
+			'hash-ad',
+			expect.any(Function), // callback
+			false, // deleteIfNotInstant (isCheckingAvailability)
+			true // keepInLibrary (!isCheckingAvailability)
+		);
+		// Torrent is added directly in the callback via torrentDB.add
+		expect(mockDb.add).toHaveBeenCalled();
 	});
 
 	it('adds TB torrents and persists them', async () => {

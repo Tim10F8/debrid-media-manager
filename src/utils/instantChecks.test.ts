@@ -3,9 +3,9 @@ import { checkCachedStatus } from '@/services/torbox';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkAvailabilityByHashes } from './availability';
 import {
-	instantCheckInAd2,
-	instantCheckInRd2,
-	instantCheckInTb2,
+	checkDatabaseAvailabilityAd2,
+	checkDatabaseAvailabilityRd2,
+	checkDatabaseAvailabilityTb2,
 	wrapLoading,
 } from './instantChecks';
 
@@ -80,7 +80,7 @@ describe('instantChecks utilities', () => {
 			},
 		] as any[]);
 
-		const instantHits = await instantCheckInRd2(
+		const instantHits = await checkDatabaseAvailabilityRd2(
 			'problem',
 			'solution',
 			'rd-key',
@@ -114,7 +114,7 @@ describe('instantChecks utilities', () => {
 			},
 		] as any[]);
 
-		const hits = await instantCheckInAd2('ad-key', ['hash-ad'], setter);
+		const hits = await checkDatabaseAvailabilityAd2('ad-key', ['hash-ad'], setter);
 
 		expect(hits).toBe(1);
 		expect(getState()[0].adAvailable).toBe(true);
@@ -139,7 +139,7 @@ describe('instantChecks utilities', () => {
 			},
 		] as any[]);
 
-		const hits = await instantCheckInTb2('tb-key', ['hash-tb'], setter);
+		const hits = await checkDatabaseAvailabilityTb2('tb-key', ['hash-tb'], setter);
 
 		expect(hits).toBe(1);
 		expect(getState()[0].tbAvailable).toBe(true);

@@ -349,4 +349,150 @@ export class AvailabilityService extends DatabaseClient {
 		});
 		return file?.hash || null;
 	}
+
+	// ====================================================================
+	// AllDebrid Availability Methods
+	// ====================================================================
+
+	public async upsertAvailabilityAd({
+		hash,
+		imdbId,
+		filename,
+		size,
+		status,
+		statusCode,
+		completionDate,
+		files,
+	}: {
+		hash: string;
+		imdbId: string;
+		filename: string;
+		size: number;
+		status: string;
+		statusCode: number;
+		completionDate: number;
+		files: Array<{ n: string; s: number; l: string }>;
+	}) {
+		// Normalize hash to lowercase (AllDebrid returns lowercase hashes)
+		const normalizedHash = hash.toLowerCase();
+		const episodeInfo = extractEpisodeInfo(filename);
+
+		return this.prisma.availableAd.upsert({
+			where: { hash: normalizedHash },
+			update: {
+				imdbId,
+				filename,
+				originalFilename: filename,
+				bytes: BigInt(size),
+				originalBytes: BigInt(size),
+				host: 'alldebrid.com',
+				progress: 100,
+				status,
+				statusCode,
+				ended: new Date(completionDate * 1000),
+				season: episodeInfo?.season,
+				episode: episodeInfo?.episode,
+				verifiedAt: new Date(),
+				verificationCount: { increment: 1 },
+				files: {
+					deleteMany: {},
+					create: files.map((file, index) => {
+						const fileEpisodeInfo = extractEpisodeInfo(file.n);
+						return {
+							link: file.l,
+							file_id: index,
+							path: file.n,
+							bytes: BigInt(file.s),
+							season: fileEpisodeInfo?.season,
+							episode: fileEpisodeInfo?.episode,
+						};
+					}),
+				},
+			},
+			create: {
+				hash: normalizedHash,
+				imdbId,
+				filename,
+				originalFilename: filename,
+				bytes: BigInt(size),
+				originalBytes: BigInt(size),
+				host: 'alldebrid.com',
+				progress: 100,
+				status,
+				statusCode,
+				ended: new Date(completionDate * 1000),
+				season: episodeInfo?.season,
+				episode: episodeInfo?.episode,
+				files: {
+					create: files.map((file, index) => {
+						const fileEpisodeInfo = extractEpisodeInfo(file.n);
+						return {
+							link: file.l,
+							file_id: index,
+							path: file.n,
+							bytes: BigInt(file.s),
+							season: fileEpisodeInfo?.season,
+							episode: fileEpisodeInfo?.episode,
+						};
+					}),
+				},
+			},
+		});
+	}
+
+	public async checkAvailabilityAd(
+		imdbId: string,
+		hashes: string[]
+	): Promise<
+		Array<{
+			hash: string;
+			files: Array<{
+				file_id: number;
+				path: string;
+				bytes: number;
+			}>;
+		}>
+	> {
+		const availableHashes = await this.prisma.availableAd.findMany({
+			where: {
+				imdbId,
+				hash: { in: hashes.map((h) => h.toLowerCase()) }, // AllDebrid returns lowercase
+				status: 'Ready', // AllDebrid uses "Ready" not "downloaded"
+				statusCode: 4, // Extra verification
+			},
+			select: {
+				hash: true,
+				files: {
+					select: {
+						file_id: true,
+						path: true,
+						bytes: true,
+					},
+				},
+			},
+		});
+
+		return availableHashes.map((record) => ({
+			hash: record.hash,
+			files: record.files.map((file) => ({
+				file_id: file.file_id,
+				path: file.path,
+				bytes: Number(file.bytes),
+			})),
+		}));
+	}
+
+	public async removeAvailabilityAd(hash: string): Promise<void> {
+		await this.prisma.availableAd.delete({
+			where: { hash: hash.toLowerCase() },
+		});
+	}
+
+	public async getIMDBIdByHashAd(hash: string): Promise<string | null> {
+		const available = await this.prisma.availableAd.findFirst({
+			where: { hash: hash.toLowerCase() },
+			select: { imdbId: true },
+		});
+		return available?.imdbId || null;
+	}
 }

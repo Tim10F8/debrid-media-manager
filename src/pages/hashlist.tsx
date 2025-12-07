@@ -7,7 +7,11 @@ import { handleAddAsMagnetInRd } from '@/utils/addMagnet';
 import { runConcurrentFunctions } from '@/utils/batch';
 import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorrent';
 import { convertToAllDebridUserTorrent, convertToUserTorrent } from '@/utils/fetchTorrents';
-import { instantCheckInAd2, instantCheckInRd2, wrapLoading } from '@/utils/instantChecks';
+import {
+	checkDatabaseAvailabilityAd2,
+	checkDatabaseAvailabilityRd2,
+	wrapLoading,
+} from '@/utils/instantChecks';
 import { getMediaId } from '@/utils/mediaId';
 import { getTypeByName } from '@/utils/mediaType';
 import getReleaseTags from '@/utils/score';
@@ -115,7 +119,7 @@ function HashlistPage() {
 				const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
 				wrapLoading(
 					'RD',
-					instantCheckInRd2(
+					checkDatabaseAvailabilityRd2(
 						tokenWithTimestamp,
 						tokenHash,
 						rdKey,
@@ -124,7 +128,11 @@ function HashlistPage() {
 					)
 				);
 			}
-			if (adKey) wrapLoading('AD', instantCheckInAd2(adKey, hashArr, setUserTorrentsList));
+			if (adKey)
+				wrapLoading(
+					'AD',
+					checkDatabaseAvailabilityAd2(adKey, hashArr, setUserTorrentsList)
+				);
 		} catch (error) {
 			console.error('Error fetching user torrents list:', error);
 			setUserTorrentsList([]);

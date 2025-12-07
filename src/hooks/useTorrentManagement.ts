@@ -8,13 +8,13 @@ import {
 	handleAddAsMagnetInRd,
 	handleAddAsMagnetInTb,
 } from '@/utils/addMagnet';
-import { removeAvailability, submitAvailability } from '@/utils/availability';
+import { removeAvailability, submitAvailability, submitAvailabilityAd } from '@/utils/availability';
 import {
 	handleDeleteAdTorrent,
 	handleDeleteRdTorrent,
 	handleDeleteTbTorrent,
 } from '@/utils/deleteTorrent';
-import { convertToUserTorrent, fetchAllDebrid } from '@/utils/fetchTorrents';
+import { convertToUserTorrent } from '@/utils/fetchTorrents';
 import { generateTokenAndHash } from '@/utils/token';
 import { useCallback, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -55,7 +55,7 @@ export function useTorrentManagement(
 				torrentInfo = info;
 				const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
 
-				// Only handle false positives for actual usage, not availability checks
+				// Only handle false positives for actual usage, not service checks
 				if (!isCheckingAvailability && wasMarkedAvailable) {
 					// Check for false positive conditions
 					const isFalsePositive =
@@ -107,34 +107,145 @@ export function useTorrentManagement(
 	);
 
 	const addAd = useCallback(
-		async (hash: string) => {
+		async (hash: string, isCheckingAvailability = false): Promise<any> => {
 			if (!adKey) return;
 
-			console.log('[TorrentManagement] addAd start', { hash });
-			await handleAddAsMagnetInAd(adKey, hash);
-			console.log('[TorrentManagement] addAd queued refresh via fetchAllDebrid', { hash });
-			await fetchAllDebrid(adKey, async (torrents: UserTorrent[]) => {
-				console.log('[TorrentManagement] addAd fetchAllDebrid callback', {
-					hash,
-					count: torrents.length,
-				});
-				await torrentDB.addAll(torrents);
-				// Update global cache with new torrents
-				torrents.forEach((torrent) => {
-					addToCache(torrent);
-					// Immediately update hashAndProgress state for this torrent
-					if (torrent.hash === hash) {
+			// Read searchResults at call time via closure
+			const torrentResult = searchResults.find((r) => r.hash === hash);
+			const wasMarkedAvailable = torrentResult?.adAvailable || false;
+			let magnetStatusInfo: any = null;
+
+			console.log('[TorrentManagement] addAd start', { hash, isCheckingAvailability });
+			await handleAddAsMagnetInAd(
+				adKey,
+				hash,
+				async (magnetStatus) => {
+					magnetStatusInfo = magnetStatus;
+
+					// If magnetStatus is null, the torrent is not instant
+					if (!magnetStatus) {
+						console.log('[TorrentManagement] addAd not instant', { hash });
+
+						// If it was marked as available, it's a false positive
+						if (!isCheckingAvailability && wasMarkedAvailable) {
+							setSearchResults((prev) =>
+								prev.map((r) =>
+									r.hash === hash ? { ...r, adAvailable: false } : r
+								)
+							);
+							toast.error('Torrent misflagged as AD available.');
+						}
+
+						return;
+					}
+
+					const [tokenWithTimestamp, tokenHash] = await generateTokenAndHash();
+
+					// Only handle false positives for actual usage, not service checks
+					if (!isCheckingAvailability && wasMarkedAvailable) {
+						// Check for false positive conditions
+						const isFalsePositive =
+							magnetStatus.statusCode !== 4 || magnetStatus.status !== 'Ready';
+
+						if (isFalsePositive) {
+							// Update UI to remove false positive
+							setSearchResults((prev) =>
+								prev.map((r) =>
+									r.hash === hash ? { ...r, adAvailable: false } : r
+								)
+							);
+
+							toast.error('Torrent misflagged as AD available.');
+						}
+					}
+
+					// Only submit availability for truly cached torrents (statusCode 4 = Ready)
+					if (magnetStatus.statusCode === 4 && magnetStatus.status === 'Ready') {
+						// Filter and transform files - links are optional, we just need name and size
+						const validFiles =
+							magnetStatus.files
+								?.filter((f) => f.n && f.s !== undefined)
+								.map((f) => ({
+									n: f.n,
+									s: f.s!,
+									l: f.l || '', // Link is optional, use empty string if not available
+								})) || [];
+
+						// Only submit if we have valid files (name and size required)
+						if (validFiles.length > 0) {
+							await submitAvailabilityAd(tokenWithTimestamp, tokenHash, {
+								hash: hash.toLowerCase(),
+								imdbId,
+								filename: magnetStatus.filename,
+								size: magnetStatus.size,
+								status: magnetStatus.status,
+								statusCode: magnetStatus.statusCode,
+								completionDate: magnetStatus.completionDate || 0,
+								files: validFiles,
+							});
+						} else {
+							console.warn(
+								'[TorrentManagement] addAd: No valid files found, skipping availability submission',
+								{
+									hash,
+									magnetId: magnetStatus.id,
+									filesCount: magnetStatus.files?.length || 0,
+								}
+							);
+						}
+					}
+
+					// For actual torrent additions (not service checks), store the torrent immediately
+					if (!isCheckingAvailability) {
+						// Convert magnet status to UserTorrent and store in database
+						const userTorrent: UserTorrent = {
+							id: `ad:${magnetStatus.id}`,
+							filename: magnetStatus.filename,
+							title: magnetStatus.filename,
+							hash: hash.toLowerCase(),
+							bytes: magnetStatus.size,
+							progress: magnetStatus.statusCode === 4 ? 100 : 0,
+							status: magnetStatus.status as any,
+							serviceStatus: magnetStatus.status,
+							added: new Date(magnetStatus.uploadDate || Date.now()),
+							mediaType: 'other',
+							links: magnetStatus.links?.map((l) => l.link) || [],
+							selectedFiles:
+								magnetStatus.files?.map((f, idx) => ({
+									filename: f.n,
+									filesize: f.s || 0,
+									link: f.l || '',
+								})) || [],
+							seeders: magnetStatus.seeders || 0,
+							speed: magnetStatus.downloadSpeed || 0,
+							adData: magnetStatus,
+						};
+
+						await torrentDB.add(userTorrent);
+						addToCache(userTorrent);
+
+						// Immediately update hashAndProgress state for this torrent
 						setHashAndProgress((prev) => ({
 							...prev,
-							[`${torrent.id.substring(0, 3)}${torrent.hash}`]: torrent.progress,
+							[`${userTorrent.id.substring(0, 3)}${userTorrent.hash}`]:
+								userTorrent.progress,
 						}));
+
+						console.log('[TorrentManagement] addAd: Stored torrent in database', {
+							id: userTorrent.id,
+							hash: userTorrent.hash,
+							progress: userTorrent.progress,
+						});
 					}
-				});
-			});
-			await fetchHashAndProgress();
+				},
+				isCheckingAvailability, // deleteIfNotInstant parameter
+				!isCheckingAvailability // keepInLibrary parameter - keep if not checking service
+			);
+
 			console.log('[TorrentManagement] addAd end', { hash });
+			return isCheckingAvailability ? magnetStatusInfo : undefined;
 		},
-		[adKey, fetchHashAndProgress, addToCache]
+		[adKey, setSearchResults, imdbId, fetchHashAndProgress, addToCache, searchResults]
 	);
 
 	const addTb = useCallback(

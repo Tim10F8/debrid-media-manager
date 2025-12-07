@@ -678,9 +678,7 @@ export const SettingsSection = () => {
 								</div>
 
 								<div className="flex flex-col gap-1">
-									<label className="font-semibold">
-										Availability check limit
-									</label>
+									<label className="font-semibold">Service check limit</label>
 									<input
 										id="dmm-availability-check-limit"
 										type="number"
@@ -691,8 +689,8 @@ export const SettingsSection = () => {
 										onChange={handleAvailabilityCheckLimitChange}
 									/>
 									<span className="text-xs text-gray-400">
-										Maximum torrents to check when using &quot;Check
-										Available&quot; button (0 = no limit)
+										Maximum torrents to check when using &quot;Check All
+										Services&quot; button (0 = no limit)
 									</span>
 								</div>
 
@@ -706,14 +704,14 @@ export const SettingsSection = () => {
 											onChange={handleIncludeTrackerStatsChange}
 										/>
 										<label className="font-semibold">
-											Include tracker stats in availability check
+											Include tracker stats in service check
 										</label>
 									</div>
 									<span className="text-xs text-gray-400">
 										When enabled, also fetches seeders, leechers, and download
-										counts from trackers during availability checks. This
-										provides more detailed information but may slow down the
-										check process.
+										counts from trackers during service checks. This provides
+										more detailed information but may slow down the check
+										process.
 									</span>
 								</div>
 
@@ -727,11 +725,11 @@ export const SettingsSection = () => {
 											onChange={handleDisableAutoAvailabilityCheckChange}
 										/>
 										<label className="font-semibold">
-											Disable auto availability check
+											Disable auto service check
 										</label>
 									</div>
 									<span className="text-xs text-gray-400">
-										When enabled, disables the automatic availability check that
+										When enabled, disables the automatic service check that
 										triggers when no cached torrents are found after a search.
 									</span>
 								</div>

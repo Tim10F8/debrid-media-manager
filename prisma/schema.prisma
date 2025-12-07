@@ -125,6 +125,47 @@ model AvailableFile {
   @@index([hash, season, episode])
 }
 
+model AvailableAd {
+  hash              String            @id
+  imdbId            String
+  filename          String
+  originalFilename  String
+  bytes             BigInt
+  originalBytes     BigInt
+  host              String
+  progress          Int
+  status            String
+  statusCode        Int?
+  ended             DateTime
+  updatedAt         DateTime          @updatedAt
+  createdAt         DateTime          @default(now())
+  season            Int?
+  episode           Int?
+  verifiedAt        DateTime          @default(now())
+  verificationCount Int               @default(1)
+  files             AvailableAdFile[]
+
+  @@index([status])
+  @@index([imdbId])
+  @@index([imdbId, hash])
+  @@index([imdbId, status, season, episode, bytes])
+  @@index([updatedAt])
+}
+
+model AvailableAdFile {
+  link        String      @id
+  file_id     Int
+  hash        String
+  path        String      @db.Text
+  bytes       BigInt
+  season      Int?
+  episode     Int?
+  availableAd AvailableAd @relation(fields: [hash], references: [hash], onDelete: Cascade)
+
+  @@index([hash])
+  @@index([hash, season, episode])
+}
+
 model User {
   id        Int     @id @default(autoincrement())
   patreonId String? @unique

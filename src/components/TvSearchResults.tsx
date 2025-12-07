@@ -1,3 +1,4 @@
+import type { DebridService } from '@/hooks/useAvailabilityCheck';
 import { SearchResult } from '@/services/mediasearch';
 import { downloadMagnetFile } from '@/utils/downloadMagnet';
 import { getEpisodeCountClass, getEpisodeCountLabel } from '@/utils/episodeUtils';
@@ -27,7 +28,10 @@ type TvSearchResultsProps = {
 	handleShowInfo: (result: SearchResult) => void;
 	handleCast: (hash: string, fileIds: string[]) => Promise<void>;
 	handleCopyMagnet: (hash: string) => void;
-	handleCheckAvailability: (result: SearchResult) => Promise<void>;
+	checkServiceAvailability: (
+		result: SearchResult,
+		servicesToCheck?: DebridService[]
+	) => Promise<void>;
 	addRd: (hash: string) => Promise<void>;
 	addAd: (hash: string) => Promise<void>;
 	addTb: (hash: string) => Promise<void>;
@@ -51,7 +55,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 	handleShowInfo,
 	handleCast,
 	handleCopyMagnet,
-	handleCheckAvailability,
+	checkServiceAvailability,
 	addRd,
 	addAd,
 	addTb,
@@ -63,7 +67,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 }) => {
 	const [loadingHashes, setLoadingHashes] = useState<Set<string>>(new Set());
 	const [castingHashes, setCastingHashes] = useState<Set<string>>(new Set());
-	const [checkingHashes, setCheckingHashes] = useState<Set<string>>(new Set());
+	const [checkingHashes, setCheckingHashes] = useState<Map<string, string>>(new Map());
 	const [downloadMagnets, setDownloadMagnets] = useState(false);
 
 	useEffect(() => {
@@ -71,6 +75,20 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 			window.localStorage.getItem('settings:downloadMagnets') === 'true';
 		setDownloadMagnets(shouldDownloadMagnets);
 	}, []);
+
+	const resolveServiceLabel = (services?: DebridService[]) => {
+		const available: DebridService[] = [];
+		if (rdKey) available.push('RD');
+		if (adKey) available.push('AD');
+		if (torboxKey) available.push('TB');
+
+		const targetServices =
+			services && services.length > 0
+				? available.filter((service) => services.includes(service))
+				: available;
+
+		return targetServices.length > 0 ? targetServices.join(' / ') : 'services';
+	};
 
 	const isDownloading = (service: string, hash: string) =>
 		`${service}:${hash}` in hashAndProgress && hashAndProgress[`${service}:${hash}`] < 100;
@@ -150,16 +168,21 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 		}
 	};
 
-	const handleCheckWithLoading = async (result: SearchResult) => {
+	const handleCheckWithLoading = async (result: SearchResult, services?: DebridService[]) => {
 		if (checkingHashes.has(result.hash)) return;
-		setCheckingHashes((prev) => new Set(prev).add(result.hash));
+		const label = resolveServiceLabel(services);
+		setCheckingHashes((prev) => {
+			const next = new Map(prev);
+			next.set(result.hash, label);
+			return next;
+		});
 		try {
-			await handleCheckAvailability(result);
+			await checkServiceAvailability(result, services);
 		} finally {
 			setCheckingHashes((prev) => {
-				const newSet = new Set(prev);
-				newSet.delete(result.hash);
-				return newSet;
+				const next = new Map(prev);
+				next.delete(result.hash);
+				return next;
 			});
 		}
 	};
@@ -235,7 +258,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 
 						const isLoading = loadingHashes.has(r.hash);
 						const isCasting = castingHashes.has(r.hash);
-						const isChecking = checkingHashes.has(r.hash);
+						const checkingLabel = checkingHashes.get(r.hash);
 
 						return (
 							<div
@@ -432,33 +455,76 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 											</button>
 										)}
 
-										{/* Check availability btn */}
-										{(rdKey || torboxKey) &&
-											!r.rdAvailable &&
-											!r.adAvailable &&
-											!r.tbAvailable && (
-												<button
-													className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${isCheckingAvailability || checkingHashes.has(r.hash) ? 'cursor-not-allowed opacity-50' : ''}`}
-													onClick={() => handleCheckWithLoading(r)}
-													disabled={
-														isCheckingAvailability ||
-														checkingHashes.has(r.hash)
-													}
-												>
-													{isCheckingAvailability ||
-													checkingHashes.has(r.hash) ? (
-														<>
-															<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
-															Checking...
-														</>
-													) : (
-														<>
-															<SearchIcon className="mr-1 inline-block h-3 w-3 text-yellow-400" />
-															Check
-														</>
-													)}
-												</button>
-											)}
+										{/* Check service availability btns */}
+										{rdKey && !r.rdAvailable && (
+											<button
+												className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${isCheckingAvailability || checkingHashes.has(r.hash) ? 'cursor-not-allowed opacity-50' : ''}`}
+												onClick={() => handleCheckWithLoading(r, ['RD'])}
+												disabled={
+													isCheckingAvailability ||
+													checkingHashes.has(r.hash)
+												}
+											>
+												{isCheckingAvailability ||
+												checkingHashes.has(r.hash) ? (
+													<>
+														<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
+														{`Checking ${checkingLabel || 'service'}...`}
+													</>
+												) : (
+													<>
+														<SearchIcon className="mr-1 inline-block h-3 w-3 text-yellow-400" />
+														Check RD
+													</>
+												)}
+											</button>
+										)}
+										{adKey && !r.adAvailable && (
+											<button
+												className={`haptic-sm inline rounded border-2 border-orange-500 bg-orange-900/30 px-1 text-xs text-orange-100 transition-colors hover:bg-orange-800/50 ${isCheckingAvailability || checkingHashes.has(r.hash) ? 'cursor-not-allowed opacity-50' : ''}`}
+												onClick={() => handleCheckWithLoading(r, ['AD'])}
+												disabled={
+													isCheckingAvailability ||
+													checkingHashes.has(r.hash)
+												}
+											>
+												{isCheckingAvailability ||
+												checkingHashes.has(r.hash) ? (
+													<>
+														<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
+														{`Checking ${checkingLabel || 'service'}...`}
+													</>
+												) : (
+													<>
+														<SearchIcon className="mr-1 inline-block h-3 w-3 text-orange-400" />
+														Check AD
+													</>
+												)}
+											</button>
+										)}
+										{torboxKey && !r.tbAvailable && (
+											<button
+												className={`haptic-sm inline rounded border-2 border-cyan-500 bg-cyan-900/30 px-1 text-xs text-cyan-100 transition-colors hover:bg-cyan-800/50 ${isCheckingAvailability || checkingHashes.has(r.hash) ? 'cursor-not-allowed opacity-50' : ''}`}
+												onClick={() => handleCheckWithLoading(r, ['TB'])}
+												disabled={
+													isCheckingAvailability ||
+													checkingHashes.has(r.hash)
+												}
+											>
+												{isCheckingAvailability ||
+												checkingHashes.has(r.hash) ? (
+													<>
+														<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
+														{`Checking ${checkingLabel || 'service'}...`}
+													</>
+												) : (
+													<>
+														<SearchIcon className="mr-1 inline-block h-3 w-3 text-cyan-400" />
+														Check TB
+													</>
+												)}
+											</button>
+										)}
 
 										{/* Watch button */}
 										{rdKey && player && r.rdAvailable && (

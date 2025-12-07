@@ -1233,7 +1233,8 @@ function TorrentsPage() {
 			const allHashes = new Set(userTorrentsList.map((t) => t.hash));
 			const addMagnet = (hash: string) => {
 				if (rdKey && debridService === 'rd') return handleAddAsMagnetInRd(rdKey, hash);
-				if (adKey && debridService === 'ad') return handleAddAsMagnetInAd(adKey, hash);
+				if (adKey && debridService === 'ad')
+					return handleAddAsMagnetInAd(adKey, hash, undefined, true, true);
 				if (tbKey && debridService === 'tb') return handleAddAsMagnetInTb(tbKey, hash);
 			};
 
@@ -1259,18 +1260,18 @@ function TorrentsPage() {
 						return;
 					}
 
-					// Check availability for RD and TB (AD doesn't have bulk availability check)
+					// Check database for cached availability for RD and TB (AD doesn't have bulk check)
 					let availableHashes: string[] = [];
 					let unavailableHashes: string[] = [];
 
 					if ((rdKey && debridService === 'rd') || (tbKey && debridService === 'tb')) {
-						toast.loading(`Checking availability for ${newHashes.length} torrents...`, {
-							id: 'availability-check',
+						toast.loading(`Checking database for ${newHashes.length} torrents...`, {
+							id: 'database-check',
 						});
 
 						try {
 							if (rdKey && debridService === 'rd') {
-								// Check RD availability in batches of 100
+								// Check RD database for cached availability in batches of 100
 								const { checkAvailabilityByHashes } = await import(
 									'@/utils/availability'
 								);
@@ -1289,7 +1290,7 @@ function TorrentsPage() {
 								availableHashes = newHashes.filter((h) => availableSet.has(h));
 								unavailableHashes = newHashes.filter((h) => !availableSet.has(h));
 							} else if (tbKey && debridService === 'tb') {
-								// Check TorBox availability
+								// Check TorBox database for cached availability
 								const { checkCachedStatus } = await import('@/services/torbox');
 								const availableSet = new Set<string>();
 
@@ -1316,7 +1317,7 @@ function TorrentsPage() {
 								unavailableHashes = newHashes.filter((h) => !availableSet.has(h));
 							}
 
-							toast.dismiss('availability-check');
+							toast.dismiss('database-check');
 							if (availableHashes.length > 0) {
 								toast.success(
 									`${availableHashes.length} cached torrents queued first.`,
@@ -1330,14 +1331,14 @@ function TorrentsPage() {
 								);
 							}
 						} catch (error) {
-							console.error('Error checking availability:', error);
-							toast.dismiss('availability-check');
-							// If availability check fails, treat all as unavailable
+							console.error('Error checking database availability:', error);
+							toast.dismiss('database-check');
+							// If database check fails, treat all as unavailable
 							unavailableHashes = newHashes;
 							availableHashes = [];
 						}
 					} else {
-						// For AD or if no availability check, treat all as unavailable
+						// For AD or if no database check, treat all as unavailable
 						unavailableHashes = newHashes;
 					}
 

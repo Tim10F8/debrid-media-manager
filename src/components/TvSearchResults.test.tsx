@@ -44,7 +44,7 @@ const renderTv = (override?: Partial<React.ComponentProps<typeof TvSearchResults
 		handleShowInfo: vi.fn(),
 		handleCast: vi.fn().mockResolvedValue(undefined),
 		handleCopyMagnet: vi.fn(),
-		handleCheckAvailability: vi.fn().mockResolvedValue(undefined),
+		checkServiceAvailability: vi.fn().mockResolvedValue(undefined),
 		addRd: vi.fn().mockResolvedValue(undefined),
 		addAd: vi.fn().mockResolvedValue(undefined),
 		addTb: vi.fn().mockResolvedValue(undefined),
@@ -83,8 +83,8 @@ describe('TvSearchResults', () => {
 			hashAndProgress: { 'rd:tv-hash': 50 },
 		});
 
-		await userEvent.click(screen.getByRole('button', { name: /Check/i }));
-		await waitFor(() => expect(props.handleCheckAvailability).toHaveBeenCalled());
+		await userEvent.click(screen.getByRole('button', { name: /Check RD/i }));
+		await waitFor(() => expect(props.checkServiceAvailability).toHaveBeenCalled());
 	});
 
 	it('downloads magnets when setting enabled', async () => {

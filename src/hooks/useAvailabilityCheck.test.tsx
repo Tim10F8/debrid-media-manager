@@ -7,8 +7,9 @@ const {
 	mockToast,
 	mockToastCall,
 	mockGenerateTokenAndHash,
-	mockInstantCheckInRd,
-	mockInstantCheckInTb,
+	mockCheckDatabaseAvailabilityRd,
+	mockCheckDatabaseAvailabilityAd,
+	mockCheckDatabaseAvailabilityTb,
 	mockGetCachedTrackerStats,
 	mockShouldIncludeTrackerStats,
 	mockProcessWithConcurrency,
@@ -30,8 +31,9 @@ const {
 		mockToast: { loading, success, error, dismiss, promise },
 		mockToastCall: call,
 		mockGenerateTokenAndHash: vi.fn(),
-		mockInstantCheckInRd: vi.fn(),
-		mockInstantCheckInTb: vi.fn(),
+		mockCheckDatabaseAvailabilityRd: vi.fn(),
+		mockCheckDatabaseAvailabilityAd: vi.fn(),
+		mockCheckDatabaseAvailabilityTb: vi.fn(),
 		mockGetCachedTrackerStats: vi.fn(),
 		mockShouldIncludeTrackerStats: vi.fn(),
 		mockProcessWithConcurrency: vi.fn(),
@@ -50,8 +52,9 @@ vi.mock('@/utils/token', () => ({
 }));
 
 vi.mock('@/utils/instantChecks', () => ({
-	instantCheckInRd: mockInstantCheckInRd,
-	instantCheckInTb: mockInstantCheckInTb,
+	checkDatabaseAvailabilityRd: mockCheckDatabaseAvailabilityRd,
+	checkDatabaseAvailabilityAd: mockCheckDatabaseAvailabilityAd,
+	checkDatabaseAvailabilityTb: mockCheckDatabaseAvailabilityTb,
 }));
 
 vi.mock('@/utils/trackerStats', () => ({
@@ -88,8 +91,10 @@ describe('useAvailabilityCheck', () => {
 				: updater;
 	});
 	const addRd = vi.fn();
+	const addAd = vi.fn();
 	const addTb = vi.fn();
 	const deleteRd = vi.fn();
+	const deleteAd = vi.fn();
 	const deleteTb = vi.fn();
 	const sortFn = vi.fn((results: SearchResult[]) => results);
 
@@ -98,8 +103,10 @@ describe('useAvailabilityCheck', () => {
 		searchResults = [...initialSearchResults];
 		setSearchResults.mockClear();
 		addRd.mockReset();
+		addAd.mockReset();
 		addTb.mockReset();
 		deleteRd.mockReset();
+		deleteAd.mockReset();
 		deleteTb.mockReset();
 		sortFn.mockClear();
 		mockToast.loading.mockClear();
@@ -107,8 +114,9 @@ describe('useAvailabilityCheck', () => {
 		mockToast.error.mockClear();
 		mockToast.dismiss.mockClear();
 		mockGenerateTokenAndHash.mockResolvedValue(['token', 'hash']);
-		mockInstantCheckInRd.mockResolvedValue(undefined);
-		mockInstantCheckInTb.mockResolvedValue(undefined);
+		mockCheckDatabaseAvailabilityRd.mockResolvedValue(undefined);
+		mockCheckDatabaseAvailabilityAd.mockResolvedValue(undefined);
+		mockCheckDatabaseAvailabilityTb.mockResolvedValue(undefined);
 		mockShouldIncludeTrackerStats.mockReturnValue(true);
 		mockGetCachedTrackerStats.mockResolvedValue({
 			seeders: 2,
@@ -153,6 +161,14 @@ describe('useAvailabilityCheck', () => {
 			links: [],
 			files: [],
 		});
+		addAd.mockResolvedValue({
+			id: 123,
+			filename: 'test.mkv',
+			size: 1024,
+			status: 'Ready',
+			statusCode: 4,
+			files: [],
+		});
 		addTb.mockResolvedValue({ id: 'tb-1', download_finished: true });
 	});
 
@@ -164,34 +180,43 @@ describe('useAvailabilityCheck', () => {
 		renderHook(() =>
 			useAvailabilityCheck(
 				'rd-key',
+				'ad-key',
 				'tb-key',
 				'tt123',
 				searchResults,
 				setSearchResults,
 				{},
 				addRd,
+				addAd,
 				addTb,
 				deleteRd,
+				deleteAd,
 				deleteTb,
 				sortFn
 			)
 		);
 
-	it('checks individual availability and triggers RD/TB refresh', async () => {
+	it('checks individual availability and triggers RD/AD/TB refresh', async () => {
 		const { result } = renderAvailabilityHook();
 
 		await act(async () => {
-			await result.current.handleCheckAvailability(searchResults[0]);
+			await result.current.checkServiceAvailability(searchResults[0]);
 		});
 
 		expect(addRd).toHaveBeenCalledWith('hash-1', true);
 		expect(deleteRd).toHaveBeenCalled();
+		expect(addAd).toHaveBeenCalledWith('hash-1', true);
+		expect(deleteAd).toHaveBeenCalled();
 		expect(addTb).toHaveBeenCalledWith('hash-1', true);
-		expect(mockInstantCheckInRd).toHaveBeenCalled();
-		expect(mockInstantCheckInTb).toHaveBeenCalled();
-		expect(mockToast.success).toHaveBeenCalledWith('Availability check done.', {
-			id: 'toast-id',
-		});
+		expect(mockCheckDatabaseAvailabilityRd).toHaveBeenCalled();
+		expect(mockCheckDatabaseAvailabilityAd).toHaveBeenCalled();
+		expect(mockCheckDatabaseAvailabilityTb).toHaveBeenCalled();
+		expect(mockToast.success).toHaveBeenCalledWith(
+			expect.stringContaining('Service check done'),
+			{
+				id: 'toast-id',
+			}
+		);
 		vi.runAllTimers();
 		expect(window.location.reload).toHaveBeenCalled();
 	});
@@ -201,7 +226,7 @@ describe('useAvailabilityCheck', () => {
 		const { result } = renderAvailabilityHook();
 
 		await act(async () => {
-			await result.current.handleAvailabilityTest(searchResults);
+			await result.current.checkServiceAvailabilityBulk(searchResults);
 		});
 
 		expect(mockToast.loading).toHaveBeenCalled();
@@ -210,8 +235,96 @@ describe('useAvailabilityCheck', () => {
 			expect.objectContaining({ duration: 4000 })
 		);
 		expect(addRd).toHaveBeenCalled();
+		expect(addAd).toHaveBeenCalled();
 		expect(addTb).toHaveBeenCalled();
 		expect(mockGetCachedTrackerStats).toHaveBeenCalled();
 		expect(mockToast.dismiss).toHaveBeenCalledWith('toast-id');
+	});
+
+	it('checks individual availability for AllDebrid only', async () => {
+		const { result } = renderHook(() =>
+			useAvailabilityCheck(
+				null, // No RD
+				'ad-key',
+				null, // No TB
+				'tt123',
+				searchResults,
+				setSearchResults,
+				{},
+				addRd,
+				addAd,
+				addTb,
+				deleteRd,
+				deleteAd,
+				deleteTb,
+				sortFn
+			)
+		);
+
+		await act(async () => {
+			await result.current.checkServiceAvailability(searchResults[0]);
+		});
+
+		expect(addRd).not.toHaveBeenCalled();
+		expect(addAd).toHaveBeenCalledWith('hash-1', true);
+		expect(deleteAd).toHaveBeenCalled();
+		expect(addTb).not.toHaveBeenCalled();
+		expect(mockCheckDatabaseAvailabilityAd).toHaveBeenCalled();
+		expect(mockToast.success).toHaveBeenCalledWith(
+			expect.stringContaining('Service check done'),
+			{
+				id: 'toast-id',
+			}
+		);
+	});
+
+	it('handles bulk availability check for multiple services', async () => {
+		const { result } = renderAvailabilityHook();
+
+		await act(async () => {
+			await result.current.checkServiceAvailabilityBulk(searchResults);
+		});
+
+		expect(addRd).toHaveBeenCalled();
+		expect(addAd).toHaveBeenCalled();
+		expect(addTb).toHaveBeenCalled();
+		expect(mockCheckDatabaseAvailabilityRd).toHaveBeenCalled();
+		expect(mockCheckDatabaseAvailabilityAd).toHaveBeenCalled();
+		expect(mockCheckDatabaseAvailabilityTb).toHaveBeenCalled();
+	});
+
+	it('targets only the selected services during bulk checks', async () => {
+		const { result } = renderAvailabilityHook();
+		const mixedResults = [
+			createSearchResult({ hash: 'hash-3', adAvailable: true }),
+			createSearchResult({ hash: 'hash-4' }),
+		];
+
+		await act(async () => {
+			await result.current.checkServiceAvailabilityBulk(mixedResults, ['RD']);
+		});
+
+		expect(addRd).toHaveBeenCalled();
+		expect(addAd).not.toHaveBeenCalled();
+		expect(addTb).not.toHaveBeenCalled();
+	});
+
+	it('shows already cached message for AD', async () => {
+		// Clear any previous settings
+		window.localStorage.removeItem('settings:availabilityCheckLimit');
+
+		const cachedResult = createSearchResult({ adAvailable: true });
+		const { result } = renderAvailabilityHook();
+
+		await act(async () => {
+			await result.current.checkServiceAvailability(cachedResult, ['AD']);
+		});
+
+		expect(mockToast.success).toHaveBeenCalledWith(
+			expect.stringContaining('Already cached in AD')
+		);
+		expect(addRd).not.toHaveBeenCalled();
+		expect(addAd).not.toHaveBeenCalled();
+		expect(addTb).not.toHaveBeenCalled();
 	});
 });
