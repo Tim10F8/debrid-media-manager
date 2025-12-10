@@ -190,11 +190,108 @@ describe('/api/stremio/cast/library/[torrentIdPlusHash]', () => {
 		expect(res.status).toHaveBeenCalledWith(404);
 		expect(res.json).toHaveBeenCalledWith({
 			status: 'error',
-			errorMessage: 'No valid streams found',
+			errorMessage: 'No valid streams found in Torrentio response',
 		});
 	});
 
-	it('returns 500 when processing fails', async () => {
+	it('returns 500 when generateUserId fails', async () => {
+		mockGenerateUserId.mockRejectedValue(new Error('Invalid token'));
+		const req = createMockRequest({ query: { rdToken: 'token', torrentIdPlusHash: '1:hash' } });
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(500);
+		expect(res.json).toHaveBeenCalledWith({
+			status: 'error',
+			errorMessage:
+				'Failed to generate user ID from RD token. Please check your RD token is valid.',
+			details: 'Invalid token',
+		});
+	});
+
+	it('returns 500 when database lookup fails', async () => {
+		mockDbGetIMDBIdByHash.mockRejectedValue(new Error('Database connection error'));
+		const req = createMockRequest({ query: { rdToken: 'token', torrentIdPlusHash: '1:hash' } });
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(500);
+		expect(res.json).toHaveBeenCalledWith({
+			status: 'error',
+			errorMessage: 'Database error: Failed to retrieve IMDB ID from hash',
+			details: 'Database connection error',
+		});
+	});
+
+	it('returns 500 when torrentio fetch fails', async () => {
+		mockDbGetIMDBIdByHash.mockResolvedValue(null);
+		(global.fetch as Mock).mockRejectedValue(new Error('Network timeout'));
+		const req = createMockRequest({ query: { rdToken: 'token', torrentIdPlusHash: '1:hash' } });
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(500);
+		expect(res.json).toHaveBeenCalledWith({
+			status: 'error',
+			errorMessage:
+				'Network error: Failed to fetch metadata from Torrentio. Please try again.',
+			details: 'Network timeout',
+		});
+	});
+
+	it('returns 500 when torrentio response parsing fails', async () => {
+		mockDbGetIMDBIdByHash.mockResolvedValue(null);
+		(global.fetch as Mock).mockResolvedValue({
+			json: vi.fn().mockRejectedValue(new Error('Invalid JSON')),
+		});
+		const req = createMockRequest({ query: { rdToken: 'token', torrentIdPlusHash: '1:hash' } });
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(500);
+		expect(res.json).toHaveBeenCalledWith({
+			status: 'error',
+			errorMessage: 'Invalid response from Torrentio API (failed to parse JSON)',
+			details: 'Invalid JSON',
+		});
+	});
+
+	it('returns 500 when stream URL HEAD request fails', async () => {
+		mockDbGetIMDBIdByHash.mockResolvedValue(null);
+		(global.fetch as Mock).mockResolvedValue({
+			json: vi.fn().mockResolvedValue({
+				meta: {
+					videos: [
+						{
+							id: 'tt9999999:1:2',
+							title: 'EpisodeTitle.mkv',
+							streams: [{ url: 'https://stream/ep1.mkv' }],
+						},
+					],
+				},
+			}),
+		});
+		mockAxiosHead.mockRejectedValue(new Error('Stream URL expired'));
+		const req = createMockRequest({ query: { rdToken: 'token', torrentIdPlusHash: '1:hash' } });
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(500);
+		expect(res.json).toHaveBeenCalledWith({
+			status: 'error',
+			errorMessage:
+				'Failed to fetch stream URL metadata. The stream URL may be invalid or expired.',
+			streamUrl: 'https://stream/ep1.mkv',
+			details: 'Stream URL expired',
+		});
+	});
+
+	it('returns 500 when database save fails', async () => {
 		mockDbSaveCast.mockRejectedValue(new Error('db down'));
 		const req = createMockRequest({ query: { rdToken: 'token', torrentIdPlusHash: '1:hash' } });
 		const res = createMockResponse();
@@ -204,7 +301,8 @@ describe('/api/stremio/cast/library/[torrentIdPlusHash]', () => {
 		expect(res.status).toHaveBeenCalledWith(500);
 		expect(res.json).toHaveBeenCalledWith({
 			status: 'error',
-			errorMessage: 'Failed to process torrent metadata',
+			errorMessage: 'Database error: Failed to save cast information',
+			details: 'db down',
 		});
 	});
 });
