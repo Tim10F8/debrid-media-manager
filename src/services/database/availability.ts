@@ -66,6 +66,25 @@ export class AvailabilityService extends DatabaseClient {
 		return available?.imdbId || null;
 	}
 
+	public async saveIMDBIdMapping(hash: string, imdbId: string): Promise<void> {
+		await this.prisma.available.upsert({
+			where: { hash },
+			update: { imdbId },
+			create: {
+				hash,
+				imdbId,
+				filename: hash,
+				originalFilename: hash,
+				bytes: BigInt(0),
+				originalBytes: BigInt(0),
+				host: 'real-debrid.com',
+				progress: 100,
+				status: 'user_mapped',
+				ended: new Date(),
+			},
+		});
+	}
+
 	public async handleDownloadedTorrent(
 		torrentInfo: TorrentInfoResponse,
 		hash: string,

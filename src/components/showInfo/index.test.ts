@@ -299,7 +299,7 @@ describe('torrent info modal buttons', () => {
 		expect(options.html).toContain('name="query" value="The Grifters 1990"');
 	});
 
-	it('includes rdToken hidden input for library cast button', async () => {
+	it('includes cast all button for library torrents', async () => {
 		const rdInfo = {
 			id: 1,
 			hash: 'hash-1',
@@ -320,7 +320,7 @@ describe('torrent info modal buttons', () => {
 		await showInfoForRD('app', 'rd-key', rdInfo, 'tt1234567', 'movie', false);
 
 		const options = mocks.modalFireMock.mock.calls[0][0];
-		expect(options.html).toContain('name="rdToken" value="rd-key"');
+		expect(options.html).toContain('id="btn-cast-all"');
 	});
 
 	it('omits cancel button for AllDebrid torrents', async () => {

@@ -79,6 +79,10 @@ export class Repository {
 		return this.availabilityService.getIMDBIdByHash(hash);
 	}
 
+	public saveIMDBIdMapping(hash: string, imdbId: string) {
+		return this.availabilityService.saveIMDBIdMapping(hash, imdbId);
+	}
+
 	public handleDownloadedTorrent(torrentInfo: TorrentInfoResponse, hash: string, imdbId: string) {
 		return this.availabilityService.handleDownloadedTorrent(torrentInfo, hash, imdbId);
 	}

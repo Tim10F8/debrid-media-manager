@@ -76,14 +76,7 @@ export const showInfoForRD = async (
         ${renderButton('delete', { id: 'btn-delete-rd' })}
         ${renderButton('magnet', { id: 'btn-magnet-copy', text: shouldDownloadMagnets ? 'Download' : 'Copy' })}
         ${renderButton('reinsert', { id: 'btn-reinsert-rd' })}
-		${
-			rdKey
-				? renderButton('castAll', {
-						link: `/api/stremio/cast/library/${info.id}:${info.hash}`,
-						linkParams: [{ name: 'rdToken', value: rdKey }],
-					})
-				: ''
-		}
+		${rdKey ? renderButton('castAll', { id: 'btn-cast-all' }) : ''}
 		${
 			info.links.length > 0
 				? renderButton('downloadAll', {
@@ -592,6 +585,93 @@ export const showInfoForRD = async (
 					toast.error('Failed to generate STRM files.', magnetToastOptions);
 				} finally {
 					toast.dismiss(toastId);
+				}
+			});
+
+			// Cast All button handler
+			const castAllBtn = document.getElementById('btn-cast-all');
+			logAction('binding cast-all button (RD)', {
+				exists: Boolean(castAllBtn),
+				hash: info.hash,
+			});
+			castAllBtn?.addEventListener('click', async () => {
+				logAction('cast-all clicked (RD)', {
+					hash: info.hash,
+					id: info.id,
+				});
+				const castUrl = `/api/stremio/cast/library/${info.id}:${info.hash}?rdToken=${rdKey}`;
+				const toastId = toast.loading('Preparing cast...', magnetToastOptions);
+				try {
+					const response = await fetch(castUrl);
+					const data = await response.json();
+
+					if (data.status === 'need_imdb_id') {
+						// Prompt user for IMDB ID
+						toast.dismiss(toastId);
+						const result = await Modal.fire({
+							title: 'IMDB ID Required',
+							html: `<p class="text-gray-300 mb-4">Could not determine the IMDB ID for this torrent. Please enter it manually.</p>
+								<p class="text-gray-400 text-sm mb-2">Torrent: ${data.torrentInfo?.filename || info.filename}</p>
+								<input type="text" id="imdb-input" class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white" placeholder="tt1234567" />
+								<p class="text-gray-500 text-xs mt-2">Find the IMDB ID on <a href="https://www.imdb.com" target="_blank" class="text-blue-400 underline">imdb.com</a></p>`,
+							showCancelButton: true,
+							confirmButtonText: 'Cast',
+							customClass: {
+								popup: '!bg-gray-900 !text-gray-100',
+								confirmButton: 'haptic',
+								cancelButton: 'haptic',
+							},
+							preConfirm: () => {
+								const input = document.getElementById(
+									'imdb-input'
+								) as HTMLInputElement;
+								const imdbId = input?.value?.trim();
+								if (!imdbId || !/^tt\d{7,}$/.test(imdbId)) {
+									Modal.showValidationMessage(
+										'Please enter a valid IMDB ID (e.g., tt1234567)'
+									);
+									return false;
+								}
+								return imdbId;
+							},
+						});
+
+						if (result.isConfirmed && result.value) {
+							// Retry with the provided IMDB ID
+							const retryToastId = toast.loading('Casting...', magnetToastOptions);
+							try {
+								const retryUrl = `${castUrl}&imdbId=${result.value}`;
+								const retryResponse = await fetch(retryUrl);
+								const retryData = await retryResponse.json();
+
+								if (retryData.status === 'success') {
+									toast.dismiss(retryToastId);
+									window.location.href = retryData.redirectUrl;
+									toast.success('Opening in Stremio...', magnetToastOptions);
+								} else {
+									toast.dismiss(retryToastId);
+									toast.error(
+										retryData.errorMessage || 'Failed to cast',
+										magnetToastOptions
+									);
+								}
+							} catch (error) {
+								toast.dismiss(retryToastId);
+								toast.error('Failed to cast to Stremio', magnetToastOptions);
+							}
+						}
+					} else if (data.status === 'success') {
+						toast.dismiss(toastId);
+						window.location.href = data.redirectUrl;
+						toast.success('Opening in Stremio...', magnetToastOptions);
+					} else {
+						toast.dismiss(toastId);
+						toast.error(data.errorMessage || 'Failed to cast', magnetToastOptions);
+					}
+				} catch (error) {
+					toast.dismiss(toastId);
+					console.error('Cast error:', error);
+					toast.error('Failed to cast to Stremio', magnetToastOptions);
 				}
 			});
 		},

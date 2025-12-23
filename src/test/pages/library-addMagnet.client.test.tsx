@@ -19,6 +19,14 @@ vi.mock('next/router', () => ({
 	useRouter: () => mockRouter,
 }));
 
+vi.mock('next/config', () => ({
+	default: () => ({
+		publicRuntimeConfig: {
+			traktClientId: 'test-trakt-client-id',
+		},
+	}),
+}));
+
 const mockAddTorrent = vi.fn();
 const mockRefreshLibrary = vi.fn();
 const mockLibraryCache = {

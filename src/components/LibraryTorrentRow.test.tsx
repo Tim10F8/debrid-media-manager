@@ -23,6 +23,13 @@ vi.mock('@/utils/hashList');
 vi.mock('next/router', () => ({
 	useRouter: vi.fn(),
 }));
+vi.mock('next/config', () => ({
+	default: () => ({
+		publicRuntimeConfig: {
+			traktClientId: 'test-trakt-client-id',
+		},
+	}),
+}));
 
 const mockHandleReinsertTorrentinRd = handleReinsertTorrentinRd as MockedFunction<
 	typeof handleReinsertTorrentinRd
@@ -341,14 +348,18 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 	});
 
 	describe('Cast All Quick Action', () => {
-		it('opens cast endpoint for RD torrents when rdKey is present', () => {
-			const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+		it('calls cast API endpoint for RD torrents when rdKey is present', async () => {
+			const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+				json: () => Promise.resolve({ status: 'success', redirectUrl: 'stremio://test' }),
+			} as Response);
 			render(<LibraryTorrentRow {...defaultProps} />);
 			const castButton = screen.getByTitle('Cast All');
 			fireEvent.click(castButton);
 			const expectedUrl = `/api/stremio/cast/library/${mockTorrent.id.substring(3)}:${mockTorrent.hash}?rdToken=${defaultProps.rdKey}`;
-			expect(openSpy).toHaveBeenCalledWith(expectedUrl, '_blank', 'noopener,noreferrer');
-			openSpy.mockRestore();
+			await waitFor(() => {
+				expect(fetchSpy).toHaveBeenCalledWith(expectedUrl);
+			});
+			fetchSpy.mockRestore();
 		});
 
 		it('hides cast button when rdKey is missing', () => {
