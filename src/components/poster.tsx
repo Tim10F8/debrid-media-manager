@@ -1,86 +1,111 @@
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
-// Function to get deterministic poster subdomain based on IMDB ID
+// Pre-compute subdomain based on IMDB ID (deterministic hash)
 const getPosterUrl = (imdbId: string | null | undefined): string => {
-	// Return empty string if no valid imdbId
 	if (!imdbId) return '';
 
-	// Extract numeric part from IMDB ID (e.g., "tt1234567" -> "1234567")
 	const numericId = imdbId.replace(/[^0-9]/g, '');
-
-	// Simple hash function for good distribution
 	let hash = 0;
 	for (let i = 0; i < numericId.length; i++) {
 		hash = (hash << 5) - hash + parseInt(numericId[i]);
-		hash = hash & hash; // Convert to 32bit integer
+		hash = hash & hash;
 	}
 
-	// Ensure positive number and get value 0-9
 	const subdomain = Math.abs(hash) % 10;
 	return `https://posters${subdomain}.debridmediamanager.com/${imdbId}-small.jpg`;
 };
 
-const Poster = ({ imdbId, title }: Record<string, string>) => {
-	const [posterUrl, setPosterUrl] = useState('');
-	const [fallbackAttempted, setFallbackAttempted] = useState(false);
+// Cache for API-fetched poster URLs to avoid duplicate requests
+const posterCache = new Map<string, string>();
 
-	useEffect(() => {
-		// Only set poster URL if we have a valid imdbId
-		if (imdbId) {
-			setPosterUrl(getPosterUrl(imdbId));
-			setFallbackAttempted(false);
-		}
-	}, [imdbId]);
+type PosterProps = {
+	imdbId: string;
+	title?: string;
+};
 
-	const handleImageError = async () => {
-		if (!fallbackAttempted) {
-			// First error - try API endpoint
-			setFallbackAttempted(true);
+const Poster = memo(
+	function Poster({ imdbId, title }: PosterProps) {
+		const [posterUrl, setPosterUrl] = useState(() => getPosterUrl(imdbId));
+		const [fallbackAttempted, setFallbackAttempted] = useState(false);
+		const mountedRef = useRef(true);
 
-			// If we have an imdbId, try the API endpoint first
+		useEffect(() => {
+			mountedRef.current = true;
+			return () => {
+				mountedRef.current = false;
+			};
+		}, []);
+
+		useEffect(() => {
 			if (imdbId) {
+				// Check cache first
+				const cached = posterCache.get(imdbId);
+				if (cached) {
+					setPosterUrl(cached);
+					setFallbackAttempted(true);
+				} else {
+					setPosterUrl(getPosterUrl(imdbId));
+					setFallbackAttempted(false);
+				}
+			}
+		}, [imdbId]);
+
+		const handleImageError = useCallback(async () => {
+			if (!fallbackAttempted && imdbId) {
+				setFallbackAttempted(true);
+
+				// Check cache before making API call
+				const cached = posterCache.get(imdbId);
+				if (cached) {
+					setPosterUrl(cached);
+					return;
+				}
+
 				try {
 					const response = await fetch(`/api/poster?imdbid=${imdbId}`);
-					if (response.ok) {
+					if (response.ok && mountedRef.current) {
 						const data = await response.json();
+						posterCache.set(imdbId, data.url);
 						setPosterUrl(data.url);
 						return;
 					}
 					throw new Error('API failed');
-				} catch (error) {
-					// If API fails, fall through to fakeimg.pl
+				} catch {
+					if (!mountedRef.current) return;
+					// Use fakeimg.pl as final fallback
+					const displayText = title || imdbId || 'No Poster';
+					const encodedTitle = encodeURIComponent(displayText);
+					const fallbackUrl = `https://fakeimg.pl/400x600/282828/eae0d0?font_size=40&font=bebas&text=${encodedTitle}&w=640&q=75`;
+					posterCache.set(imdbId, fallbackUrl);
+					setPosterUrl(fallbackUrl);
 				}
 			}
+		}, [fallbackAttempted, imdbId, title]);
 
-			// Use fakeimg.pl as final fallback
-			const displayText = title || imdbId || 'No Poster';
-			const encodedTitle = encodeURIComponent(displayText);
-			setPosterUrl(
-				`https://fakeimg.pl/400x600/282828/eae0d0?font_size=40&font=bebas&text=${encodedTitle}&w=640&q=75`
-			);
-		}
-	};
-
-	return (
-		<div className="relative aspect-[2/3] w-full overflow-hidden rounded bg-gray-800">
-			{posterUrl ? (
-				<Image
-					fill
-					sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-					src={posterUrl}
-					alt={`Poster for ${title || imdbId || 'unknown'}`}
-					loading="lazy"
-					onError={handleImageError}
-					className="object-cover"
-				/>
-			) : (
-				<div className="absolute inset-0 flex items-center justify-center text-gray-600">
-					<div className="p-2 text-center text-sm">Loading...</div>
-				</div>
-			)}
-		</div>
-	);
-};
+		return (
+			<div className="relative aspect-[2/3] w-full overflow-hidden rounded bg-gray-800">
+				{posterUrl ? (
+					<Image
+						fill
+						sizes="80px"
+						src={posterUrl}
+						alt={`Poster for ${title || imdbId || 'unknown'}`}
+						loading="lazy"
+						onError={handleImageError}
+						className="object-cover"
+					/>
+				) : (
+					<div className="absolute inset-0 flex items-center justify-center text-gray-600">
+						<div className="p-2 text-center text-sm">Loading...</div>
+					</div>
+				)}
+			</div>
+		);
+	},
+	// Custom comparison - only re-render if imdbId or title changes
+	(prevProps, nextProps) =>
+		prevProps.imdbId === nextProps.imdbId && (prevProps.title ?? '') === (nextProps.title ?? '')
+);
 
 export default Poster;
