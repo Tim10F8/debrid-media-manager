@@ -48,6 +48,21 @@ vi.mock('@/components/showInfo', () => ({
 	showInfoForRD: vi.fn(),
 }));
 
+vi.mock('@/contexts/LibraryCacheContext', () => ({
+	useLibraryCache: () => ({
+		libraryItems: [],
+		isLoading: false,
+		isFetching: false,
+		lastFetchTime: null,
+		error: null,
+		refreshLibrary: vi.fn(),
+		setLibraryItems: vi.fn(),
+		addTorrent: vi.fn(),
+		removeTorrent: vi.fn(),
+		updateTorrent: vi.fn(),
+	}),
+}));
+
 vi.mock('@/hooks/auth', () => ({
 	useRealDebridAccessToken: () => ['rd-token'],
 	useAllDebridApiKey: () => 'ad-token',
@@ -141,7 +156,18 @@ vi.mock('@/utils/withAuth', () => ({
 }));
 vi.mock('axios', () => ({
 	__esModule: true,
-	default: { get: axiosGetMock },
+	default: {
+		get: axiosGetMock,
+		create: () => ({
+			get: axiosGetMock,
+			post: vi.fn(),
+			delete: vi.fn(),
+			interceptors: {
+				request: { use: vi.fn() },
+				response: { use: vi.fn() },
+			},
+		}),
+	},
 	get: axiosGetMock,
 	AxiosError: AxiosErrorMock,
 }));
