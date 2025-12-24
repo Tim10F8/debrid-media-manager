@@ -2,6 +2,7 @@ import MediaHeader from '@/components/MediaHeader';
 import MovieSearchResults from '@/components/MovieSearchResults';
 import SearchControls from '@/components/SearchControls';
 import { showInfoForRD } from '@/components/showInfo';
+import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
 import { useAvailabilityCheck, type DebridService } from '@/hooks/useAvailabilityCheck';
 import { useExternalSources } from '@/hooks/useExternalSources';
@@ -114,6 +115,9 @@ const MovieSearch: FunctionComponent = () => {
 	const [rdKey] = useRealDebridAccessToken();
 	const adKey = useAllDebridApiKey();
 	const torboxKey = useTorBoxAccessToken();
+
+	// Library sync status - used to prevent auto-availability check while library is still loading
+	const { isFetching: isLibrarySyncing } = useLibraryCache();
 
 	const [shouldDownloadMagnets] = useState(
 		() =>
@@ -539,7 +543,8 @@ const MovieSearch: FunctionComponent = () => {
 			}
 
 			// Auto-trigger availability check for services that have no cached torrents
-			if (finalResults > 0 && !isCheckingAvailability) {
+			// Only trigger after library has finished syncing to ensure accurate counts
+			if (finalResults > 0 && !isCheckingAvailability && !isLibrarySyncing) {
 				const autoCheckDisabled =
 					window.localStorage.getItem('settings:disableAutoAvailabilityCheck') === 'true';
 				const autoCheckKey = `autoAvailabilityChecked:${imdbid}`;
@@ -574,6 +579,7 @@ const MovieSearch: FunctionComponent = () => {
 		adKey,
 		torboxKey,
 		isCheckingAvailability,
+		isLibrarySyncing,
 		checkServiceAvailabilityBulk,
 		filteredResults,
 		imdbid,
