@@ -95,29 +95,65 @@ function buildTestUrl(host: string): string {
 }
 
 /**
- * Checks if an error indicates a DNS resolution failure (host doesn't exist).
- * These servers should be excluded from results entirely.
+ * Checks if a hostname resolves in DNS.
+ * Returns true if the hostname exists, false if it doesn't.
+ * This is used to filter out servers that don't exist at all.
  */
-function isDnsError(error: Error): boolean {
-	const message = error.message.toLowerCase();
-	return (
-		message.includes('enotfound') ||
-		message.includes('eai_noname') ||
-		message.includes('getaddrinfo') ||
-		message.includes('unknown host') ||
-		message.includes('name or service not known')
-	);
+async function hostExists(hostname: string): Promise<boolean> {
+	try {
+		// Use a simple fetch with a very short timeout to check if DNS resolves
+		// We abort immediately after the connection is established (or fails)
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+		const testUrl = `https://${hostname}/`;
+		await fetch(testUrl, {
+			method: 'HEAD',
+			signal: controller.signal,
+		});
+
+		clearTimeout(timeoutId);
+		return true; // If we get here, DNS resolved (even if HTTP failed)
+	} catch (error) {
+		if (error instanceof Error) {
+			const message = error.message.toLowerCase();
+			// DNS resolution failures - host doesn't exist
+			if (
+				message.includes('enotfound') ||
+				message.includes('eai_noname') ||
+				message.includes('getaddrinfo') ||
+				message.includes('unknown host') ||
+				message.includes('name or service not known')
+			) {
+				return false;
+			}
+		}
+		// Any other error (timeout, connection refused, etc.) means DNS resolved
+		// but the server is just not responding - it still "exists"
+		return true;
+	}
 }
 
 /**
  * Tests a single server's latency by making HEAD requests.
  * Makes multiple iterations and returns the average latency.
  * Returns null if the server doesn't exist (DNS resolution failure).
+ *
+ * Three possible outcomes:
+ * 1. null - Server doesn't exist (DNS doesn't resolve) → excluded from results
+ * 2. ok: false - Server exists but is failing (timeout, HTTP error, etc.) → counted as failing
+ * 3. ok: true - Server exists and is working → counted as working
  */
 async function testServerLatency(server: {
 	id: string;
 	host: string;
 }): Promise<WorkingStreamServerStatus | null> {
+	// First check if the server exists at all (DNS resolves)
+	const exists = await hostExists(server.host);
+	if (!exists) {
+		return null; // Server doesn't exist - exclude from results entirely
+	}
+
 	const checkedAt = Date.now();
 	let totalLatencyMs = 0;
 	let successfulIterations = 0;
@@ -157,10 +193,6 @@ async function testServerLatency(server: {
 		} catch (error) {
 			clearTimeout(timeoutId);
 			if (error instanceof Error) {
-				// DNS resolution failure means the server doesn't exist - exclude it
-				if (isDnsError(error)) {
-					return null;
-				}
 				if (error.name === 'AbortError') {
 					lastError = 'Timeout';
 				} else {

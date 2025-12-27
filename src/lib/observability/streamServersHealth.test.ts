@@ -107,12 +107,15 @@ describe('streamServersHealth', () => {
 		const requestedUrls = fetchMock.mock.calls.map(([arg]) =>
 			typeof arg === 'string' ? arg : ((arg as { url?: string })?.url ?? String(arg ?? ''))
 		);
-		const uniqueUrls = new Set(requestedUrls);
+
+		// Filter to only speedtest URLs (exclude host existence check URLs)
+		const speedtestUrls = requestedUrls.filter((url) => url.includes('/speedtest/'));
+		const uniqueUrls = new Set(speedtestUrls);
 		// With random cache busters, we should have many unique URLs
 		expect(uniqueUrls.size).toBeGreaterThan(10);
 
-		// URLs should contain /speedtest/test.rar/ path
-		requestedUrls.slice(0, 10).forEach((url) => {
+		// Speedtest URLs should contain /speedtest/test.rar/ path
+		speedtestUrls.slice(0, 10).forEach((url) => {
 			expect(url).toContain('/speedtest/test.rar/');
 		});
 	});
