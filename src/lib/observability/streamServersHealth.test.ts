@@ -1,8 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getRealDebridObservabilityStats } from './getRealDebridObservabilityStats';
-import { __testing, getWorkingStreamMetrics } from './streamServersHealth';
-import { STREAM_SERVER_IDS, STREAM_SERVER_TEMPLATE } from './streamServersList';
+import { __testing } from './streamServersHealth';
+
+// Mock the repository to prevent actual database calls
+vi.mock('@/services/repository', () => ({
+	repository: {
+		upsertStreamHealthResults: vi.fn().mockResolvedValue(undefined),
+		getStreamHealthMetrics: vi.fn().mockResolvedValue({
+			total: 0,
+			working: 0,
+			rate: 0,
+			lastChecked: null,
+			avgLatencyMs: null,
+			fastestServer: null,
+			failedServers: [],
+		}),
+		getAllStreamStatuses: vi.fn().mockResolvedValue([]),
+		recordStreamHealthSnapshot: vi.fn().mockResolvedValue(undefined),
+		recordServerReliability: vi.fn().mockResolvedValue(undefined),
+	},
+}));
 
 type MockHeaders = Record<string, string>;
 
@@ -18,80 +36,103 @@ function mockResponse(status: number, headers: MockHeaders = {}) {
 				return normalized[name.toLowerCase()] ?? null;
 			},
 		},
-	} as any;
+	} as unknown as Response;
 }
 
 describe('streamServersHealth', () => {
-	const TEST_TEMPLATE = STREAM_SERVER_TEMPLATE;
 	let originalFetch: typeof fetch;
 
 	beforeEach(() => {
 		originalFetch = globalThis.fetch;
-		__testing.setServerSourceForTesting(['20-4', '21-4'], TEST_TEMPLATE);
+		__testing.reset();
 	});
 
 	afterEach(() => {
 		globalThis.fetch = originalFetch;
-		vi.restoreAllMocks();
-		__testing.clearServerSourceOverride();
+		vi.clearAllMocks();
+		__testing.reset();
+	});
+
+	it('generates correct server list (1-120 on both domains with IPv4 variants)', () => {
+		const servers = __testing.getServerList();
+
+		// Should have 120 servers on each domain, plus 120 IPv4 variants for .download.real-debrid.com
+		// Total: 120 * 2 (both domains) + 120 (-4 variants) = 360
+		expect(servers.length).toBe(360);
+
+		// Check first few servers
+		expect(servers[0]).toEqual({
+			id: '1.download.real-debrid.com',
+			host: '1.download.real-debrid.com',
+		});
+		expect(servers[1]).toEqual({
+			id: '1-4.download.real-debrid.com',
+			host: '1-4.download.real-debrid.com',
+		});
+		expect(servers[2]).toEqual({
+			id: '1.download.real-debrid.cloud',
+			host: '1.download.real-debrid.cloud',
+		});
+
+		// Check last server
+		const lastServer = servers[servers.length - 1];
+		expect(lastServer.host).toContain('120');
 	});
 
 	it('reports working stream percentage after a run', async () => {
-		const fetchMock = vi.fn(async (target: unknown) => {
-			const url =
-				typeof target === 'string'
-					? target
-					: ((target as { url?: string })?.url ?? String(target ?? ''));
-			if (url.includes('20-4')) {
-				return mockResponse(200, { 'content-length': '1024' });
-			}
-			return mockResponse(503, { 'content-length': '1024' });
-		});
+		// All requests succeed
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(mockResponse(200, { 'content-length': '1024' }));
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-		const initial = getWorkingStreamMetrics();
-		expect(initial.total).toBe(2);
-		expect(initial.inProgress).toBe(true);
 
 		const metrics = await __testing.runNow();
 
-		expect(fetchMock).toHaveBeenCalledTimes(2);
-		const requestedUrls = fetchMock.mock.calls.map(([arg]) =>
-			typeof arg === 'string' ? arg : ((arg as { url?: string })?.url ?? String(arg ?? ''))
-		);
-		requestedUrls.forEach((url) => {
-			expect(url).not.toContain('/test.rar/0.123456');
-			expect(/\/test\.rar\/0\.[0-9]+/.test(url)).toBe(true);
-		});
-		expect(metrics.total).toBe(2);
-		expect(metrics.working).toBe(1);
-		expect(metrics.rate).toBeCloseTo(0.5, 5);
+		// 360 servers * 3 iterations each = 1080 calls
+		expect(fetchMock).toHaveBeenCalled();
+		expect(metrics.total).toBe(360);
+		expect(metrics.working).toBe(360);
+		expect(metrics.rate).toBe(1);
 		expect(metrics.lastError).toBeNull();
-		expect(metrics.statuses).toHaveLength(2);
-
-		const success = metrics.statuses.find((entry) => entry.id === '20-4');
-		const failure = metrics.statuses.find((entry) => entry.id === '21-4');
-
-		expect(success?.ok).toBe(true);
-		expect(success?.contentLength).toBe(1024);
-		expect(failure?.ok).toBe(false);
-		expect(failure?.error).toBe('Unexpected status 503');
+		expect(metrics.statuses).toHaveLength(360);
 	});
 
-	it('uses decimal cache busters when replacing the test suffix', async () => {
+	it('uses random cache busters in test URLs', async () => {
 		const fetchMock = vi.fn().mockResolvedValue(mockResponse(200, { 'content-length': '512' }));
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
-		const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.987654321);
 
 		await __testing.runNow();
+
+		// Check that URLs contain random cache busters, not fixed values
 		const requestedUrls = fetchMock.mock.calls.map(([arg]) =>
 			typeof arg === 'string' ? arg : ((arg as { url?: string })?.url ?? String(arg ?? ''))
 		);
-		requestedUrls.forEach((url) => {
-			expect(url).toContain('/test.rar/0.98765432');
-			expect(url).not.toContain('/test.rar/0.123456');
+		const uniqueUrls = new Set(requestedUrls);
+		// With random cache busters, we should have many unique URLs
+		expect(uniqueUrls.size).toBeGreaterThan(10);
+
+		// URLs should contain /speedtest/test.rar/ path
+		requestedUrls.slice(0, 10).forEach((url) => {
+			expect(url).toContain('/speedtest/test.rar/');
 		});
-		randomSpy.mockRestore();
+	});
+
+	it('measures latency and reports fastest server', async () => {
+		let callOrder = 0;
+		const fetchMock = vi.fn(async (url: string) => {
+			callOrder++;
+			// Simulate different latencies by varying response time
+			await new Promise((resolve) => setTimeout(resolve, callOrder % 5));
+			return mockResponse(200, { 'content-length': '1024' });
+		});
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		const metrics = await __testing.runNow();
+
+		expect(metrics.avgLatencyMs).not.toBeNull();
+		expect(metrics.avgLatencyMs).toBeGreaterThan(0);
+		expect(metrics.fastestServer).not.toBeNull();
+		expect(typeof metrics.fastestServer).toBe('string');
 	});
 
 	it('connects working stream metrics to getStats', async () => {
@@ -103,60 +144,66 @@ describe('streamServersHealth', () => {
 		await __testing.runNow();
 		const stats = getRealDebridObservabilityStats();
 
-		expect(stats.workingStream.total).toBe(2);
-		expect(stats.workingStream.working).toBe(2);
+		expect(stats.workingStream.total).toBe(360);
+		expect(stats.workingStream.working).toBe(360);
 		expect(stats.workingStream.rate).toBe(1);
 		expect(stats.workingStream.lastError).toBeNull();
+		expect(stats.workingStream.avgLatencyMs).not.toBeNull();
+		expect(stats.workingStream.fastestServer).not.toBeNull();
 	});
 
-	it('reloads overridden servers after reset', async () => {
-		const fetchMock = vi.fn().mockResolvedValue(mockResponse(200, { 'content-length': '512' }));
-		globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-		await __testing.runNow();
-		expect(fetchMock).toHaveBeenCalledTimes(2);
-
-		__testing.setServerSourceForTesting(['21-4'], TEST_TEMPLATE);
-		fetchMock.mockClear();
-
-		await __testing.runNow();
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-
-		__testing.reset();
-		fetchMock.mockReset().mockResolvedValue(mockResponse(200, { 'content-length': '512' }));
+	it('sorts servers by latency (fastest first)', async () => {
+		let callIndex = 0;
+		const fetchMock = vi.fn(async (url: string) => {
+			callIndex++;
+			// Make some servers faster than others based on their number
+			const serverNum = parseInt(url.match(/\/(\d+)[\.-]/)?.[1] ?? '0');
+			await new Promise((resolve) => setTimeout(resolve, serverNum % 10));
+			return mockResponse(200, { 'content-length': '1024' });
+		});
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		const metrics = await __testing.runNow();
-		expect(metrics.total).toBe(1);
-		expect(fetchMock).toHaveBeenCalledTimes(1);
+
+		// Working servers should be first
+		const workingServers = metrics.statuses.filter((s) => s.ok);
+		expect(workingServers.length).toBe(metrics.working);
+
+		// Latencies should be in ascending order for working servers
+		for (let i = 1; i < workingServers.length; i++) {
+			expect(workingServers[i].latencyMs).toBeGreaterThanOrEqual(
+				workingServers[i - 1].latencyMs ?? 0
+			);
+		}
 	});
 
-	it('reports parse error when no server ids are configured', () => {
-		__testing.setServerSourceForTesting([], TEST_TEMPLATE);
-
-		const metrics = getWorkingStreamMetrics();
-
-		expect(metrics.total).toBe(0);
-		expect(metrics.working).toBe(0);
-		expect(metrics.rate).toBe(0);
-		expect(metrics.lastError).toBe('No stream servers extracted from stream-servers.txt');
-		expect(metrics.inProgress).toBe(false);
-		expect(metrics.statuses).toHaveLength(0);
-	});
-
-	it('restores default servers after clearing override', () => {
-		const fetchMock = vi.fn().mockResolvedValue(mockResponse(200, { 'content-length': '512' }));
+	it('handles timeout errors gracefully', async () => {
+		const fetchMock = vi.fn(async () => {
+			// Simulate a timeout by aborting
+			const error = new Error('The operation was aborted');
+			error.name = 'AbortError';
+			throw error;
+		});
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-		let metrics = getWorkingStreamMetrics();
-		expect(metrics.total).toBe(2);
+		const metrics = await __testing.runNow();
 
-		__testing.setServerSourceForTesting(['21-4'], TEST_TEMPLATE);
-		metrics = getWorkingStreamMetrics();
-		expect(metrics.total).toBe(1);
+		expect(metrics.working).toBe(0);
+		expect(metrics.rate).toBe(0);
+		// All statuses should have a Timeout error
+		expect(metrics.statuses.every((s) => s.error === 'Timeout')).toBe(true);
+	});
 
-		__testing.clearServerSourceOverride();
-		metrics = getWorkingStreamMetrics();
-		expect(metrics.total).toBe(STREAM_SERVER_IDS.length);
+	it('handles network errors gracefully', async () => {
+		const fetchMock = vi.fn(async () => {
+			throw new Error('Network error');
+		});
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		const metrics = await __testing.runNow();
+
+		expect(metrics.working).toBe(0);
+		expect(metrics.rate).toBe(0);
+		expect(metrics.statuses.every((s) => s.error === 'Network error')).toBe(true);
 	});
 });

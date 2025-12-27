@@ -240,3 +240,126 @@ model ZurgKeys {
 
   @@index([validUntil])
 }
+
+// Real-Debrid operational events for observability
+// Stores individual API call results for the sliding window
+model RdOperationalEvent {
+  id        Int      @id @default(autoincrement())
+  operation String   // e.g., "GET /user", "GET /torrents"
+  status    Int      // HTTP status code
+  createdAt DateTime @default(now())
+
+  @@index([operation])
+  @@index([createdAt])
+  @@index([operation, status])
+}
+
+// Stream server health check results
+// Stores the latest health check for each server
+model StreamServerHealth {
+  host      String   @id // e.g., "1.download.real-debrid.com"
+  status    Int?
+  latencyMs Float?
+  ok        Boolean  @default(false)
+  error     String?  @db.Text
+  checkedAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([ok])
+  @@index([latencyMs])
+  @@index([checkedAt])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HISTORICAL DATA FOR 90-DAY OBSERVABILITY
+// ═══════════════════════════════════════════════════════════════
+
+// RD Operations - Hourly aggregates (kept for 7 days, then rolled into daily)
+model RdOperationalHourly {
+  id           Int      @id @default(autoincrement())
+  hour         DateTime // Start of hour (UTC), e.g., 2024-01-15T14:00:00Z
+  operation    String   // "GET /user", "GET /torrents", etc.
+  totalCount   Int      // Total requests in this hour
+  successCount Int      // 2xx responses
+  failureCount Int      // 5xx responses
+  otherCount   Int      @default(0) // 3xx, 4xx (not counted in availability)
+  successRate  Float    // Pre-computed: successCount / (successCount + failureCount)
+  createdAt    DateTime @default(now())
+
+  @@unique([hour, operation])
+  @@index([hour])
+  @@index([operation, hour])
+}
+
+// RD Operations - Daily aggregates (kept for 90 days)
+model RdOperationalDaily {
+  id             Int      @id @default(autoincrement())
+  date           DateTime // Start of day (UTC)
+  operation      String
+  totalCount     Int      // Sum of hourly totals
+  successCount   Int
+  failureCount   Int
+  avgSuccessRate Float    // Average of hourly success rates
+  minSuccessRate Float    // Worst hour of the day
+  maxSuccessRate Float    // Best hour of the day
+  peakHour       Int?     // Hour with most traffic (0-23)
+  createdAt      DateTime @default(now())
+
+  @@unique([date, operation])
+  @@index([date])
+  @@index([operation, date])
+}
+
+// Stream Health - Hourly snapshots (kept for 7 days)
+model StreamHealthHourly {
+  id             Int      @id @default(autoincrement())
+  hour           DateTime // Start of hour (UTC)
+  totalServers   Int      // Always 360
+  workingServers Int      // How many passed all 3 iterations
+  workingRate    Float    // workingServers / totalServers
+  avgLatencyMs   Float?   // Average latency of working servers
+  minLatencyMs   Float?   // Fastest server latency
+  maxLatencyMs   Float?   // Slowest working server latency
+  fastestServer  String?  // Hostname of fastest server
+  checksInHour   Int      @default(1) // Number of checks aggregated
+  failedServers  Json     @default("[]") // Array of failed server hostnames
+  createdAt      DateTime @default(now())
+
+  @@unique([hour])
+  @@index([hour])
+}
+
+// Stream Health - Daily aggregates (kept for 90 days)
+model StreamHealthDaily {
+  id             Int      @id @default(autoincrement())
+  date           DateTime // Start of day (UTC)
+  avgWorkingRate Float    // Average % of servers working across all checks
+  minWorkingRate Float    // Worst check of the day
+  maxWorkingRate Float    // Best check of the day
+  avgLatencyMs   Float?   // Average latency across all checks
+  checksCount    Int      // Total health checks that day
+  alwaysWorking  Int      @default(0) // Servers that never failed
+  neverWorking   Int      @default(0) // Servers that never worked
+  flaky          Int      @default(0) // Intermittent servers
+  createdAt      DateTime @default(now())
+
+  @@unique([date])
+  @@index([date])
+}
+
+// Per-server daily reliability (for server-level analysis)
+model ServerReliabilityDaily {
+  id           Int      @id @default(autoincrement())
+  date         DateTime
+  host         String   // Server hostname
+  checksCount  Int      // Times checked
+  successCount Int      // Times it was working
+  avgLatencyMs Float?   // Average latency when working
+  reliability  Float    // successCount / checksCount
+  createdAt    DateTime @default(now())
+
+  @@unique([date, host])
+  @@index([date])
+  @@index([host])
+  @@index([reliability])
+}

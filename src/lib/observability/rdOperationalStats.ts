@@ -1,5 +1,8 @@
 // Shared in-memory stats for Real-Debrid operations.
 // Uses globalThis to ensure a single instance across Next.js route bundles.
+// Also persists to MySQL for cross-replica consistency.
+
+import { repository } from '@/services/repository';
 
 export type RealDebridOperation =
 	| 'GET /user'
@@ -96,6 +99,11 @@ export function recordRdUnrestrictEvent(event: RdOperationalEvent) {
 	if (store.length > MAX_EVENTS) {
 		store.splice(0, store.length - MAX_EVENTS);
 	}
+
+	// Also persist to MySQL for cross-replica consistency (fire-and-forget)
+	repository.recordRdEvent(event.operation, event.status).catch((error) => {
+		console.error('Failed to persist RD event to MySQL:', error);
+	});
 }
 
 export function getLastEvents(): RdOperationalEvent[] {
@@ -171,4 +179,12 @@ export function getStats() {
 		byOperation,
 		windowSize: MAX_EVENTS,
 	};
+}
+
+/**
+ * Gets stats from MySQL database for cross-replica consistency.
+ * Use this for the API endpoint to get consolidated stats from all replicas.
+ */
+export function getStatsFromDb() {
+	return repository.getRdObservabilityStats();
 }

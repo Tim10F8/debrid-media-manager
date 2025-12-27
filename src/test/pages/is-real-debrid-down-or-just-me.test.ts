@@ -46,6 +46,8 @@ describe('Real-Debrid status page caching', () => {
 			failedServers: [],
 			lastError: null,
 			inProgress: false,
+			avgLatencyMs: null,
+			fastestServer: null,
 		};
 		const fakeStats: ReturnType<typeof combined.getRealDebridObservabilityStats> = {
 			totalTracked: 0,
@@ -60,6 +62,7 @@ describe('Real-Debrid status page caching', () => {
 			windowSize: 0,
 			workingStream: fakeWorkingStream,
 		};
+		vi.spyOn(combined, 'getRealDebridObservabilityStatsFromDb').mockResolvedValue(fakeStats);
 		vi.spyOn(combined, 'getRealDebridObservabilityStats').mockReturnValue(fakeStats);
 		const setHeader = vi.fn();
 		const result = await getServerSideProps({

@@ -46,6 +46,8 @@ describe('Real-Debrid observability API caching', () => {
 			failedServers: [],
 			lastError: null,
 			inProgress: false,
+			avgLatencyMs: 50,
+			fastestServer: '1.download.real-debrid.com',
 		};
 		const fakeStats: ReturnType<typeof combined.getRealDebridObservabilityStats> = {
 			totalTracked: 1,
@@ -60,6 +62,7 @@ describe('Real-Debrid observability API caching', () => {
 			windowSize: 10,
 			workingStream: fakeWorkingStream,
 		};
+		vi.spyOn(combined, 'getRealDebridObservabilityStatsFromDb').mockResolvedValue(fakeStats);
 		vi.spyOn(combined, 'getRealDebridObservabilityStats').mockReturnValue(fakeStats);
 
 		const headerStore: Record<string, string> = {};
@@ -94,6 +97,8 @@ describe('Real-Debrid observability API caching', () => {
 			failedServers: ['21-4', '22-4'],
 			lastError: null,
 			inProgress: false,
+			avgLatencyMs: 75,
+			fastestServer: '1.download.real-debrid.com',
 		};
 		const fakeStats: ReturnType<typeof combined.getRealDebridObservabilityStats> = {
 			totalTracked: 12,
@@ -109,8 +114,9 @@ describe('Real-Debrid observability API caching', () => {
 			workingStream: fakeWorkingStream,
 		};
 		const statsSpy = vi
-			.spyOn(combined, 'getRealDebridObservabilityStats')
-			.mockReturnValue(fakeStats);
+			.spyOn(combined, 'getRealDebridObservabilityStatsFromDb')
+			.mockResolvedValue(fakeStats);
+		vi.spyOn(combined, 'getRealDebridObservabilityStats').mockReturnValue(fakeStats);
 
 		const res = {
 			setHeader: vi.fn(),

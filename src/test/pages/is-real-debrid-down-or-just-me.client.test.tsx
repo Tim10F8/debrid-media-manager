@@ -42,6 +42,8 @@ function buildWorkingStream(): CompactWorkingStreamMetrics {
 		failedServers: [],
 		lastError: null,
 		inProgress: false,
+		avgLatencyMs: null,
+		fastestServer: null,
 	};
 }
 
@@ -128,11 +130,17 @@ describe('RealDebridStatusPage client refresh', () => {
 
 		render(<RealDebridStatusPage stats={baseStats} />);
 
-		await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+		// Wait for at least one call (page makes 1 + HistoryCharts makes 3 = 4 total)
+		await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 
-		const requestUrl = mockFetch.mock.calls[0][0];
-		expect(typeof requestUrl).toBe('string');
-		const parsedUrl = new URL(requestUrl as string);
+		// Find the observability call (has verbose=true)
+		const observabilityCall = mockFetch.mock.calls.find(([url]) => {
+			if (typeof url !== 'string') return false;
+			return url.includes('/api/observability/real-debrid');
+		});
+		expect(observabilityCall).toBeTruthy();
+		const requestUrl = observabilityCall![0] as string;
+		const parsedUrl = new URL(requestUrl);
 		expect(parsedUrl.origin).toBe(window.location.origin);
 		expect(parsedUrl.searchParams.get('verbose')).toBe('true');
 		expect(parsedUrl.searchParams.get('_t')).not.toBeNull();
@@ -149,8 +157,10 @@ describe('RealDebridStatusPage client refresh', () => {
 
 		render(<RealDebridStatusPage stats={baseStats} />);
 
-		await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+		// Wait for at least one call (page + HistoryCharts)
+		await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 	});
+
 	it('logs when the refresh payload is invalid', async () => {
 		const mockFetch = vi.fn().mockResolvedValue({
 			ok: true,
@@ -161,7 +171,8 @@ describe('RealDebridStatusPage client refresh', () => {
 
 		render(<RealDebridStatusPage stats={baseStats} />);
 
-		await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+		// Wait for at least one call (page + HistoryCharts)
+		await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 
 		const payloadLog = consoleError.mock.calls.find(
 			([message]) => message === 'Received invalid Real-Debrid stats payload'

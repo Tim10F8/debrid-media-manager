@@ -4,11 +4,30 @@ import type { GetServerSideProps, NextPage } from 'next';
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
 
+import { HistoryCharts } from '@/components/observability/HistoryCharts';
+import { ServerStatusBreakdown } from '@/components/observability/ServerStatusBreakdown';
 import {
 	getRealDebridObservabilityStats,
+	getRealDebridObservabilityStatsFromDb,
 	type RealDebridObservabilityStats,
 } from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats } from '@/lib/observability/rdOperationalStats';
+
+// Use fixed locale to avoid hydration mismatches between server and client
+const FIXED_LOCALE = 'en-US';
+
+function formatNumber(value: number): string {
+	return value.toLocaleString(FIXED_LOCALE);
+}
+
+function formatDateTime(timestamp: number): string {
+	return new Date(timestamp).toLocaleString(FIXED_LOCALE, {
+		month: 'short',
+		day: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit',
+	});
+}
 
 type Props = {
 	stats: RealDebridObservabilityStats;
@@ -46,7 +65,15 @@ export const getServerSideProps: GetServerSideProps<Props> = async ({ res }) => 
 	res.setHeader('Pragma', 'no-cache');
 	res.setHeader('Expires', '0');
 
-	const stats = getRealDebridObservabilityStats();
+	// Use DB-backed stats for cross-replica consistency
+	// Fall back to in-memory stats if DB read fails
+	let stats: RealDebridObservabilityStats;
+	try {
+		stats = await getRealDebridObservabilityStatsFromDb();
+	} catch (error) {
+		console.error('Failed to get stats from DB, using in-memory:', error);
+		stats = getRealDebridObservabilityStats();
+	}
 	return { props: { stats } };
 };
 
@@ -107,7 +134,7 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 	const operationStats = stats.monitoredOperations
 		.map((operation) => stats.byOperation[operation])
 		.filter((entry): entry is OperationStats => Boolean(entry));
-	const trackingWindowLabel = stats.windowSize.toLocaleString();
+	const trackingWindowLabel = formatNumber(stats.windowSize);
 	const pageTitle = 'Is Real-Debrid Down Or Just Me?';
 	const canonicalUrl = 'https://debridmediamanager.com/is-real-debrid-down-or-just-me';
 	const monitoredSummary = 'Real-Debrid account and torrent management endpoints';
@@ -192,25 +219,25 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 	}> = [
 		{
 			label: 'Tracked Real-Debrid responses',
-			value: stats.totalTracked.toLocaleString(),
+			value: formatNumber(stats.totalTracked),
 			helper: `Last ${trackingWindowLabel} recorded calls across monitored endpoints.`,
 			icon: History,
 		},
 		{
 			label: 'Considered (2xx + 5xx)',
-			value: stats.considered.toLocaleString(),
+			value: formatNumber(stats.considered),
 			helper: 'Responses counted toward the availability calculation.',
 			icon: Activity,
 		},
 		{
 			label: '2xx responses',
-			value: stats.successCount.toLocaleString(),
+			value: formatNumber(stats.successCount),
 			helper: 'Successful proxy calls to Real-Debrid.',
 			icon: CheckCircle2,
 		},
 		{
 			label: '5xx responses',
-			value: stats.failureCount.toLocaleString(),
+			value: formatNumber(stats.failureCount),
 			helper: 'Upstream failures or proxy errors surfaced recently.',
 			icon: AlertTriangle,
 		},
@@ -261,20 +288,20 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 		: workingStream?.inProgress
 			? 'Checking…'
 			: '—';
+	const workingStreamAvgLatency =
+		workingStream?.avgLatencyMs != null ? Math.round(workingStream.avgLatencyMs) : null;
+	const workingStreamFastest = workingStream?.fastestServer ?? null;
 	const workingStreamHelper = workingStream
 		? workingStream.lastError
 			? workingStream.lastError
 			: workingStream.lastChecked
-				? 'Servers responding with HTTP 200 and Content-Length > 0.'
-				: 'Checking stream servers…'
+				? workingStreamAvgLatency != null
+					? `Avg latency: ${workingStreamAvgLatency}ms across ${workingStream.working} servers.`
+					: 'Servers responding with HTTP 200 and Content-Length > 0.'
+				: 'Testing 360 servers (1-120 on both RD domains)…'
 		: 'Stream availability monitor unavailable.';
 	const workingStreamLastCheckedLabel = workingStream?.lastChecked
-		? new Date(workingStream.lastChecked).toLocaleString(undefined, {
-				month: 'short',
-				day: 'numeric',
-				hour: '2-digit',
-				minute: '2-digit',
-			})
+		? formatDateTime(workingStream.lastChecked)
 		: null;
 	const workingStreamMeterWidth =
 		workingStream && workingStream.lastChecked
@@ -285,14 +312,7 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 	const workingStreamMeterClass = workingStream?.lastError
 		? 'bg-rose-500'
 		: (workingStreamHealth?.meter ?? 'bg-slate-500');
-	const formattedLastUpdated = lastUpdated
-		? lastUpdated.toLocaleString(undefined, {
-				month: 'short',
-				day: 'numeric',
-				hour: '2-digit',
-				minute: '2-digit',
-			})
-		: null;
+	const formattedLastUpdated = stats.lastTs ? formatDateTime(stats.lastTs) : null;
 	const statusAsOfCopy = formattedLastUpdated ? `As of ${formattedLastUpdated}` : 'As of —';
 
 	return (
@@ -449,6 +469,11 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 								>
 									{workingStreamHelper}
 								</div>
+								{workingStreamFastest ? (
+									<div className="mt-1 text-[11px] text-emerald-400/80">
+										Fastest: {workingStreamFastest}
+									</div>
+								) : null}
 								{workingStreamLastCheckedLabel ? (
 									<div className="mt-1 text-[11px] text-slate-500">
 										Last check {workingStreamLastCheckedLabel}
@@ -530,8 +555,8 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 											</span>
 											<span className="text-slate-400">
 												{successRatePct !== null
-													? `${operationStat.successCount.toLocaleString()} / ${operationStat.considered.toLocaleString()} (2xx)`
-													: `${operationStat.totalTracked.toLocaleString()} tracked`}
+													? `${formatNumber(operationStat.successCount)} / ${formatNumber(operationStat.considered)} (2xx)`
+													: `${formatNumber(operationStat.totalTracked)} tracked`}
 											</span>
 										</div>
 										<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-700/60">
@@ -547,14 +572,14 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 										</div>
 										<div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-400">
 											<span>
-												2xx: {operationStat.successCount.toLocaleString()}
+												2xx: {formatNumber(operationStat.successCount)}
 											</span>
 											<span>
-												5xx: {operationStat.failureCount.toLocaleString()}
+												5xx: {formatNumber(operationStat.failureCount)}
 											</span>
 											<span>
 												Total tracked:{' '}
-												{operationStat.totalTracked.toLocaleString()}
+												{formatNumber(operationStat.totalTracked)}
 											</span>
 										</div>
 									</div>
@@ -563,17 +588,16 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 						</div>
 					</section>
 
+					<HistoryCharts />
+
+					<ServerStatusBreakdown />
+
 					<section className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
 						<div className="flex items-center gap-2 text-slate-200">
 							<Clock className="h-4 w-4 text-slate-400" />
 							<span>
-								{lastUpdated
-									? `Last event captured ${lastUpdated.toLocaleString(undefined, {
-											month: 'short',
-											day: 'numeric',
-											hour: '2-digit',
-											minute: '2-digit',
-										})}`
+								{stats.lastTs
+									? `Last event captured ${formatDateTime(stats.lastTs)}`
 									: 'No events captured yet'}
 							</span>
 						</div>

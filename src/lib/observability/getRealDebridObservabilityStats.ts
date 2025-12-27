@@ -1,7 +1,9 @@
+import { repository } from '@/services/repository';
+
 import { getStats, type OperationStats, type RealDebridOperation } from './rdOperationalStats';
-import { loadRealDebridSnapshot, saveRealDebridSnapshot } from './realDebridSnapshot';
 import {
 	getCompactWorkingStreamMetrics,
+	getStreamMetricsFromDb,
 	type CompactWorkingStreamMetrics,
 } from './streamServersHealth';
 
@@ -17,47 +19,6 @@ export interface RealDebridObservabilityStats {
 	byOperation: Record<RealDebridOperation, OperationStats>;
 	windowSize: number;
 	workingStream: CompactWorkingStreamMetrics;
-}
-
-const SNAPSHOT_INTERVAL_MS = 10 * 60 * 1000;
-
-let snapshotSchedulerStarted = false;
-let lastPersistedSignature: string | null = null;
-let snapshotInterval: NodeJS.Timeout | null = null;
-
-function signatureFor(stats: RealDebridObservabilityStats): string {
-	// Capture key fields to avoid rewriting identical payloads.
-	const operations = stats.monitoredOperations.map((operation) => {
-		const opStats = stats.byOperation[operation];
-		return [
-			operation,
-			opStats?.totalTracked ?? 0,
-			opStats?.considered ?? 0,
-			opStats?.successRate ?? 0,
-			opStats?.lastTs ?? null,
-		];
-	});
-
-	return JSON.stringify({
-		totalTracked: stats.totalTracked,
-		successCount: stats.successCount,
-		failureCount: stats.failureCount,
-		considered: stats.considered,
-		successRate: stats.successRate,
-		lastTs: stats.lastTs,
-		isDown: stats.isDown,
-		operations,
-		workingStream: stats.workingStream,
-	});
-}
-
-function persistSnapshot(stats: RealDebridObservabilityStats) {
-	const signature = signatureFor(stats);
-	if (lastPersistedSignature === signature) {
-		return;
-	}
-	saveRealDebridSnapshot(stats);
-	lastPersistedSignature = signature;
 }
 
 function computeFullStats(): RealDebridObservabilityStats {
@@ -79,71 +40,51 @@ function computeFullStats(): RealDebridObservabilityStats {
 	};
 }
 
-function hasMeaningfulStats(stats: RealDebridObservabilityStats): boolean {
-	if (stats.totalTracked > 0 || stats.considered > 0 || stats.lastTs !== null) {
-		return true;
-	}
-
-	const stream = stats.workingStream;
-	return Boolean(
-		stream &&
-			(stream.lastChecked !== null ||
-				stream.failedServers.length > 0 ||
-				stream.lastError ||
-				stream.inProgress)
-	);
-}
-
-function ensureSnapshotScheduler() {
-	if (snapshotSchedulerStarted) {
-		return;
-	}
-	snapshotSchedulerStarted = true;
-
-	const run = () => {
-		try {
-			const stats = computeFullStats();
-			if (!hasMeaningfulStats(stats)) {
-				return;
-			}
-			persistSnapshot(stats);
-		} catch (error) {
-			console.error('Failed scheduled Real-Debrid observability snapshot', error);
-		}
-	};
-
-	run();
-	snapshotInterval = setInterval(run, SNAPSHOT_INTERVAL_MS);
-	if (typeof snapshotInterval.unref === 'function') {
-		snapshotInterval.unref();
-	}
-}
-
+/**
+ * Gets Real-Debrid observability stats from in-memory state.
+ * This is useful for local/quick reads but may not reflect all replicas.
+ */
 export function getRealDebridObservabilityStats(): RealDebridObservabilityStats {
-	ensureSnapshotScheduler();
-	const computed = computeFullStats();
-	if (hasMeaningfulStats(computed)) {
-		persistSnapshot(computed);
-		return computed;
-	}
+	return computeFullStats();
+}
 
-	const persisted = loadRealDebridSnapshot();
-	if (persisted) {
-		lastPersistedSignature = signatureFor(persisted);
-		console.info('Serving Real-Debrid observability stats from persisted snapshot');
-		return persisted;
-	}
+/**
+ * Gets Real-Debrid observability stats from MySQL database.
+ * This provides cross-replica consistency and should be used for API endpoints.
+ */
+export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebridObservabilityStats> {
+	const [rdStats, streamMetrics] = await Promise.all([
+		repository.getRdObservabilityStats(),
+		getStreamMetricsFromDb(),
+	]);
 
-	return computed;
+	return {
+		totalTracked: rdStats.totalTracked,
+		successCount: rdStats.successCount,
+		failureCount: rdStats.failureCount,
+		considered: rdStats.considered,
+		successRate: rdStats.successRate,
+		lastTs: rdStats.lastTs,
+		isDown: rdStats.isDown,
+		monitoredOperations: rdStats.monitoredOperations,
+		byOperation: rdStats.byOperation,
+		windowSize: rdStats.windowSize,
+		workingStream: {
+			total: streamMetrics.total,
+			working: streamMetrics.working,
+			rate: streamMetrics.rate,
+			lastChecked: streamMetrics.lastChecked,
+			failedServers: streamMetrics.failedServers,
+			lastError: null,
+			inProgress: false,
+			avgLatencyMs: streamMetrics.avgLatencyMs,
+			fastestServer: streamMetrics.fastestServer,
+		},
+	};
 }
 
 export const __testing = {
 	resetState() {
-		if (snapshotInterval) {
-			clearInterval(snapshotInterval);
-			snapshotInterval = null;
-		}
-		snapshotSchedulerStarted = false;
-		lastPersistedSignature = null;
+		// No-op: MySQL state is managed by the database
 	},
 };

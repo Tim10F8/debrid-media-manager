@@ -4,13 +4,18 @@ import {
 	AvailabilityService,
 	CastService,
 	HashSearchService,
+	HistoryAggregationService,
+	RdObservabilityService,
 	ReportService,
 	ScrapedService,
 	SearchService,
+	StreamHealthService,
 	TorrentSnapshotService,
 	ZurgKeysService,
 } from './database';
 import { HashSearchParams } from './database/hashSearch';
+import { RealDebridOperation } from './database/rdObservability';
+import { StreamServerStatus } from './database/streamHealth';
 import { ScrapeSearchResult } from './mediasearch';
 import { TorrentInfoResponse } from './types';
 
@@ -24,6 +29,9 @@ export type RepositoryDependencies = Partial<{
 	torrentSnapshotService: TorrentSnapshotService;
 	hashSearchService: HashSearchService;
 	zurgKeysService: ZurgKeysService;
+	rdObservabilityService: RdObservabilityService;
+	streamHealthService: StreamHealthService;
+	historyAggregationService: HistoryAggregationService;
 }>;
 
 export class Repository {
@@ -36,6 +44,9 @@ export class Repository {
 	private torrentSnapshotService: TorrentSnapshotService;
 	private hashSearchService: HashSearchService;
 	private zurgKeysService: ZurgKeysService;
+	private rdObservabilityService: RdObservabilityService;
+	private streamHealthService: StreamHealthService;
+	private historyAggregationService: HistoryAggregationService;
 
 	constructor({
 		availabilityService,
@@ -47,6 +58,9 @@ export class Repository {
 		torrentSnapshotService,
 		hashSearchService,
 		zurgKeysService,
+		rdObservabilityService,
+		streamHealthService,
+		historyAggregationService,
 	}: RepositoryDependencies = {}) {
 		this.availabilityService = availabilityService ?? new AvailabilityService();
 		this.scrapedService = scrapedService ?? new ScrapedService();
@@ -57,6 +71,10 @@ export class Repository {
 		this.torrentSnapshotService = torrentSnapshotService ?? new TorrentSnapshotService();
 		this.hashSearchService = hashSearchService ?? new HashSearchService();
 		this.zurgKeysService = zurgKeysService ?? new ZurgKeysService();
+		this.rdObservabilityService = rdObservabilityService ?? new RdObservabilityService();
+		this.streamHealthService = streamHealthService ?? new StreamHealthService();
+		this.historyAggregationService =
+			historyAggregationService ?? new HistoryAggregationService();
 	}
 
 	// Ensure connection is properly closed when repository is no longer needed
@@ -71,6 +89,9 @@ export class Repository {
 			this.torrentSnapshotService.disconnect(),
 			this.hashSearchService.disconnect(),
 			this.zurgKeysService.disconnect(),
+			this.rdObservabilityService.disconnect(),
+			this.streamHealthService.disconnect(),
+			this.historyAggregationService.disconnect(),
 		]);
 	}
 
@@ -404,6 +425,111 @@ export class Repository {
 
 	public listZurgApiKeys() {
 		return this.zurgKeysService.listApiKeys();
+	}
+
+	// RD Observability Service Methods
+	public recordRdEvent(operation: RealDebridOperation, status: number) {
+		return this.rdObservabilityService.recordEvent(operation, status);
+	}
+
+	public getRdObservabilityStats() {
+		return this.rdObservabilityService.getStats();
+	}
+
+	public cleanupOldRdEvents() {
+		return this.rdObservabilityService.cleanupOldEvents();
+	}
+
+	public getRdEventCount() {
+		return this.rdObservabilityService.getEventCount();
+	}
+
+	// Stream Health Service Methods
+	public upsertStreamHealthResults(results: StreamServerStatus[]) {
+		return this.streamHealthService.upsertHealthResults(results);
+	}
+
+	public getAllStreamStatuses() {
+		return this.streamHealthService.getAllStatuses();
+	}
+
+	public getStreamHealthMetrics() {
+		return this.streamHealthService.getMetrics();
+	}
+
+	public cleanupOldStreamHealth(olderThanHours?: number) {
+		return this.streamHealthService.cleanupOldEntries(olderThanHours);
+	}
+
+	public getStreamHealthCount() {
+		return this.streamHealthService.getCount();
+	}
+
+	// History Aggregation Service Methods
+	public aggregateRdHourly(targetHour?: Date) {
+		return this.historyAggregationService.aggregateRdHourly(targetHour);
+	}
+
+	public rollupRdDaily(targetDate?: Date) {
+		return this.historyAggregationService.rollupRdDaily(targetDate);
+	}
+
+	public recordStreamHealthSnapshot(data: {
+		totalServers: number;
+		workingServers: number;
+		avgLatencyMs: number | null;
+		minLatencyMs: number | null;
+		maxLatencyMs: number | null;
+		fastestServer: string | null;
+		failedServers: string[];
+	}) {
+		return this.historyAggregationService.recordStreamHealthSnapshot(data);
+	}
+
+	public recordServerReliability(
+		statuses: Array<{ host: string; ok: boolean; latencyMs: number | null }>
+	) {
+		return this.historyAggregationService.recordServerReliability(statuses);
+	}
+
+	public rollupStreamDaily(targetDate?: Date) {
+		return this.historyAggregationService.rollupStreamDaily(targetDate);
+	}
+
+	public cleanupOldHistoryData() {
+		return this.historyAggregationService.cleanupOldData();
+	}
+
+	public getRdHourlyHistory(hoursBack?: number, operation?: string) {
+		return this.historyAggregationService.getRdHourlyHistory(hoursBack, operation);
+	}
+
+	public getRdDailyHistory(daysBack?: number, operation?: string) {
+		return this.historyAggregationService.getRdDailyHistory(daysBack, operation);
+	}
+
+	public getStreamHourlyHistory(hoursBack?: number) {
+		return this.historyAggregationService.getStreamHourlyHistory(hoursBack);
+	}
+
+	public getStreamDailyHistory(daysBack?: number) {
+		return this.historyAggregationService.getStreamDailyHistory(daysBack);
+	}
+
+	public getServerReliability(
+		daysBack?: number,
+		sortBy?: 'reliability' | 'latency',
+		limit?: number
+	) {
+		return this.historyAggregationService.getServerReliability(daysBack, sortBy, limit);
+	}
+
+	public runHistoryAggregation() {
+		return this.historyAggregationService.runAggregation();
+	}
+
+	public runDailyRollup(targetDate?: Date) {
+		return this.historyAggregationService.runDailyRollup(targetDate);
 	}
 }
 
