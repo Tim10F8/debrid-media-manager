@@ -143,15 +143,22 @@ async function hostExists(hostname: string): Promise<boolean> {
  * 1. null - Server doesn't exist (DNS doesn't resolve) → excluded from results
  * 2. ok: false - Server exists but is failing (timeout, HTTP error, etc.) → counted as failing
  * 3. ok: true - Server exists and is working → counted as working
+ *
+ * Note: DNS existence check is only done for .download.real-debrid.com domains.
+ * The .download.real-debrid.cloud domains are behind Cloudflare which always resolves
+ * DNS but returns HTTP errors for non-existent hosts - those are counted as failures.
  */
 async function testServerLatency(server: {
 	id: string;
 	host: string;
 }): Promise<WorkingStreamServerStatus | null> {
-	// First check if the server exists at all (DNS resolves)
-	const exists = await hostExists(server.host);
-	if (!exists) {
-		return null; // Server doesn't exist - exclude from results entirely
+	// Only check DNS existence for .com domains
+	// .cloud domains are behind Cloudflare which always resolves DNS
+	if (server.host.endsWith('.download.real-debrid.com')) {
+		const exists = await hostExists(server.host);
+		if (!exists) {
+			return null; // Server doesn't exist - exclude from results entirely
+		}
 	}
 
 	const checkedAt = Date.now();
