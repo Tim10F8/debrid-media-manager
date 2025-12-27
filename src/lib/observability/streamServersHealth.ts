@@ -167,6 +167,30 @@ function buildTestUrl(host: string, baseTestUrl: string): string {
 	return url.toString();
 }
 
+function getBaseComHostForCloud(host: string): string | null {
+	const match = /^(\d+)\.download\.real-debrid\.cloud$/u.exec(host);
+	if (!match) {
+		return null;
+	}
+	return `${match[1]}.download.real-debrid.com`;
+}
+
+const DNS_ERROR_CODES = new Set(['ENOTFOUND', 'EAI_NONAME', 'ENODATA']);
+
+function getDnsErrorCode(error: unknown): string | null {
+	if (!error || typeof error !== 'object') {
+		return null;
+	}
+	const candidate = error as { code?: string; cause?: unknown };
+	if (typeof candidate.code === 'string') {
+		return candidate.code;
+	}
+	if (candidate.cause && typeof (candidate.cause as { code?: string }).code === 'string') {
+		return (candidate.cause as { code?: string }).code ?? null;
+	}
+	return null;
+}
+
 /**
  * Checks if a hostname resolves in DNS.
  * Returns true if the hostname exists, false if it doesn't.
@@ -188,6 +212,11 @@ async function hostExists(hostname: string): Promise<boolean> {
 		clearTimeout(timeoutId);
 		return true; // If we get here, DNS resolved (even if HTTP failed)
 	} catch (error) {
+		const dnsCode = getDnsErrorCode(error);
+		if (dnsCode && DNS_ERROR_CODES.has(dnsCode)) {
+			return false;
+		}
+
 		if (error instanceof Error) {
 			const message = error.message.toLowerCase();
 			// DNS resolution failures - host doesn't exist
@@ -223,12 +252,22 @@ async function hostExists(hostname: string): Promise<boolean> {
  */
 async function testServerLatency(
 	server: { id: string; host: string },
-	baseTestUrl: string
+	baseTestUrl: string,
+	hostExistenceCache: Map<string, Promise<boolean>>
 ): Promise<WorkingStreamServerStatus | null> {
+	// If the base .com host doesn't resolve, skip the .cloud proxy host too.
+	const baseComHost = getBaseComHostForCloud(server.host);
+	if (baseComHost) {
+		const exists = await hostExistsCached(baseComHost, hostExistenceCache);
+		if (!exists) {
+			return null;
+		}
+	}
+
 	// Only check DNS existence for .com domains
 	// .cloud domains are behind Cloudflare which always resolves DNS
 	if (server.host.endsWith('.download.real-debrid.com')) {
-		const exists = await hostExists(server.host);
+		const exists = await hostExistsCached(server.host, hostExistenceCache);
 		if (!exists) {
 			return null; // Server doesn't exist - exclude from results entirely
 		}
@@ -305,6 +344,20 @@ async function testServerLatency(
 	};
 }
 
+function hostExistsCached(
+	hostname: string,
+	cache: Map<string, Promise<boolean>>
+): Promise<boolean> {
+	const cached = cache.get(hostname);
+	if (cached) {
+		return cached;
+	}
+
+	const promise = hostExists(hostname);
+	cache.set(hostname, promise);
+	return promise;
+}
+
 /**
  * Runs the network test against all Real-Debrid download servers.
  * Tests servers in parallel with a limited concurrency pool.
@@ -319,6 +372,7 @@ async function inspectServers(rdToken?: string): Promise<WorkingStreamServerStat
 
 	const servers = generateServerHosts();
 	const results: WorkingStreamServerStatus[] = [];
+	const hostExistenceCache = new Map<string, Promise<boolean>>();
 
 	// Process hosts in batches with limited concurrency
 	let index = 0;
@@ -327,7 +381,7 @@ async function inspectServers(rdToken?: string): Promise<WorkingStreamServerStat
 		while (index < servers.length) {
 			const currentIndex = index++;
 			const server = servers[currentIndex];
-			const result = await testServerLatency(server, baseTestUrl);
+			const result = await testServerLatency(server, baseTestUrl, hostExistenceCache);
 			// Only include servers that exist (non-null result)
 			if (result !== null) {
 				results.push(result);
@@ -390,6 +444,9 @@ async function executeCheck(state: SchedulerState): Promise<void> {
 			// Get RD token from environment if available for more realistic testing
 			const rdToken = process.env.RD_ACCESS_TOKEN || undefined;
 			const statuses = await inspectServers(rdToken);
+			const allHosts = generateServerHosts().map((server) => server.id);
+			const includedHosts = new Set(statuses.map((status) => status.id));
+			const excludedHosts = allHosts.filter((host) => !includedHosts.has(host));
 			const workingServers = statuses.filter((status) => status.ok);
 			const working = workingServers.length;
 
@@ -404,6 +461,9 @@ async function executeCheck(state: SchedulerState): Promise<void> {
 			const fastestServer = workingServers[0]?.id ?? null;
 
 			// Persist to MySQL
+			if (excludedHosts.length > 0) {
+				await repository.deleteStreamHealthHosts(excludedHosts);
+			}
 			const dbResults = statuses.map((s) => ({
 				host: s.id,
 				status: s.status,

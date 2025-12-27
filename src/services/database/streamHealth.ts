@@ -95,6 +95,38 @@ export class StreamHealthService extends DatabaseClient {
 	}
 
 	/**
+	 * Deletes stream server health entries for excluded hosts.
+	 */
+	public async deleteHosts(hosts: string[]): Promise<number> {
+		if (hosts.length === 0) {
+			return 0;
+		}
+
+		try {
+			const result = await this.prisma.streamServerHealth.deleteMany({
+				where: {
+					host: { in: hosts },
+				},
+			});
+			return result.count;
+		} catch (error: any) {
+			if (
+				error?.code?.startsWith?.('P') ||
+				error?.name?.includes?.('Prisma') ||
+				error?.message?.includes('does not exist') ||
+				error?.message?.includes('Authentication failed')
+			) {
+				console.warn(
+					'deleteHosts: Database error, returning 0:',
+					error?.code || error?.name
+				);
+				return 0;
+			}
+			throw error;
+		}
+	}
+
+	/**
 	 * Gets aggregated stream health metrics.
 	 */
 	public async getMetrics(): Promise<StreamHealthMetrics> {

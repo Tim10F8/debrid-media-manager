@@ -15,6 +15,7 @@ vi.mock('@/services/repository', () => ({
 			fastestServer: null,
 			failedServers: [],
 		}),
+		deleteStreamHealthHosts: vi.fn().mockResolvedValue(0),
 		getAllStreamStatuses: vi.fn().mockResolvedValue([]),
 		recordStreamHealthSnapshot: vi.fn().mockResolvedValue(undefined),
 		recordServerReliability: vi.fn().mockResolvedValue(undefined),
