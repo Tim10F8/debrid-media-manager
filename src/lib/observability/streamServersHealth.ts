@@ -402,8 +402,11 @@ export function getCompactWorkingStreamMetrics(): CompactWorkingStreamMetrics {
 /**
  * Gets stream health metrics from MySQL database for cross-replica consistency.
  * Use this for the API endpoint to get consolidated stats from all replicas.
+ * Also ensures the health check is scheduled (side effect).
  */
 export function getStreamMetricsFromDb() {
+	// Ensure health check is scheduled on this replica
+	getStore();
 	return repository.getStreamHealthMetrics();
 }
 
