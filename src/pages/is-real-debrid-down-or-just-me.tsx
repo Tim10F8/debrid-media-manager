@@ -1,12 +1,10 @@
 import type { RealDebridObservabilityStats } from '@/lib/observability/getRealDebridObservabilityStats';
-import type { OperationStats } from '@/lib/observability/rdOperationalStats';
 import type { LucideIcon } from 'lucide-react';
 import {
 	Activity,
 	AlertTriangle,
 	CheckCircle2,
 	Clock,
-	History,
 	Link2,
 	Loader2,
 } from 'lucide-react';
@@ -142,9 +140,6 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 	const successPct = Math.round(stats.successRate * 100);
 	const lastUpdated = stats.lastTs ? new Date(stats.lastTs) : null;
 	const lastUpdatedIso = lastUpdated ? lastUpdated.toISOString() : null;
-	const operationStats = stats.monitoredOperations
-		.map((operation) => stats.byOperation[operation])
-		.filter((entry): entry is OperationStats => Boolean(entry));
 	const trackingWindowLabel = formatNumber(stats.windowSize);
 	const monitoredSummary =
 		'Real-Debrid account, torrent management, and unrestrict endpoints';
@@ -227,12 +222,6 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 		helper: string;
 		icon: LucideIcon;
 	}> = [
-		{
-			label: 'Tracked Real-Debrid responses',
-			value: formatNumber(stats.totalTracked),
-			helper: `Last ${trackingWindowLabel} recorded calls across monitored endpoints.`,
-			icon: History,
-		},
 		{
 			label: 'Considered (2xx + 5xx)',
 			value: formatNumber(stats.considered),
@@ -523,91 +512,6 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 								<div className="mt-2 text-xs text-slate-400">{helper}</div>
 							</div>
 						))}
-					</section>
-
-					<section className="space-y-6 rounded-xl border border-white/10 bg-black/25 p-5">
-						<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-							<div>
-								<h2 className="text-lg font-semibold text-white">
-									Operation breakdown
-								</h2>
-								<p className="text-xs text-slate-400">
-									{stats.monitoredOperations.length} endpoints monitored via this
-									proxy instance.
-								</p>
-							</div>
-							<div className="text-xs text-slate-400">
-								Success rate thresholds · Healthy ≥ 90% · Watchlist ≥ 60%
-							</div>
-						</div>
-						<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-							{operationStats.map((operationStat) => {
-								const successRatePct = operationStat.considered
-									? Math.round(operationStat.successRate * 100)
-									: null;
-								const health = operationHealthMeta(
-									operationStat.successRate,
-									operationStat.considered
-								);
-								return (
-									<div
-										key={operationStat.operation}
-										className="rounded-2xl border border-white/10 bg-black/40 p-5"
-									>
-										<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-											<div>
-												<p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-													Operation
-												</p>
-												<h3 className="mt-1 break-words text-sm font-semibold text-white">
-													{operationStat.operation}
-												</h3>
-											</div>
-											<span
-												className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${health.badge}`}
-											>
-												{health.label}
-											</span>
-										</div>
-										<div className="mt-4 flex flex-col gap-2 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-											<span className="text-slate-300">
-												{successRatePct !== null
-													? `${successRatePct}% success`
-													: 'No samples yet'}
-											</span>
-											<span className="text-slate-400">
-												{successRatePct !== null
-													? `${formatNumber(operationStat.successCount)} / ${formatNumber(operationStat.considered)} (2xx)`
-													: `${formatNumber(operationStat.totalTracked)} tracked`}
-											</span>
-										</div>
-										<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-700/60">
-											<div
-												className={`h-full rounded-full ${health.meter}`}
-												style={{
-													width:
-														successRatePct !== null
-															? `${successRatePct}%`
-															: '12%',
-												}}
-											/>
-										</div>
-										<div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-400">
-											<span>
-												2xx: {formatNumber(operationStat.successCount)}
-											</span>
-											<span>
-												5xx: {formatNumber(operationStat.failureCount)}
-											</span>
-											<span>
-												Total tracked:{' '}
-												{formatNumber(operationStat.totalTracked)}
-											</span>
-										</div>
-									</div>
-								);
-							})}
-						</div>
 					</section>
 
 					<HistoryCharts />
