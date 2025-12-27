@@ -4,6 +4,7 @@
 // Uses actual unrestricted RD links for testing (like zurg does).
 
 import { repository } from '@/services/repository';
+import { unrestrictLink } from '@/services/realDebrid';
 
 const GLOBAL_KEY = '__DMM_STREAM_HEALTH_SCHEDULER__';
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
@@ -95,34 +96,10 @@ async function unrestrictNetworkTestLink(token: string): Promise<string | null> 
 
 			// Generate random 5-digit password
 			const password = String(Math.floor(Math.random() * 90000) + 10000);
-
-			const formData = new URLSearchParams();
-			formData.set('link', link);
-			formData.set('password', password);
-
-			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-			const response = await fetch('https://api.real-debrid.com/rest/1.0/unrestrict/link', {
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${token}`,
-					'Content-Type': 'application/x-www-form-urlencoded',
-				},
-				body: formData.toString(),
-				signal: controller.signal,
-			});
-
-			clearTimeout(timeoutId);
-
-			if (!response.ok) {
-				continue;
-			}
-
-			const data = (await response.json()) as { download?: string };
-			if (data.download) {
-				console.log(`[StreamHealth] Unrestricted test link: ${data.download}`);
-				return data.download;
+			const response = await unrestrictLink(token, link, '', true, password);
+			if (response?.download) {
+				console.log(`[StreamHealth] Unrestricted test link: ${response.download}`);
+				return response.download;
 			}
 		} catch {
 			// Try next link

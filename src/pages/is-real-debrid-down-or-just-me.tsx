@@ -1,7 +1,15 @@
 import type { RealDebridObservabilityStats } from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats } from '@/lib/observability/rdOperationalStats';
 import type { LucideIcon } from 'lucide-react';
-import { Activity, AlertTriangle, CheckCircle2, Clock, History, Loader2 } from 'lucide-react';
+import {
+	Activity,
+	AlertTriangle,
+	CheckCircle2,
+	Clock,
+	History,
+	Link2,
+	Loader2,
+} from 'lucide-react';
 import type { NextPage } from 'next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
@@ -109,7 +117,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 	const pageTitle = 'Is Real-Debrid Down Or Just Me?';
 	const canonicalUrl = 'https://debridmediamanager.com/is-real-debrid-down-or-just-me';
 	const defaultDescription =
-		'Live Real-Debrid availability dashboard covering account and torrent endpoints.';
+		'Live Real-Debrid availability dashboard covering account, torrent, and unrestrict endpoints.';
 
 	// Show loading state
 	if (loading || !stats) {
@@ -138,10 +146,11 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 		.map((operation) => stats.byOperation[operation])
 		.filter((entry): entry is OperationStats => Boolean(entry));
 	const trackingWindowLabel = formatNumber(stats.windowSize);
-	const monitoredSummary = 'Real-Debrid account and torrent management endpoints';
+	const monitoredSummary =
+		'Real-Debrid account, torrent management, and unrestrict endpoints';
 	const description = stats.considered
-		? `Live Real-Debrid availability across account and torrent endpoints based on the last ${trackingWindowLabel} proxy responses.`
-		: 'Live Real-Debrid availability dashboard covering account and torrent endpoints.';
+		? `Live Real-Debrid availability across account, torrent, and unrestrict endpoints based on the last ${trackingWindowLabel} proxy responses.`
+		: 'Live Real-Debrid availability dashboard covering account, torrent, and unrestrict endpoints.';
 	const structuredData: Record<string, unknown> = {
 		'@context': 'https://schema.org',
 		'@type': 'WebPage',
@@ -243,6 +252,18 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 			icon: AlertTriangle,
 		},
 	];
+	const unrestrictStats = stats.byOperation['POST /unrestrict/link'];
+	const unrestrictSuccessPct =
+		unrestrictStats?.considered ? Math.round(unrestrictStats.successRate * 100) : null;
+	const unrestrictSummary = unrestrictStats?.considered
+		? `${formatNumber(unrestrictStats.successCount)}/${formatNumber(unrestrictStats.considered)} (2xx)`
+		: 'No samples yet.';
+	summaryMetrics.push({
+		label: 'Unrestrict success rate',
+		value: unrestrictSuccessPct !== null ? `${unrestrictSuccessPct}%` : '—',
+		helper: unrestrictSummary,
+		icon: Link2,
+	});
 
 	const operationHealthMeta = (
 		successRate: number,

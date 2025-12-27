@@ -15,6 +15,7 @@ const operations: RealDebridOperation[] = [
 	'POST /torrents/addMagnet',
 	'POST /torrents/selectFiles/{id}',
 	'DELETE /torrents/delete/{id}',
+	'POST /unrestrict/link',
 ];
 
 function buildEmptyByOperation(): Record<RealDebridOperation, OperationStats> {

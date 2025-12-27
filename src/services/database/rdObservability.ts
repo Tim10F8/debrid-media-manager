@@ -6,7 +6,8 @@ export type RealDebridOperation =
 	| 'GET /torrents/info/{id}'
 	| 'POST /torrents/addMagnet'
 	| 'POST /torrents/selectFiles/{id}'
-	| 'DELETE /torrents/delete/{id}';
+	| 'DELETE /torrents/delete/{id}'
+	| 'POST /unrestrict/link';
 
 export interface OperationStats {
 	operation: RealDebridOperation;
@@ -38,6 +39,7 @@ const MONITORED_OPERATIONS: RealDebridOperation[] = [
 	'POST /torrents/addMagnet',
 	'POST /torrents/selectFiles/{id}',
 	'DELETE /torrents/delete/{id}',
+	'POST /unrestrict/link',
 ];
 
 const MAX_EVENTS = 10_000;

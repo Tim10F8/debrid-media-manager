@@ -10,7 +10,8 @@ export type RealDebridOperation =
 	| 'GET /torrents/info/{id}'
 	| 'POST /torrents/addMagnet'
 	| 'POST /torrents/selectFiles/{id}'
-	| 'DELETE /torrents/delete/{id}';
+	| 'DELETE /torrents/delete/{id}'
+	| 'POST /unrestrict/link';
 
 export interface RdOperationalEvent {
 	ts: number; // epoch ms
@@ -62,6 +63,11 @@ const OPERATION_DEFINITIONS: Array<{
 		operation: 'DELETE /torrents/delete/{id}',
 		method: 'DELETE',
 		test: (pathname) => /\/torrents\/delete(\/|$)/.test(pathname),
+	},
+	{
+		operation: 'POST /unrestrict/link',
+		method: 'POST',
+		test: (pathname) => /\/unrestrict\/link(\/|$)/.test(pathname),
 	},
 ];
 

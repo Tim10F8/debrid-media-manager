@@ -13,6 +13,7 @@ const operations: RealDebridOperation[] = [
 	'POST /torrents/addMagnet',
 	'POST /torrents/selectFiles/{id}',
 	'DELETE /torrents/delete/{id}',
+	'POST /unrestrict/link',
 ];
 
 function buildEmptyByOperation(): Record<RealDebridOperation, OperationStats> {
@@ -73,7 +74,7 @@ describe('Real-Debrid status page (client-side only)', () => {
 
 	it('builds valid byOperation structure', () => {
 		const byOp = buildEmptyByOperation();
-		expect(Object.keys(byOp)).toHaveLength(6);
+		expect(Object.keys(byOp)).toHaveLength(7);
 		expect(byOp['GET /user'].operation).toBe('GET /user');
 	});
 });

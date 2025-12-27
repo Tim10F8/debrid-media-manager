@@ -8,6 +8,7 @@ const MONITORED_OPERATIONS: RealDebridOperation[] = [
 	'POST /torrents/addMagnet',
 	'POST /torrents/selectFiles/{id}',
 	'DELETE /torrents/delete/{id}',
+	'POST /unrestrict/link',
 ];
 
 // Retention periods

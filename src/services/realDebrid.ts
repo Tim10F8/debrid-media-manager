@@ -688,7 +688,8 @@ export const unrestrictLink = async (
 	accessToken: string,
 	link: string,
 	ipAddress: string,
-	bare: boolean = false
+	bare: boolean = false,
+	password?: string
 ): Promise<UnrestrictResponse> => {
 	try {
 		const params = new URLSearchParams();
@@ -702,6 +703,9 @@ export const unrestrictLink = async (
 			params.append('ip', ipAddress);
 		}
 		params.append('link', link);
+		if (password) {
+			params.append('password', password);
+		}
 
 		const response = await realDebridAxios.post<UnrestrictResponse>(
 			`${bare ? 'https://app.real-debrid.com' : getProxyUrl(config.proxy) + config.realDebridHostname}/rest/1.0/unrestrict/link`,
@@ -713,8 +717,10 @@ export const unrestrictLink = async (
 				},
 			}
 		);
+		recordSuccessMetric('POST /unrestrict/link', response.status);
 		return response.data;
 	} catch (error: any) {
+		recordFailureMetric('POST /unrestrict/link', error);
 		console.error('Error checking unrestrict:', error.message);
 		throw error;
 	}
@@ -737,8 +743,10 @@ export const proxyUnrestrictLink = async (
 			{ headers }
 		);
 
+		recordSuccessMetric('POST /unrestrict/link', response.status);
 		return response.data;
 	} catch (error: any) {
+		recordFailureMetric('POST /unrestrict/link', error);
 		console.error('Error checking unrestrict:', error.message);
 		throw error;
 	}
