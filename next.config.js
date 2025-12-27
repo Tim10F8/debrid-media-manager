@@ -4,6 +4,7 @@ const withPWA = require('next-pwa')(pwaConfig);
 
 const nextConfig = {
 	output: 'standalone',
+	transpilePackages: ['recharts', '@reduxjs/toolkit'],
 	webpack: (config) => {
 		config.cache = {
 			type: 'filesystem',
