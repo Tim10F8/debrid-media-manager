@@ -93,8 +93,18 @@ describe('RealDebridStatusPage client refresh', () => {
 		}
 	});
 
-	it('renders working stream outside of the success rate card', () => {
-		const { getByTestId } = render(<RealDebridStatusPage stats={baseStats} />);
+	it('renders working stream outside of the success rate card', async () => {
+		const mockFetch = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve(baseStats),
+		});
+		setMockFetch(mockFetch);
+
+		const { getByTestId } = render(<RealDebridStatusPage />);
+
+		// Wait for data to load
+		await waitFor(() => expect(getByTestId('success-rate-card')).toBeTruthy());
+
 		const successCard = getByTestId('success-rate-card');
 		expect(successCard).toBeTruthy();
 		expect(within(successCard).queryByText('Working Stream')).toBeNull();
@@ -105,8 +115,18 @@ describe('RealDebridStatusPage client refresh', () => {
 		expect(getByTestId('status-freshness').textContent).toBe('As of —');
 	});
 
-	it('promotes Debrid Media Manager with an external CTA link', () => {
-		const { getByRole, getByTestId } = render(<RealDebridStatusPage stats={baseStats} />);
+	it('promotes Debrid Media Manager with an external CTA link', async () => {
+		const mockFetch = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve(baseStats),
+		});
+		setMockFetch(mockFetch);
+
+		const { getByRole, getByTestId } = render(<RealDebridStatusPage />);
+
+		// Wait for data to load
+		await waitFor(() => expect(getByTestId('dmm-marketing-copy')).toBeTruthy());
+
 		const marketingCopy = getByTestId('dmm-marketing-copy');
 		expect(marketingCopy.textContent).toContain(
 			'Debrid Media Manager is a free, open source dashboard for Real-Debrid, AllDebrid, and TorBox.'
@@ -122,7 +142,7 @@ describe('RealDebridStatusPage client refresh', () => {
 		expect(ctaLink).toHaveAttribute('rel', 'noreferrer noopener');
 	});
 
-	it('requests verbose stats during client refresh', async () => {
+	it('requests verbose stats during client fetch', async () => {
 		const resolvedStats = { ...baseStats };
 		const mockFetch = vi.fn().mockResolvedValue({
 			ok: true,
@@ -130,9 +150,9 @@ describe('RealDebridStatusPage client refresh', () => {
 		});
 		setMockFetch(mockFetch);
 
-		render(<RealDebridStatusPage stats={baseStats} />);
+		render(<RealDebridStatusPage />);
 
-		// Wait for at least one call (page makes 1 + HistoryCharts makes 3 = 4 total)
+		// Wait for at least one call
 		await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 
 		// Find the observability call (has verbose=true)
@@ -157,13 +177,13 @@ describe('RealDebridStatusPage client refresh', () => {
 		setMockFetch(mockFetch);
 		expect(globalWithFetch.fetch).toBe(mockFetch as unknown as typeof fetch);
 
-		render(<RealDebridStatusPage stats={baseStats} />);
+		render(<RealDebridStatusPage />);
 
-		// Wait for at least one call (page + HistoryCharts)
+		// Wait for at least one call
 		await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 	});
 
-	it('logs when the refresh payload is invalid', async () => {
+	it('logs when the fetch payload is invalid', async () => {
 		const mockFetch = vi.fn().mockResolvedValue({
 			ok: true,
 			json: () => Promise.resolve({ not: 'expected' }),
@@ -171,14 +191,16 @@ describe('RealDebridStatusPage client refresh', () => {
 		setMockFetch(mockFetch);
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-		render(<RealDebridStatusPage stats={baseStats} />);
+		render(<RealDebridStatusPage />);
 
-		// Wait for at least one call (page + HistoryCharts)
+		// Wait for at least one call
 		await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 
-		const payloadLog = consoleError.mock.calls.find(
-			([message]) => message === 'Received invalid Real-Debrid stats payload'
-		);
-		expect(payloadLog).toBeTruthy();
+		await waitFor(() => {
+			const payloadLog = consoleError.mock.calls.find(
+				([message]) => message === 'Received invalid Real-Debrid stats payload'
+			);
+			expect(payloadLog).toBeTruthy();
+		});
 	});
 });

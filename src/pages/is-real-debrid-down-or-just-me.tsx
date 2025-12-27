@@ -1,11 +1,8 @@
-import {
-	getRealDebridObservabilityStatsFromDb,
-	type RealDebridObservabilityStats,
-} from '@/lib/observability/getRealDebridObservabilityStats';
+import type { RealDebridObservabilityStats } from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats } from '@/lib/observability/rdOperationalStats';
 import type { LucideIcon } from 'lucide-react';
-import { Activity, AlertTriangle, CheckCircle2, Clock, History } from 'lucide-react';
-import type { GetServerSideProps, NextPage } from 'next';
+import { Activity, AlertTriangle, CheckCircle2, Clock, History, Loader2 } from 'lucide-react';
+import type { NextPage } from 'next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
@@ -39,10 +36,6 @@ function formatDateTime(timestamp: number): string {
 	});
 }
 
-type Props = {
-	stats: RealDebridObservabilityStats;
-};
-
 type StatusState = 'idle' | 'up' | 'down';
 
 function isRealDebridObservabilityPayload(value: unknown): value is RealDebridObservabilityStats {
@@ -68,46 +61,25 @@ function isRealDebridObservabilityPayload(value: unknown): value is RealDebridOb
 	return true;
 }
 
-export const getServerSideProps: GetServerSideProps<Props> = async ({ res }) => {
-	res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate');
-	res.setHeader('CDN-Cache-Control', 'no-store');
-	res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
-	res.setHeader('Pragma', 'no-cache');
-	res.setHeader('Expires', '0');
-
-	// Use DB-backed stats for cross-replica consistency
-	const stats = await getRealDebridObservabilityStatsFromDb();
-	return { props: { stats } };
-};
-
-const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean } = ({
-	stats: initialStats,
-}) => {
-	const [stats, setStats] = useState(initialStats);
+const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = () => {
+	const [stats, setStats] = useState<RealDebridObservabilityStats | null>(null);
+	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
 		let cancelled = false;
 
-		const loadFreshStats = async () => {
+		const loadStats = async () => {
 			try {
-				const fetchImpl = globalThis.fetch;
-				if (typeof fetchImpl !== 'function') {
-					console.error('Fetch API unavailable for Real-Debrid stats refresh');
-					return;
-				}
 				const cacheBuster = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 				const params = new URLSearchParams({ _t: cacheBuster, verbose: 'true' });
-				const origin =
-					typeof window !== 'undefined' && window.location?.origin
-						? window.location.origin
-						: (process.env.DMM_ORIGIN ?? 'http://localhost:3000');
+				const origin = window.location.origin;
 				const requestUrl = new URL('/api/observability/real-debrid', origin);
 				requestUrl.search = params.toString();
-				const response = await fetchImpl(requestUrl.toString(), {
+				const response = await fetch(requestUrl.toString(), {
 					cache: 'no-store',
 				});
 				if (!response.ok) {
-					console.error('Real-Debrid stats refresh failed with status', response.status);
+					console.error('Real-Debrid stats fetch failed with status', response.status);
 					return;
 				}
 				const payload: unknown = await response.json();
@@ -119,16 +91,44 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 					setStats(payload);
 				}
 			} catch (error) {
-				console.error('Failed to refresh Real-Debrid stats', error);
+				console.error('Failed to fetch Real-Debrid stats', error);
+			} finally {
+				if (!cancelled) {
+					setLoading(false);
+				}
 			}
 		};
 
-		loadFreshStats();
+		loadStats();
 
 		return () => {
 			cancelled = true;
 		};
 	}, []);
+
+	const pageTitle = 'Is Real-Debrid Down Or Just Me?';
+	const canonicalUrl = 'https://debridmediamanager.com/is-real-debrid-down-or-just-me';
+	const defaultDescription =
+		'Live Real-Debrid availability dashboard covering account and torrent endpoints.';
+
+	// Show loading state
+	if (loading || !stats) {
+		return (
+			<>
+				<Head>
+					<title>{pageTitle}</title>
+					<link rel="canonical" href={canonicalUrl} />
+					<meta name="description" content={defaultDescription} />
+				</Head>
+				<main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
+					<div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-center gap-4 py-32">
+						<Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+						<p className="text-slate-400">Loading Real-Debrid status...</p>
+					</div>
+				</main>
+			</>
+		);
+	}
 
 	const state: StatusState = !stats.considered ? 'idle' : stats.isDown ? 'down' : 'up';
 	const successPct = Math.round(stats.successRate * 100);
@@ -138,8 +138,6 @@ const RealDebridStatusPage: NextPage<Props> & { disableLibraryProvider?: boolean
 		.map((operation) => stats.byOperation[operation])
 		.filter((entry): entry is OperationStats => Boolean(entry));
 	const trackingWindowLabel = formatNumber(stats.windowSize);
-	const pageTitle = 'Is Real-Debrid Down Or Just Me?';
-	const canonicalUrl = 'https://debridmediamanager.com/is-real-debrid-down-or-just-me';
 	const monitoredSummary = 'Real-Debrid account and torrent management endpoints';
 	const description = stats.considered
 		? `Live Real-Debrid availability across account and torrent endpoints based on the last ${trackingWindowLabel} proxy responses.`

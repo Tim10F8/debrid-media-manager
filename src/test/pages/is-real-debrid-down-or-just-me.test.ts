@@ -4,9 +4,7 @@ import type {
 	CompactWorkingStreamMetrics,
 	RealDebridObservabilityStats,
 } from '@/lib/observability/getRealDebridObservabilityStats';
-import * as combined from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats, RealDebridOperation } from '@/lib/observability/rdOperationalStats';
-import { getServerSideProps } from '@/pages/is-real-debrid-down-or-just-me';
 
 const operations: RealDebridOperation[] = [
 	'GET /user',
@@ -35,58 +33,47 @@ function buildEmptyByOperation(): Record<RealDebridOperation, OperationStats> {
 	);
 }
 
-describe('Real-Debrid status page caching', () => {
+function buildEmptyStats(): RealDebridObservabilityStats {
+	const fakeWorkingStream: CompactWorkingStreamMetrics = {
+		total: 0,
+		working: 0,
+		rate: 0,
+		lastChecked: null,
+		failedServers: [],
+		lastError: null,
+		inProgress: false,
+		avgLatencyMs: null,
+		fastestServer: null,
+	};
+	return {
+		totalTracked: 0,
+		successCount: 0,
+		failureCount: 0,
+		considered: 0,
+		successRate: 0,
+		lastTs: null,
+		isDown: false,
+		monitoredOperations: [],
+		byOperation: buildEmptyByOperation(),
+		windowSize: 0,
+		workingStream: fakeWorkingStream,
+	};
+}
+
+describe('Real-Debrid status page (client-side only)', () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 	});
 
-	it('marks the SSR response as non-cacheable', async () => {
-		const fakeWorkingStream: CompactWorkingStreamMetrics = {
-			total: 0,
-			working: 0,
-			rate: 0,
-			lastChecked: null,
-			failedServers: [],
-			lastError: null,
-			inProgress: false,
-			avgLatencyMs: null,
-			fastestServer: null,
-		};
-		const fakeStats: RealDebridObservabilityStats = {
-			totalTracked: 0,
-			successCount: 0,
-			failureCount: 0,
-			considered: 0,
-			successRate: 0,
-			lastTs: null,
-			isDown: false,
-			monitoredOperations: [],
-			byOperation: buildEmptyByOperation(),
-			windowSize: 0,
-			workingStream: fakeWorkingStream,
-		};
-		vi.spyOn(combined, 'getRealDebridObservabilityStatsFromDb').mockResolvedValue(fakeStats);
-		const setHeader = vi.fn();
-		const result = await getServerSideProps({
-			req: {} as any,
-			res: { setHeader } as any,
-			params: {},
-			query: {},
-			resolvedUrl: '/is-real-debrid-down-or-just-me',
-			locales: undefined,
-			locale: undefined,
-			defaultLocale: undefined,
-		} as any);
+	it('exports empty stats builder for test utilities', () => {
+		const stats = buildEmptyStats();
+		expect(stats.totalTracked).toBe(0);
+		expect(stats.workingStream.inProgress).toBe(false);
+	});
 
-		expect(setHeader).toHaveBeenCalledWith(
-			'Cache-Control',
-			'private, no-store, no-cache, must-revalidate'
-		);
-		expect(setHeader).toHaveBeenCalledWith('CDN-Cache-Control', 'no-store');
-		expect(setHeader).toHaveBeenCalledWith('Vercel-CDN-Cache-Control', 'no-store');
-		expect(setHeader).toHaveBeenCalledWith('Pragma', 'no-cache');
-		expect(setHeader).toHaveBeenCalledWith('Expires', '0');
-		expect(result).toEqual({ props: { stats: fakeStats } });
-		expect(fakeStats.workingStream.inProgress).toBe(false);
+	it('builds valid byOperation structure', () => {
+		const byOp = buildEmptyByOperation();
+		expect(Object.keys(byOp)).toHaveLength(6);
+		expect(byOp['GET /user'].operation).toBe('GET /user');
 	});
 });
