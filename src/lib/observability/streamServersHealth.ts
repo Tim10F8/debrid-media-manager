@@ -22,13 +22,13 @@ const NETWORK_TEST_LINKS = [
 	'https://real-debrid.com/d/UOQW5PEF24XWK',
 ];
 
-// Fallback path if unrestrict fails (e.g., no token available)
-const FALLBACK_TEST_PATH = '/speedtest/test.rar';
+// Fallback URL if unrestrict fails (e.g., no token available)
+const FALLBACK_TEST_URL = 'https://1.download.real-debrid.com/speedtest/test.rar';
 
-// Cached test URL path from unrestricted link
-let cachedTestPath: string | null = null;
-let cachedTestPathExpiry: number = 0;
-const TEST_PATH_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+// Cached unrestricted download URL
+let cachedTestUrl: string | null = null;
+let cachedTestUrlExpiry: number = 0;
+const TEST_URL_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 export interface WorkingStreamServerStatus {
 	id: string;
@@ -105,7 +105,7 @@ function generateServerHosts(): Array<{ id: string; host: string }> {
 
 /**
  * Attempts to unrestrict one of the network test links using the RD API.
- * Returns the download URL path if successful, null otherwise.
+ * Returns the full download URL if successful, null otherwise.
  */
 async function unrestrictNetworkTestLink(token: string): Promise<string | null> {
 	// Shuffle links randomly
@@ -145,10 +145,8 @@ async function unrestrictNetworkTestLink(token: string): Promise<string | null> 
 
 			const data = (await response.json()) as { download?: string };
 			if (data.download) {
-				// Extract path from download URL
-				const url = new URL(data.download);
-				console.log(`[StreamHealth] Unrestricted test link: ${url.pathname}`);
-				return url.pathname;
+				console.log(`[StreamHealth] Unrestricted test link: ${data.download}`);
+				return data.download;
 			}
 		} catch {
 			// Try next link
@@ -160,36 +158,37 @@ async function unrestrictNetworkTestLink(token: string): Promise<string | null> 
 }
 
 /**
- * Gets the test path to use for server testing.
- * Uses cached unrestricted path if available, otherwise falls back to speedtest.
+ * Gets the test URL to use for server testing.
+ * Uses cached unrestricted URL if available, otherwise falls back to speedtest.
  */
-async function getTestPath(token?: string): Promise<string> {
-	// Check if we have a valid cached path
-	if (cachedTestPath && Date.now() < cachedTestPathExpiry) {
-		return cachedTestPath;
+async function getTestUrl(token?: string): Promise<string> {
+	// Check if we have a valid cached URL
+	if (cachedTestUrl && Date.now() < cachedTestUrlExpiry) {
+		return cachedTestUrl;
 	}
 
 	// Try to unrestrict a new test link if we have a token
 	if (token) {
-		const newPath = await unrestrictNetworkTestLink(token);
-		if (newPath) {
-			cachedTestPath = newPath;
-			cachedTestPathExpiry = Date.now() + TEST_PATH_CACHE_TTL_MS;
-			return newPath;
+		const newUrl = await unrestrictNetworkTestLink(token);
+		if (newUrl) {
+			cachedTestUrl = newUrl;
+			cachedTestUrlExpiry = Date.now() + TEST_URL_CACHE_TTL_MS;
+			return newUrl;
 		}
 	}
 
-	// Fall back to speedtest path
-	return FALLBACK_TEST_PATH;
+	// Fall back to speedtest URL
+	return FALLBACK_TEST_URL;
 }
 
 /**
- * Builds a test URL for a given host and test path.
- * For unrestricted links, uses the path as-is.
- * For fallback speedtest, the path is already complete.
+ * Builds a test URL for a given host by replacing the hostname in the base URL.
+ * This preserves the full path and query parameters from the unrestricted link.
  */
-function buildTestUrl(host: string, testPath: string): string {
-	return `https://${host}${testPath}`;
+function buildTestUrl(host: string, baseTestUrl: string): string {
+	const url = new URL(baseTestUrl);
+	url.hostname = host;
+	return url.toString();
 }
 
 /**
@@ -233,7 +232,7 @@ async function hostExists(hostname: string): Promise<boolean> {
 }
 
 /**
- * Tests a single server's latency by making HEAD requests.
+ * Tests a single server's latency by making GET requests with Range header.
  * Makes multiple iterations and returns the average latency.
  * Returns null if the server doesn't exist (DNS resolution failure).
  *
@@ -248,7 +247,7 @@ async function hostExists(hostname: string): Promise<boolean> {
  */
 async function testServerLatency(
 	server: { id: string; host: string },
-	testPath: string
+	baseTestUrl: string
 ): Promise<WorkingStreamServerStatus | null> {
 	// Only check DNS existence for .com domains
 	// .cloud domains are behind Cloudflare which always resolves DNS
@@ -267,14 +266,20 @@ async function testServerLatency(
 	let lastError: string | null = null;
 
 	for (let i = 0; i < ITERATIONS_PER_SERVER; i++) {
-		const testUrl = buildTestUrl(server.host, testPath);
+		const testUrl = buildTestUrl(server.host, baseTestUrl);
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+		// Request a random single byte using Range header
+		const randomByte = Math.floor(Math.random() * 1000);
 
 		try {
 			const startTime = performance.now();
 			const response = await fetch(testUrl, {
-				method: 'HEAD',
+				method: 'GET',
+				headers: {
+					Range: `bytes=${randomByte}-${randomByte}`,
+				},
 				signal: controller.signal,
 			});
 			const endTime = performance.now();
@@ -285,13 +290,11 @@ async function testServerLatency(
 			const header = response.headers.get('content-length');
 			lastContentLength = header ? Number(header) : null;
 
-			if (response.status === 200) {
-				if (lastContentLength !== null && lastContentLength > 0) {
-					totalLatencyMs += endTime - startTime;
-					successfulIterations++;
-				} else {
-					lastError = 'Missing or invalid Content-Length';
-				}
+			// 206 Partial Content is the expected response for Range requests
+			// 200 OK is also acceptable (server may ignore Range header)
+			if (response.status === 206 || response.status === 200) {
+				totalLatencyMs += endTime - startTime;
+				successfulIterations++;
 			} else {
 				lastError = `HTTP ${response.status}`;
 			}
@@ -316,7 +319,7 @@ async function testServerLatency(
 
 	return {
 		id: server.id,
-		url: `https://${server.host}${testPath}`,
+		url: buildTestUrl(server.host, baseTestUrl),
 		status: lastStatus,
 		contentLength: lastContentLength,
 		ok,
@@ -334,9 +337,9 @@ async function testServerLatency(
  * @param rdToken - Optional RD token to unrestrict test links (for more realistic testing)
  */
 async function inspectServers(rdToken?: string): Promise<WorkingStreamServerStatus[]> {
-	// Get the test path (unrestricted if token available, fallback to speedtest)
-	const testPath = await getTestPath(rdToken);
-	console.log(`[StreamHealth] Using test path: ${testPath}`);
+	// Get the test URL (unrestricted if token available, fallback to speedtest)
+	const baseTestUrl = await getTestUrl(rdToken);
+	console.log(`[StreamHealth] Using test URL: ${baseTestUrl}`);
 
 	const servers = generateServerHosts();
 	const results: WorkingStreamServerStatus[] = [];
@@ -348,7 +351,7 @@ async function inspectServers(rdToken?: string): Promise<WorkingStreamServerStat
 		while (index < servers.length) {
 			const currentIndex = index++;
 			const server = servers[currentIndex];
-			const result = await testServerLatency(server, testPath);
+			const result = await testServerLatency(server, baseTestUrl);
 			// Only include servers that exist (non-null result)
 			if (result !== null) {
 				results.push(result);

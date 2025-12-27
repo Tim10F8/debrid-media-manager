@@ -39,6 +39,11 @@ function mockResponse(status: number, headers: MockHeaders = {}) {
 	} as unknown as Response;
 }
 
+// 206 Partial Content is the expected response for Range requests
+function mockPartialContentResponse(headers: MockHeaders = {}) {
+	return mockResponse(206, { 'content-length': '1', ...headers });
+}
+
 describe('streamServersHealth', () => {
 	let originalFetch: typeof fetch;
 
@@ -80,10 +85,8 @@ describe('streamServersHealth', () => {
 	});
 
 	it('reports working stream percentage after a run', async () => {
-		// All requests succeed
-		const fetchMock = vi
-			.fn()
-			.mockResolvedValue(mockResponse(200, { 'content-length': '1024' }));
+		// All requests succeed with 206 Partial Content (Range request response)
+		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		const metrics = await __testing.runNow();
@@ -97,8 +100,8 @@ describe('streamServersHealth', () => {
 		expect(metrics.statuses).toHaveLength(360);
 	});
 
-	it('uses correct test path in URLs', async () => {
-		const fetchMock = vi.fn().mockResolvedValue(mockResponse(200, { 'content-length': '512' }));
+	it('uses correct test URL format', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		await __testing.runNow();
@@ -110,7 +113,7 @@ describe('streamServersHealth', () => {
 		// Filter to only speedtest URLs (exclude host existence check URLs)
 		const speedtestUrls = requestedUrls.filter((url) => url.includes('/speedtest/'));
 
-		// Speedtest URLs should contain /speedtest/test.rar path
+		// Speedtest URLs should contain /speedtest/test.rar path (fallback when no token)
 		speedtestUrls.slice(0, 10).forEach((url) => {
 			expect(url).toContain('/speedtest/test.rar');
 		});
@@ -118,11 +121,11 @@ describe('streamServersHealth', () => {
 
 	it('measures latency and reports fastest server', async () => {
 		let callOrder = 0;
-		const fetchMock = vi.fn(async (url: string) => {
+		const fetchMock = vi.fn(async () => {
 			callOrder++;
 			// Simulate different latencies by varying response time
 			await new Promise((resolve) => setTimeout(resolve, callOrder % 5));
-			return mockResponse(200, { 'content-length': '1024' });
+			return mockPartialContentResponse();
 		});
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
@@ -135,9 +138,7 @@ describe('streamServersHealth', () => {
 	});
 
 	it('connects working stream metrics to getStats', async () => {
-		const fetchMock = vi
-			.fn()
-			.mockResolvedValue(mockResponse(200, { 'content-length': '2048' }));
+		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		await __testing.runNow();
@@ -152,13 +153,11 @@ describe('streamServersHealth', () => {
 	});
 
 	it('sorts servers by latency (fastest first)', async () => {
-		let callIndex = 0;
 		const fetchMock = vi.fn(async (url: string) => {
-			callIndex++;
 			// Make some servers faster than others based on their number
 			const serverNum = parseInt(url.match(/\/(\d+)[\.-]/)?.[1] ?? '0');
 			await new Promise((resolve) => setTimeout(resolve, serverNum % 10));
-			return mockResponse(200, { 'content-length': '1024' });
+			return mockPartialContentResponse();
 		});
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
