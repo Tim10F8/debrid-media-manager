@@ -1,6 +1,7 @@
 // Stream server health check module using zurg-style network testing.
 // Tests Real-Debrid download servers 1-120 on both domains with latency measurement.
 // Persists results to MySQL for cross-replica consistency.
+// Uses actual unrestricted RD links for testing (like zurg does).
 
 import { repository } from '@/services/repository';
 
@@ -11,7 +12,23 @@ const REQUEST_TIMEOUT_MS = 5000;
 const ITERATIONS_PER_SERVER = 3;
 const MAX_SERVER_NUMBER = 120;
 const DOMAINS = ['download.real-debrid.com', 'download.real-debrid.cloud'] as const;
-const TEST_PATH = '/speedtest/test.rar';
+
+// Hardcoded Real-Debrid links used for network testing (same as zurg)
+// One of these is unrestricted to get a real download URL for testing
+const NETWORK_TEST_LINKS = [
+	'https://real-debrid.com/d/4LCJSAEO65WUG',
+	'https://real-debrid.com/d/YC6KPSGW566IY',
+	'https://real-debrid.com/d/B6MJ4JMWKZLHA',
+	'https://real-debrid.com/d/UOQW5PEF24XWK',
+];
+
+// Fallback path if unrestrict fails (e.g., no token available)
+const FALLBACK_TEST_PATH = '/speedtest/test.rar';
+
+// Cached test URL path from unrestricted link
+let cachedTestPath: string | null = null;
+let cachedTestPathExpiry: number = 0;
+const TEST_PATH_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 export interface WorkingStreamServerStatus {
 	id: string;
@@ -87,11 +104,91 @@ function generateServerHosts(): Array<{ id: string; host: string }> {
 }
 
 /**
+ * Attempts to unrestrict one of the network test links using the RD API.
+ * Returns the download URL path if successful, null otherwise.
+ */
+async function unrestrictNetworkTestLink(token: string): Promise<string | null> {
+	// Shuffle links randomly
+	const links = [...NETWORK_TEST_LINKS].sort(() => Math.random() - 0.5);
+
+	for (const testLink of links) {
+		try {
+			// Extract download code (truncate to 13 chars like zurg does)
+			const code = testLink.replace('https://real-debrid.com/d/', '').slice(0, 13);
+			const link = `https://real-debrid.com/d/${code}`;
+
+			// Generate random 5-digit password
+			const password = String(Math.floor(Math.random() * 90000) + 10000);
+
+			const formData = new URLSearchParams();
+			formData.set('link', link);
+			formData.set('password', password);
+
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+			const response = await fetch('https://api.real-debrid.com/rest/1.0/unrestrict/link', {
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${token}`,
+					'Content-Type': 'application/x-www-form-urlencoded',
+				},
+				body: formData.toString(),
+				signal: controller.signal,
+			});
+
+			clearTimeout(timeoutId);
+
+			if (!response.ok) {
+				continue;
+			}
+
+			const data = (await response.json()) as { download?: string };
+			if (data.download) {
+				// Extract path from download URL
+				const url = new URL(data.download);
+				console.log(`[StreamHealth] Unrestricted test link: ${url.pathname}`);
+				return url.pathname;
+			}
+		} catch {
+			// Try next link
+			continue;
+		}
+	}
+
+	return null;
+}
+
+/**
+ * Gets the test path to use for server testing.
+ * Uses cached unrestricted path if available, otherwise falls back to speedtest.
+ */
+async function getTestPath(token?: string): Promise<string> {
+	// Check if we have a valid cached path
+	if (cachedTestPath && Date.now() < cachedTestPathExpiry) {
+		return cachedTestPath;
+	}
+
+	// Try to unrestrict a new test link if we have a token
+	if (token) {
+		const newPath = await unrestrictNetworkTestLink(token);
+		if (newPath) {
+			cachedTestPath = newPath;
+			cachedTestPathExpiry = Date.now() + TEST_PATH_CACHE_TTL_MS;
+			return newPath;
+		}
+	}
+
+	// Fall back to speedtest path
+	return FALLBACK_TEST_PATH;
+}
+
+/**
  * Builds a test URL with a random cache buster like zurg does.
  */
-function buildTestUrl(host: string): string {
+function buildTestUrl(host: string, testPath: string): string {
 	const randomFloat = Math.random();
-	return `https://${host}${TEST_PATH}/${randomFloat}`;
+	return `https://${host}${testPath}/${randomFloat}`;
 }
 
 /**
@@ -148,10 +245,10 @@ async function hostExists(hostname: string): Promise<boolean> {
  * The .download.real-debrid.cloud domains are behind Cloudflare which always resolves
  * DNS but returns HTTP errors for non-existent hosts - those are counted as failures.
  */
-async function testServerLatency(server: {
-	id: string;
-	host: string;
-}): Promise<WorkingStreamServerStatus | null> {
+async function testServerLatency(
+	server: { id: string; host: string },
+	testPath: string
+): Promise<WorkingStreamServerStatus | null> {
 	// Only check DNS existence for .com domains
 	// .cloud domains are behind Cloudflare which always resolves DNS
 	if (server.host.endsWith('.download.real-debrid.com')) {
@@ -169,7 +266,7 @@ async function testServerLatency(server: {
 	let lastError: string | null = null;
 
 	for (let i = 0; i < ITERATIONS_PER_SERVER; i++) {
-		const testUrl = buildTestUrl(server.host);
+		const testUrl = buildTestUrl(server.host, testPath);
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -218,7 +315,7 @@ async function testServerLatency(server: {
 
 	return {
 		id: server.id,
-		url: `https://${server.host}${TEST_PATH}`,
+		url: `https://${server.host}${testPath}`,
 		status: lastStatus,
 		contentLength: lastContentLength,
 		ok,
@@ -232,8 +329,14 @@ async function testServerLatency(server: {
  * Runs the network test against all Real-Debrid download servers.
  * Tests servers in parallel with a limited concurrency pool.
  * Servers that don't exist (DNS failure) are excluded from results.
+ *
+ * @param rdToken - Optional RD token to unrestrict test links (for more realistic testing)
  */
-async function inspectServers(): Promise<WorkingStreamServerStatus[]> {
+async function inspectServers(rdToken?: string): Promise<WorkingStreamServerStatus[]> {
+	// Get the test path (unrestricted if token available, fallback to speedtest)
+	const testPath = await getTestPath(rdToken);
+	console.log(`[StreamHealth] Using test path: ${testPath}`);
+
 	const servers = generateServerHosts();
 	const results: WorkingStreamServerStatus[] = [];
 
@@ -244,7 +347,7 @@ async function inspectServers(): Promise<WorkingStreamServerStatus[]> {
 		while (index < servers.length) {
 			const currentIndex = index++;
 			const server = servers[currentIndex];
-			const result = await testServerLatency(server);
+			const result = await testServerLatency(server, testPath);
 			// Only include servers that exist (non-null result)
 			if (result !== null) {
 				results.push(result);
@@ -315,7 +418,9 @@ function executeCheck(state: StreamHealthState): Promise<void> {
 	const promise = (async () => {
 		state.metrics.inProgress = true;
 		try {
-			const statuses = await inspectServers();
+			// Get RD token from environment if available for more realistic testing
+			const rdToken = process.env.RD_ACCESS_TOKEN || undefined;
+			const statuses = await inspectServers(rdToken);
 			const workingServers = statuses.filter((status) => status.ok);
 			const working = workingServers.length;
 
