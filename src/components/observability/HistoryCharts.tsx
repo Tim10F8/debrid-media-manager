@@ -378,12 +378,12 @@ export function HistoryCharts() {
 										>
 											<stop
 												offset="5%"
-												stopColor="#0ea5e9"
+												stopColor="#10b981"
 												stopOpacity={0.3}
 											/>
 											<stop
 												offset="95%"
-												stopColor="#0ea5e9"
+												stopColor="#10b981"
 												stopOpacity={0}
 											/>
 										</linearGradient>
@@ -418,7 +418,7 @@ export function HistoryCharts() {
 									<Area
 										type="monotone"
 										dataKey="workingRate"
-										stroke="#0ea5e9"
+										stroke="#10b981"
 										fill="url(#streamGradient)"
 										strokeWidth={2}
 									/>
@@ -464,9 +464,9 @@ export function HistoryCharts() {
 										<td className="py-2 text-right">
 											<span
 												className={
-													server.reliability >= 0.95
+													server.reliability >= 0.9
 														? 'text-emerald-400'
-														: server.reliability >= 0.8
+														: server.reliability >= 0.6
 															? 'text-amber-400'
 															: 'text-rose-400'
 												}

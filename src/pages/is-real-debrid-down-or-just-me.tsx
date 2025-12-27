@@ -142,8 +142,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 	const lastUpdated = stats.lastTs ? new Date(stats.lastTs) : null;
 	const lastUpdatedIso = lastUpdated ? lastUpdated.toISOString() : null;
 	const trackingWindowLabel = formatNumber(stats.windowSize);
-	const monitoredSummary =
-		'Real-Debrid account, torrent management, and unrestrict endpoints';
+	const monitoredSummary = 'Real-Debrid account, torrent management, and unrestrict endpoints';
 	const description = stats.considered
 		? `Live Real-Debrid availability across account, torrent, and unrestrict endpoints based on the last ${trackingWindowLabel} proxy responses.`
 		: 'Live Real-Debrid availability dashboard covering account, torrent, and unrestrict endpoints.';
@@ -217,6 +216,15 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 			: 'Elevated failure rate detected across the tracked operations.'
 		: 'Collecting the first sample of Real-Debrid requests.';
 
+	// Graduated meter color for success rate card (matches operationHealthMeta thresholds)
+	const successRateMeterClass = !stats.considered
+		? 'bg-slate-400'
+		: stats.successRate >= 0.9
+			? 'bg-emerald-400'
+			: stats.successRate >= 0.6
+				? 'bg-amber-400'
+				: 'bg-rose-500';
+
 	const summaryMetrics: Array<{
 		label: string;
 		value: string;
@@ -232,20 +240,21 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 		{
 			label: '2xx / 5xx responses',
 			value: `${formatNumber(stats.successCount)} / ${formatNumber(stats.failureCount)}`,
-			helper:
-				'Successful proxy calls to Real-Debrid vs upstream failures surfaced recently.',
+			helper: 'Successful proxy calls to Real-Debrid vs upstream failures surfaced recently.',
 			icon: CheckCircle2,
 		},
 	];
 	const unrestrictStats = stats.byOperation['POST /unrestrict/link'];
-	const unrestrictSuccessPct =
-		unrestrictStats?.considered ? Math.round(unrestrictStats.successRate * 100) : null;
+	const unrestrictSuccessPct = unrestrictStats?.considered
+		? Math.round(unrestrictStats.successRate * 100)
+		: null;
 	const unrestrictSummary = unrestrictStats?.considered
 		? `${formatNumber(unrestrictStats.successCount)}/${formatNumber(unrestrictStats.considered)} (2xx)`
 		: 'No samples yet.';
 	const addTorrentStats = stats.byOperation['POST /torrents/addMagnet'];
-	const addTorrentSuccessPct =
-		addTorrentStats?.considered ? Math.round(addTorrentStats.successRate * 100) : null;
+	const addTorrentSuccessPct = addTorrentStats?.considered
+		? Math.round(addTorrentStats.successRate * 100)
+		: null;
 	const addTorrentSummary = addTorrentStats?.considered
 		? `${formatNumber(addTorrentStats.successCount)}/${formatNumber(addTorrentStats.considered)} (2xx)`
 		: 'No samples yet.';
@@ -316,7 +325,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 			: workingStream.lastChecked
 				? workingStreamAvgLatency != null
 					? `Avg latency: ${workingStreamAvgLatency}ms across ${workingStream.working} servers.`
-					: 'Servers responding with HTTP 200 and Content-Length > 0.'
+					: 'Servers responding with HTTP 206 (partial content).'
 				: 'Testing 360 servers (1-120 on both RD domains)…'
 		: 'Stream availability monitor unavailable.';
 	const workingStreamLastCheckedLabel = workingStream?.lastChecked
@@ -445,7 +454,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 								</div>
 								<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-700/60">
 									<div
-										className={`h-full rounded-full ${statusMeta[state].meter}`}
+										className={`h-full rounded-full ${successRateMeterClass}`}
 										style={{
 											width: stats.considered ? `${successPct}%` : '12%',
 										}}

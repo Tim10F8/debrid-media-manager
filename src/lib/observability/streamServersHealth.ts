@@ -3,8 +3,8 @@
 // All data is stored in MySQL - no in-memory caching.
 // Uses actual unrestricted RD links for testing (like zurg does).
 
-import { repository } from '@/services/repository';
 import { unrestrictLink } from '@/services/realDebrid';
+import { repository } from '@/services/repository';
 
 const GLOBAL_KEY = '__DMM_STREAM_HEALTH_SCHEDULER__';
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
@@ -283,12 +283,14 @@ async function testServerLatency(
 			lastContentLength = header ? Number(header) : null;
 
 			// 206 Partial Content is the expected response for Range requests
-			// 200 OK is also acceptable (server may ignore Range header)
-			if (response.status === 206 || response.status === 200) {
+			if (response.status === 206) {
 				totalLatencyMs += endTime - startTime;
 				successfulIterations++;
 			} else {
-				lastError = `HTTP ${response.status}`;
+				lastError =
+					response.status === 200
+						? 'HTTP 200 (Range ignored)'
+						: `HTTP ${response.status}`;
 			}
 		} catch (error) {
 			clearTimeout(timeoutId);
