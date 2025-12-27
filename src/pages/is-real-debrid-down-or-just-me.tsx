@@ -1,17 +1,28 @@
-import type { LucideIcon } from 'lucide-react';
-import { Activity, AlertTriangle, CheckCircle2, Clock, History } from 'lucide-react';
-import type { GetServerSideProps, NextPage } from 'next';
-import Head from 'next/head';
-import { useEffect, useState } from 'react';
-
-import { HistoryCharts } from '@/components/observability/HistoryCharts';
-import { ServerStatusBreakdown } from '@/components/observability/ServerStatusBreakdown';
 import {
 	getRealDebridObservabilityStats,
 	getRealDebridObservabilityStatsFromDb,
 	type RealDebridObservabilityStats,
 } from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats } from '@/lib/observability/rdOperationalStats';
+import type { LucideIcon } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Clock, History } from 'lucide-react';
+import type { GetServerSideProps, NextPage } from 'next';
+import dynamic from 'next/dynamic';
+import Head from 'next/head';
+import { useEffect, useState } from 'react';
+
+// Dynamic imports with ssr: false to avoid Recharts SSR compatibility issues
+const HistoryCharts = dynamic(
+	() => import('@/components/observability/HistoryCharts').then((mod) => mod.HistoryCharts),
+	{ ssr: false }
+);
+const ServerStatusBreakdown = dynamic(
+	() =>
+		import('@/components/observability/ServerStatusBreakdown').then(
+			(mod) => mod.ServerStatusBreakdown
+		),
+	{ ssr: false }
+);
 
 // Use fixed locale to avoid hydration mismatches between server and client
 const FIXED_LOCALE = 'en-US';
