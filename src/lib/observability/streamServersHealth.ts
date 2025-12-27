@@ -95,13 +95,29 @@ function buildTestUrl(host: string): string {
 }
 
 /**
+ * Checks if an error indicates a DNS resolution failure (host doesn't exist).
+ * These servers should be excluded from results entirely.
+ */
+function isDnsError(error: Error): boolean {
+	const message = error.message.toLowerCase();
+	return (
+		message.includes('enotfound') ||
+		message.includes('eai_noname') ||
+		message.includes('getaddrinfo') ||
+		message.includes('unknown host') ||
+		message.includes('name or service not known')
+	);
+}
+
+/**
  * Tests a single server's latency by making HEAD requests.
  * Makes multiple iterations and returns the average latency.
+ * Returns null if the server doesn't exist (DNS resolution failure).
  */
 async function testServerLatency(server: {
 	id: string;
 	host: string;
-}): Promise<WorkingStreamServerStatus> {
+}): Promise<WorkingStreamServerStatus | null> {
 	const checkedAt = Date.now();
 	let totalLatencyMs = 0;
 	let successfulIterations = 0;
@@ -141,6 +157,10 @@ async function testServerLatency(server: {
 		} catch (error) {
 			clearTimeout(timeoutId);
 			if (error instanceof Error) {
+				// DNS resolution failure means the server doesn't exist - exclude it
+				if (isDnsError(error)) {
+					return null;
+				}
 				if (error.name === 'AbortError') {
 					lastError = 'Timeout';
 				} else {
@@ -172,6 +192,7 @@ async function testServerLatency(server: {
 /**
  * Runs the network test against all Real-Debrid download servers.
  * Tests servers in parallel with a limited concurrency pool.
+ * Servers that don't exist (DNS failure) are excluded from results.
  */
 async function inspectServers(): Promise<WorkingStreamServerStatus[]> {
 	const servers = generateServerHosts();
@@ -185,7 +206,10 @@ async function inspectServers(): Promise<WorkingStreamServerStatus[]> {
 			const currentIndex = index++;
 			const server = servers[currentIndex];
 			const result = await testServerLatency(server);
-			results.push(result);
+			// Only include servers that exist (non-null result)
+			if (result !== null) {
+				results.push(result);
+			}
 		}
 	}
 
