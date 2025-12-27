@@ -7,6 +7,7 @@ import {
 	Clock,
 	Link2,
 	Loader2,
+	PlusCircle,
 } from 'lucide-react';
 import type { NextPage } from 'next';
 import dynamic from 'next/dynamic';
@@ -229,16 +230,11 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 			icon: Activity,
 		},
 		{
-			label: '2xx responses',
-			value: formatNumber(stats.successCount),
-			helper: 'Successful proxy calls to Real-Debrid.',
+			label: '2xx / 5xx responses',
+			value: `${formatNumber(stats.successCount)} / ${formatNumber(stats.failureCount)}`,
+			helper:
+				'Successful proxy calls to Real-Debrid vs upstream failures surfaced recently.',
 			icon: CheckCircle2,
-		},
-		{
-			label: '5xx responses',
-			value: formatNumber(stats.failureCount),
-			helper: 'Upstream failures or proxy errors surfaced recently.',
-			icon: AlertTriangle,
 		},
 	];
 	const unrestrictStats = stats.byOperation['POST /unrestrict/link'];
@@ -247,6 +243,18 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 	const unrestrictSummary = unrestrictStats?.considered
 		? `${formatNumber(unrestrictStats.successCount)}/${formatNumber(unrestrictStats.considered)} (2xx)`
 		: 'No samples yet.';
+	const addTorrentStats = stats.byOperation['POST /torrents/addMagnet'];
+	const addTorrentSuccessPct =
+		addTorrentStats?.considered ? Math.round(addTorrentStats.successRate * 100) : null;
+	const addTorrentSummary = addTorrentStats?.considered
+		? `${formatNumber(addTorrentStats.successCount)}/${formatNumber(addTorrentStats.considered)} (2xx)`
+		: 'No samples yet.';
+	summaryMetrics.push({
+		label: 'Add torrent success rate',
+		value: addTorrentSuccessPct !== null ? `${addTorrentSuccessPct}%` : '—',
+		helper: addTorrentSummary,
+		icon: PlusCircle,
+	});
 	summaryMetrics.push({
 		label: 'Unrestrict success rate',
 		value: unrestrictSuccessPct !== null ? `${unrestrictSuccessPct}%` : '—',
@@ -453,13 +461,6 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 									<div className="text-xs font-medium uppercase tracking-wider text-slate-400">
 										Working Stream
 									</div>
-									{workingStreamHealth && !workingStream?.lastError ? (
-										<span
-											className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${workingStreamHealth.badge}`}
-										>
-											{workingStreamHealth.label}
-										</span>
-									) : null}
 								</div>
 								<div className="mt-2 flex items-baseline justify-between gap-2">
 									<span className="text-3xl font-semibold text-white">
