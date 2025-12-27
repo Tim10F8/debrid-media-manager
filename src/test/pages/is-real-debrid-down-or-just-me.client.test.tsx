@@ -1,9 +1,11 @@
 import { render, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { RealDebridObservabilityStats } from '@/lib/observability/getRealDebridObservabilityStats';
+import type {
+	CompactWorkingStreamMetrics,
+	RealDebridObservabilityStats,
+} from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats, RealDebridOperation } from '@/lib/observability/rdOperationalStats';
-import type { CompactWorkingStreamMetrics } from '@/lib/observability/streamServersHealth';
 import RealDebridStatusPage from '@/pages/is-real-debrid-down-or-just-me';
 
 const operations: RealDebridOperation[] = [

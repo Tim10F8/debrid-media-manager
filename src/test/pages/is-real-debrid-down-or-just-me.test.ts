@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type {
+	CompactWorkingStreamMetrics,
+	RealDebridObservabilityStats,
+} from '@/lib/observability/getRealDebridObservabilityStats';
 import * as combined from '@/lib/observability/getRealDebridObservabilityStats';
 import type { OperationStats, RealDebridOperation } from '@/lib/observability/rdOperationalStats';
-import type { CompactWorkingStreamMetrics } from '@/lib/observability/streamServersHealth';
 import { getServerSideProps } from '@/pages/is-real-debrid-down-or-just-me';
 
 const operations: RealDebridOperation[] = [
@@ -49,7 +52,7 @@ describe('Real-Debrid status page caching', () => {
 			avgLatencyMs: null,
 			fastestServer: null,
 		};
-		const fakeStats: ReturnType<typeof combined.getRealDebridObservabilityStats> = {
+		const fakeStats: RealDebridObservabilityStats = {
 			totalTracked: 0,
 			successCount: 0,
 			failureCount: 0,
@@ -63,7 +66,6 @@ describe('Real-Debrid status page caching', () => {
 			workingStream: fakeWorkingStream,
 		};
 		vi.spyOn(combined, 'getRealDebridObservabilityStatsFromDb').mockResolvedValue(fakeStats);
-		vi.spyOn(combined, 'getRealDebridObservabilityStats').mockReturnValue(fakeStats);
 		const setHeader = vi.fn();
 		const result = await getServerSideProps({
 			req: {} as any,

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getRealDebridObservabilityStats } from './getRealDebridObservabilityStats';
 import { __testing } from './streamServersHealth';
 
 // Mock the repository to prevent actual database calls
@@ -84,20 +83,19 @@ describe('streamServersHealth', () => {
 		expect(lastServer.host).toContain('120');
 	});
 
-	it('reports working stream percentage after a run', async () => {
+	it('persists results to database after a run', async () => {
+		const { repository } = await import('@/services/repository');
+
 		// All requests succeed with 206 Partial Content (Range request response)
 		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-		const metrics = await __testing.runNow();
+		await __testing.runNow();
 
-		// 360 servers * 3 iterations each = 1080 calls
-		expect(fetchMock).toHaveBeenCalled();
-		expect(metrics.total).toBe(360);
-		expect(metrics.working).toBe(360);
-		expect(metrics.rate).toBe(1);
-		expect(metrics.lastError).toBeNull();
-		expect(metrics.statuses).toHaveLength(360);
+		// Should have called upsertStreamHealthResults
+		expect(repository.upsertStreamHealthResults).toHaveBeenCalled();
+		expect(repository.recordStreamHealthSnapshot).toHaveBeenCalled();
+		expect(repository.recordServerReliability).toHaveBeenCalled();
 	});
 
 	it('uses correct test URL format', async () => {
@@ -119,63 +117,9 @@ describe('streamServersHealth', () => {
 		});
 	});
 
-	it('measures latency and reports fastest server', async () => {
-		let callOrder = 0;
-		const fetchMock = vi.fn(async () => {
-			callOrder++;
-			// Simulate different latencies by varying response time
-			await new Promise((resolve) => setTimeout(resolve, callOrder % 5));
-			return mockPartialContentResponse();
-		});
-		globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-		const metrics = await __testing.runNow();
-
-		expect(metrics.avgLatencyMs).not.toBeNull();
-		expect(metrics.avgLatencyMs).toBeGreaterThan(0);
-		expect(metrics.fastestServer).not.toBeNull();
-		expect(typeof metrics.fastestServer).toBe('string');
-	});
-
-	it('connects working stream metrics to getStats', async () => {
-		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
-		globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-		await __testing.runNow();
-		const stats = getRealDebridObservabilityStats();
-
-		expect(stats.workingStream.total).toBe(360);
-		expect(stats.workingStream.working).toBe(360);
-		expect(stats.workingStream.rate).toBe(1);
-		expect(stats.workingStream.lastError).toBeNull();
-		expect(stats.workingStream.avgLatencyMs).not.toBeNull();
-		expect(stats.workingStream.fastestServer).not.toBeNull();
-	});
-
-	it('sorts servers by latency (fastest first)', async () => {
-		const fetchMock = vi.fn(async (url: string) => {
-			// Make some servers faster than others based on their number
-			const serverNum = parseInt(url.match(/\/(\d+)[\.-]/)?.[1] ?? '0');
-			await new Promise((resolve) => setTimeout(resolve, serverNum % 10));
-			return mockPartialContentResponse();
-		});
-		globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-		const metrics = await __testing.runNow();
-
-		// Working servers should be first
-		const workingServers = metrics.statuses.filter((s) => s.ok);
-		expect(workingServers.length).toBe(metrics.working);
-
-		// Latencies should be in ascending order for working servers
-		for (let i = 1; i < workingServers.length; i++) {
-			expect(workingServers[i].latencyMs).toBeGreaterThanOrEqual(
-				workingServers[i - 1].latencyMs ?? 0
-			);
-		}
-	});
-
 	it('handles timeout errors gracefully', async () => {
+		const { repository } = await import('@/services/repository');
+
 		const fetchMock = vi.fn(async () => {
 			// Simulate a timeout by aborting
 			const error = new Error('The operation was aborted');
@@ -184,24 +128,23 @@ describe('streamServersHealth', () => {
 		});
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-		const metrics = await __testing.runNow();
+		await __testing.runNow();
 
-		expect(metrics.working).toBe(0);
-		expect(metrics.rate).toBe(0);
-		// All statuses should have a Timeout error
-		expect(metrics.statuses.every((s) => s.error === 'Timeout')).toBe(true);
+		// Should still persist results (all failures)
+		expect(repository.upsertStreamHealthResults).toHaveBeenCalled();
 	});
 
 	it('handles network errors gracefully', async () => {
+		const { repository } = await import('@/services/repository');
+
 		const fetchMock = vi.fn(async () => {
 			throw new Error('Network error');
 		});
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-		const metrics = await __testing.runNow();
+		await __testing.runNow();
 
-		expect(metrics.working).toBe(0);
-		expect(metrics.rate).toBe(0);
-		expect(metrics.statuses.every((s) => s.error === 'Network error')).toBe(true);
+		// Should still persist results (all failures)
+		expect(repository.upsertStreamHealthResults).toHaveBeenCalled();
 	});
 });

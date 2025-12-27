@@ -1,5 +1,4 @@
 import {
-	getRealDebridObservabilityStats,
 	getRealDebridObservabilityStatsFromDb,
 	type RealDebridObservabilityStats,
 } from '@/lib/observability/getRealDebridObservabilityStats';
@@ -77,14 +76,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async ({ res }) => 
 	res.setHeader('Expires', '0');
 
 	// Use DB-backed stats for cross-replica consistency
-	// Fall back to in-memory stats if DB read fails
-	let stats: RealDebridObservabilityStats;
-	try {
-		stats = await getRealDebridObservabilityStatsFromDb();
-	} catch (error) {
-		console.error('Failed to get stats from DB, using in-memory:', error);
-		stats = getRealDebridObservabilityStats();
-	}
+	const stats = await getRealDebridObservabilityStatsFromDb();
 	return { props: { stats } };
 };
 

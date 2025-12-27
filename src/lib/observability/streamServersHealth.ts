@@ -1,11 +1,11 @@
 // Stream server health check module using zurg-style network testing.
 // Tests Real-Debrid download servers 1-120 on both domains with latency measurement.
-// Persists results to MySQL for cross-replica consistency.
+// All data is stored in MySQL - no in-memory caching.
 // Uses actual unrestricted RD links for testing (like zurg does).
 
 import { repository } from '@/services/repository';
 
-const GLOBAL_KEY = '__DMM_STREAM_HEALTH__';
+const GLOBAL_KEY = '__DMM_STREAM_HEALTH_SCHEDULER__';
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_CONCURRENT_REQUESTS = 8;
 const REQUEST_TIMEOUT_MS = 5000;
@@ -25,7 +25,7 @@ const NETWORK_TEST_LINKS = [
 // Fallback URL if unrestrict fails (e.g., no token available)
 const FALLBACK_TEST_URL = 'https://1.download.real-debrid.com/speedtest/test.rar';
 
-// Cached unrestricted download URL
+// Cached unrestricted download URL (only cache needed for unrestrict)
 let cachedTestUrl: string | null = null;
 let cachedTestUrlExpiry: number = 0;
 const TEST_URL_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -41,43 +41,19 @@ export interface WorkingStreamServerStatus {
 	latencyMs: number | null;
 }
 
-interface WorkingStreamMetricsInternal {
-	total: number;
-	working: number;
-	rate: number;
-	lastChecked: number | null;
-	statuses: WorkingStreamServerStatus[];
-	lastError: string | null;
-	inProgress: boolean;
-	avgLatencyMs: number | null;
-	fastestServer: string | null;
-}
-
-interface StreamHealthState {
-	metrics: WorkingStreamMetricsInternal;
+interface SchedulerState {
 	interval?: NodeJS.Timeout;
 	runPromise: Promise<void> | null;
+	inProgress: boolean;
 }
 
-type StreamHealthGlobalKey = typeof GLOBAL_KEY;
-type StreamHealthGlobal = typeof globalThis & {
-	[K in StreamHealthGlobalKey]?: StreamHealthState;
+type SchedulerGlobalKey = typeof GLOBAL_KEY;
+type SchedulerGlobal = typeof globalThis & {
+	[K in SchedulerGlobalKey]?: SchedulerState;
 };
 
-function getGlobalStore(): StreamHealthGlobal {
-	return globalThis as StreamHealthGlobal;
-}
-
-export interface WorkingStreamMetrics {
-	total: number;
-	working: number;
-	rate: number;
-	lastChecked: number | null;
-	statuses: WorkingStreamServerStatus[];
-	lastError: string | null;
-	inProgress: boolean;
-	avgLatencyMs: number | null;
-	fastestServer: string | null;
+function getGlobalStore(): SchedulerGlobal {
+	return globalThis as SchedulerGlobal;
 }
 
 /**
@@ -379,30 +355,19 @@ async function inspectServers(rdToken?: string): Promise<WorkingStreamServerStat
 	return results;
 }
 
-function getStore(): StreamHealthState {
+function getScheduler(): SchedulerState {
 	const g = getGlobalStore();
 	if (!g[GLOBAL_KEY]) {
-		const metrics: WorkingStreamMetricsInternal = {
-			total: 0,
-			working: 0,
-			rate: 0,
-			lastChecked: null,
-			statuses: [],
-			lastError: null,
-			inProgress: false,
-			avgLatencyMs: null,
-			fastestServer: null,
-		};
 		g[GLOBAL_KEY] = {
-			metrics,
 			runPromise: null,
+			inProgress: false,
 		};
 		scheduleJobs(g[GLOBAL_KEY]!);
 	}
 	return g[GLOBAL_KEY]!;
 }
 
-function scheduleJobs(state: StreamHealthState) {
+function scheduleJobs(state: SchedulerState) {
 	const run = () => {
 		const promise = executeCheck(state);
 		promise.catch(() => {});
@@ -415,12 +380,12 @@ function scheduleJobs(state: StreamHealthState) {
 	}
 }
 
-function executeCheck(state: StreamHealthState): Promise<void> {
+async function executeCheck(state: SchedulerState): Promise<void> {
 	if (state.runPromise) {
 		return state.runPromise;
 	}
 	const promise = (async () => {
-		state.metrics.inProgress = true;
+		state.inProgress = true;
 		try {
 			// Get RD token from environment if available for more realistic testing
 			const rdToken = process.env.RD_ACCESS_TOKEN || undefined;
@@ -438,16 +403,7 @@ function executeCheck(state: StreamHealthState): Promise<void> {
 			// Get fastest server
 			const fastestServer = workingServers[0]?.id ?? null;
 
-			state.metrics.statuses = statuses;
-			state.metrics.total = statuses.length;
-			state.metrics.working = working;
-			state.metrics.rate = statuses.length > 0 ? working / statuses.length : 0;
-			state.metrics.lastChecked = Date.now();
-			state.metrics.lastError = null;
-			state.metrics.avgLatencyMs = avgLatencyMs;
-			state.metrics.fastestServer = fastestServer;
-
-			// Persist to MySQL for cross-replica consistency (fire-and-forget)
+			// Persist to MySQL
 			const dbResults = statuses.map((s) => ({
 				host: s.id,
 				status: s.status,
@@ -456,11 +412,9 @@ function executeCheck(state: StreamHealthState): Promise<void> {
 				error: s.error,
 				checkedAt: new Date(s.checkedAt),
 			}));
-			repository.upsertStreamHealthResults(dbResults).catch((error) => {
-				console.error('Failed to persist stream health to MySQL:', error);
-			});
+			await repository.upsertStreamHealthResults(dbResults);
 
-			// Record to history for 90-day tracking (fire-and-forget)
+			// Record to history for 90-day tracking
 			const failedServers = statuses.filter((s) => !s.ok).map((s) => s.id);
 			const minLatencyMs =
 				workingServers.length > 0
@@ -471,52 +425,40 @@ function executeCheck(state: StreamHealthState): Promise<void> {
 					? Math.max(...workingServers.map((s) => s.latencyMs ?? 0))
 					: null;
 
-			repository
-				.recordStreamHealthSnapshot({
-					totalServers: statuses.length,
-					workingServers: working,
-					avgLatencyMs,
-					minLatencyMs: minLatencyMs === Infinity ? null : minLatencyMs,
-					maxLatencyMs,
-					fastestServer,
-					failedServers,
-				})
-				.catch((error) => {
-					console.error('Failed to record stream health snapshot:', error);
-				});
+			await repository.recordStreamHealthSnapshot({
+				totalServers: statuses.length,
+				workingServers: working,
+				avgLatencyMs,
+				minLatencyMs: minLatencyMs === Infinity ? null : minLatencyMs,
+				maxLatencyMs,
+				fastestServer,
+				failedServers,
+			});
 
-			// Record per-server reliability (fire-and-forget)
-			repository
-				.recordServerReliability(
-					statuses.map((s) => ({
-						host: s.id,
-						ok: s.ok,
-						latencyMs: s.latencyMs,
-					}))
-				)
-				.catch((error) => {
-					console.error('Failed to record server reliability:', error);
-				});
+			// Record per-server reliability
+			await repository.recordServerReliability(
+				statuses.map((s) => ({
+					host: s.id,
+					ok: s.ok,
+					latencyMs: s.latencyMs,
+				}))
+			);
+
+			console.log(
+				`[StreamHealth] Check complete: ${working}/${statuses.length} servers working`
+			);
 		} catch (error) {
-			state.metrics.statuses = [];
-			state.metrics.total = 0;
-			state.metrics.working = 0;
-			state.metrics.rate = 0;
-			state.metrics.lastChecked = Date.now();
-			state.metrics.lastError =
-				error instanceof Error ? error.message : 'Failed to evaluate stream servers';
-			state.metrics.avgLatencyMs = null;
-			state.metrics.fastestServer = null;
+			console.error('[StreamHealth] Check failed:', error);
 		}
 	})().finally(() => {
-		state.metrics.inProgress = false;
+		state.inProgress = false;
 		state.runPromise = null;
 	});
 	state.runPromise = promise;
 	return promise;
 }
 
-function clearState() {
+function clearScheduler() {
 	const g = getGlobalStore();
 	const current = g[GLOBAL_KEY];
 	if (current?.interval) {
@@ -525,60 +467,28 @@ function clearState() {
 	g[GLOBAL_KEY] = undefined;
 }
 
-export function getWorkingStreamMetrics(): WorkingStreamMetrics {
-	const state = getStore();
-	return {
-		total: state.metrics.total,
-		working: state.metrics.working,
-		rate: state.metrics.rate,
-		lastChecked: state.metrics.lastChecked,
-		statuses: state.metrics.statuses.map((status) => ({ ...status })),
-		lastError: state.metrics.lastError,
-		inProgress: state.metrics.inProgress,
-		avgLatencyMs: state.metrics.avgLatencyMs,
-		fastestServer: state.metrics.fastestServer,
-	};
-}
-
-export interface CompactWorkingStreamMetrics {
-	total: number;
-	working: number;
-	rate: number;
-	lastChecked: number | null;
-	failedServers: string[];
-	lastError: string | null;
-	inProgress: boolean;
-	avgLatencyMs: number | null;
-	fastestServer: string | null;
-}
-
-export function getCompactWorkingStreamMetrics(): CompactWorkingStreamMetrics {
-	const state = getStore();
-	const failedServers = state.metrics.statuses
-		.filter((status) => !status.ok)
-		.map((status) => status.id);
-
-	return {
-		total: state.metrics.total,
-		working: state.metrics.working,
-		rate: state.metrics.rate,
-		lastChecked: state.metrics.lastChecked,
-		failedServers,
-		lastError: state.metrics.lastError,
-		inProgress: state.metrics.inProgress,
-		avgLatencyMs: state.metrics.avgLatencyMs,
-		fastestServer: state.metrics.fastestServer,
-	};
+/**
+ * Ensures the stream health check scheduler is running.
+ * Call this on app startup or when the API is first accessed.
+ */
+export function ensureStreamHealthScheduler(): void {
+	getScheduler();
 }
 
 /**
- * Gets stream health metrics from MySQL database for cross-replica consistency.
- * Use this for the API endpoint to get consolidated stats from all replicas.
- * Also ensures the health check is scheduled (side effect).
+ * Checks if a health check is currently in progress.
  */
-export function getStreamMetricsFromDb() {
-	// Ensure health check is scheduled on this replica
-	getStore();
+export function isHealthCheckInProgress(): boolean {
+	const g = getGlobalStore();
+	return g[GLOBAL_KEY]?.inProgress ?? false;
+}
+
+/**
+ * Gets stream health metrics from MySQL database.
+ * Also ensures the health check scheduler is running.
+ */
+export async function getStreamMetricsFromDb() {
+	ensureStreamHealthScheduler();
 	return repository.getStreamHealthMetrics();
 }
 
@@ -591,14 +501,15 @@ export function getStreamStatusesFromDb() {
 
 export const __testing = {
 	reset() {
-		clearState();
+		clearScheduler();
+		cachedTestUrl = null;
+		cachedTestUrlExpiry = 0;
 	},
 	async runNow() {
-		const state = getStore();
+		const state = getScheduler();
 		await executeCheck(state);
-		return getWorkingStreamMetrics();
+		return repository.getStreamHealthMetrics();
 	},
-	// Expose for testing: generate server list without running tests
 	getServerList() {
 		return generateServerHosts();
 	},

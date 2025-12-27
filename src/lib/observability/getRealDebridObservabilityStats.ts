@@ -1,11 +1,19 @@
 import { repository } from '@/services/repository';
 
-import { getStats, type OperationStats, type RealDebridOperation } from './rdOperationalStats';
-import {
-	getCompactWorkingStreamMetrics,
-	getStreamMetricsFromDb,
-	type CompactWorkingStreamMetrics,
-} from './streamServersHealth';
+import { type OperationStats, type RealDebridOperation } from './rdOperationalStats';
+import { getStreamMetricsFromDb, isHealthCheckInProgress } from './streamServersHealth';
+
+export interface CompactWorkingStreamMetrics {
+	total: number;
+	working: number;
+	rate: number;
+	lastChecked: number | null;
+	failedServers: string[];
+	lastError: string | null;
+	inProgress: boolean;
+	avgLatencyMs: number | null;
+	fastestServer: string | null;
+}
 
 export interface RealDebridObservabilityStats {
 	totalTracked: number;
@@ -19,33 +27,6 @@ export interface RealDebridObservabilityStats {
 	byOperation: Record<RealDebridOperation, OperationStats>;
 	windowSize: number;
 	workingStream: CompactWorkingStreamMetrics;
-}
-
-function computeFullStats(): RealDebridObservabilityStats {
-	const core = getStats();
-	const workingStream = getCompactWorkingStreamMetrics();
-
-	return {
-		totalTracked: core.totalTracked,
-		successCount: core.successCount,
-		failureCount: core.failureCount,
-		considered: core.considered,
-		successRate: core.successRate,
-		lastTs: core.lastTs,
-		isDown: core.isDown,
-		monitoredOperations: core.monitoredOperations,
-		byOperation: core.byOperation,
-		windowSize: core.windowSize,
-		workingStream,
-	};
-}
-
-/**
- * Gets Real-Debrid observability stats from in-memory state.
- * This is useful for local/quick reads but may not reflect all replicas.
- */
-export function getRealDebridObservabilityStats(): RealDebridObservabilityStats {
-	return computeFullStats();
 }
 
 /**
@@ -76,12 +57,15 @@ export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebri
 			lastChecked: streamMetrics.lastChecked,
 			failedServers: streamMetrics.failedServers,
 			lastError: null,
-			inProgress: false,
+			inProgress: isHealthCheckInProgress(),
 			avgLatencyMs: streamMetrics.avgLatencyMs,
 			fastestServer: streamMetrics.fastestServer,
 		},
 	};
 }
+
+// Alias for backward compatibility
+export const getRealDebridObservabilityStats = getRealDebridObservabilityStatsFromDb;
 
 export const __testing = {
 	resetState() {
