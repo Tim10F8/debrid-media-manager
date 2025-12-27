@@ -97,26 +97,22 @@ describe('streamServersHealth', () => {
 		expect(metrics.statuses).toHaveLength(360);
 	});
 
-	it('uses random cache busters in test URLs', async () => {
+	it('uses correct test path in URLs', async () => {
 		const fetchMock = vi.fn().mockResolvedValue(mockResponse(200, { 'content-length': '512' }));
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		await __testing.runNow();
 
-		// Check that URLs contain random cache busters, not fixed values
 		const requestedUrls = fetchMock.mock.calls.map(([arg]) =>
 			typeof arg === 'string' ? arg : ((arg as { url?: string })?.url ?? String(arg ?? ''))
 		);
 
 		// Filter to only speedtest URLs (exclude host existence check URLs)
 		const speedtestUrls = requestedUrls.filter((url) => url.includes('/speedtest/'));
-		const uniqueUrls = new Set(speedtestUrls);
-		// With random cache busters, we should have many unique URLs
-		expect(uniqueUrls.size).toBeGreaterThan(10);
 
-		// Speedtest URLs should contain /speedtest/test.rar/ path
+		// Speedtest URLs should contain /speedtest/test.rar path
 		speedtestUrls.slice(0, 10).forEach((url) => {
-			expect(url).toContain('/speedtest/test.rar/');
+			expect(url).toContain('/speedtest/test.rar');
 		});
 	});
 

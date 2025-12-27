@@ -184,11 +184,12 @@ async function getTestPath(token?: string): Promise<string> {
 }
 
 /**
- * Builds a test URL with a random cache buster like zurg does.
+ * Builds a test URL for a given host and test path.
+ * For unrestricted links, uses the path as-is.
+ * For fallback speedtest, the path is already complete.
  */
 function buildTestUrl(host: string, testPath: string): string {
-	const randomFloat = Math.random();
-	return `https://${host}${testPath}/${randomFloat}`;
+	return `https://${host}${testPath}`;
 }
 
 /**
