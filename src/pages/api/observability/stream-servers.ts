@@ -26,8 +26,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return res.status(405).json({ error: 'Method not allowed' });
 	}
 
-	// Allow short caching
-	res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=30');
+	// No caching to ensure consistency with the main status page
+	res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+	res.setHeader('Pragma', 'no-cache');
 
 	try {
 		const statuses = await getStreamStatusesFromDb();
