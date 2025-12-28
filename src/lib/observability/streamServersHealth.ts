@@ -538,6 +538,16 @@ export function getStreamStatusesFromDb() {
 	return repository.getAllStreamStatuses();
 }
 
+/**
+ * Runs the stream health check immediately (on-demand).
+ * Returns the updated metrics after the check completes.
+ */
+export async function runHealthCheckNow() {
+	const state = getScheduler();
+	await executeCheck(state);
+	return repository.getStreamHealthMetrics();
+}
+
 export const __testing = {
 	reset() {
 		clearScheduler();
@@ -545,9 +555,7 @@ export const __testing = {
 		cachedTestUrlExpiry = 0;
 	},
 	async runNow() {
-		const state = getScheduler();
-		await executeCheck(state);
-		return repository.getStreamHealthMetrics();
+		return runHealthCheckNow();
 	},
 	getServerList() {
 		return generateServerHosts();
