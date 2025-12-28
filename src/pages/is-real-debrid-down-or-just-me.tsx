@@ -176,6 +176,19 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 	const currentStatus = statusMeta[state];
 	const StatusIcon = currentStatus.icon;
 
+	const getPercentageColor = (pct: number) =>
+		pct >= 90 ? 'text-emerald-400' : pct >= 60 ? 'text-amber-400' : 'text-rose-500';
+
+	const unrestrictPct = stats.byOperation['POST /unrestrict/link']?.considered
+		? Math.round(stats.byOperation['POST /unrestrict/link'].successRate * 100)
+		: null;
+	const torrentsPct = stats.byOperation['GET /torrents']?.considered
+		? Math.round(stats.byOperation['GET /torrents'].successRate * 100)
+		: null;
+	const addMagnetPct = stats.byOperation['POST /torrents/addMagnet']?.considered
+		? Math.round(stats.byOperation['POST /torrents/addMagnet'].successRate * 100)
+		: null;
+
 	const summaryMetrics: Array<{
 		label: string;
 		value: string;
@@ -188,36 +201,28 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 			value: stats.considered ? `${successPct}%` : '—',
 			helper: `${formatNumber(stats.successCount)}/${formatNumber(stats.considered)} requests`,
 			icon: Activity,
-			color:
-				successPct >= 90
-					? 'text-emerald-400'
-					: successPct >= 60
-						? 'text-amber-400'
-						: 'text-rose-500',
+			color: getPercentageColor(successPct),
 		},
 		{
 			label: 'Unrestrict',
-			value: stats.byOperation['POST /unrestrict/link']?.considered
-				? `${Math.round(stats.byOperation['POST /unrestrict/link'].successRate * 100)}%`
-				: '—',
+			value: unrestrictPct !== null ? `${unrestrictPct}%` : '—',
 			helper: 'Link generation',
 			icon: Link2,
+			color: unrestrictPct !== null ? getPercentageColor(unrestrictPct) : undefined,
 		},
 		{
 			label: 'Torrents',
-			value: stats.byOperation['GET /torrents']?.considered
-				? `${Math.round(stats.byOperation['GET /torrents'].successRate * 100)}%`
-				: '—',
+			value: torrentsPct !== null ? `${torrentsPct}%` : '—',
 			helper: 'List retrieval',
 			icon: List,
+			color: torrentsPct !== null ? getPercentageColor(torrentsPct) : undefined,
 		},
 		{
 			label: 'Add Magnet',
-			value: stats.byOperation['POST /torrents/addMagnet']?.considered
-				? `${Math.round(stats.byOperation['POST /torrents/addMagnet'].successRate * 100)}%`
-				: '—',
+			value: addMagnetPct !== null ? `${addMagnetPct}%` : '—',
 			helper: 'Submission',
 			icon: DownloadCloud,
+			color: addMagnetPct !== null ? getPercentageColor(addMagnetPct) : undefined,
 		},
 	];
 
