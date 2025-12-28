@@ -34,8 +34,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return res.status(405).json({ error: 'Method not allowed' });
 	}
 
-	// Allow short caching for history data
-	res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60');
+	// No caching to ensure consistency with the main status page
+	res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+	res.setHeader('Pragma', 'no-cache');
 
 	const query = req.query as HistoryQuery;
 	const type = query.type ?? 'rd';
