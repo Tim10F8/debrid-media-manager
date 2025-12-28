@@ -24,13 +24,6 @@ const HistoryCharts = dynamic(
 	() => import('@/components/observability/HistoryCharts').then((mod) => mod.HistoryCharts),
 	{ ssr: false }
 );
-const ServerStatusBreakdown = dynamic(
-	() =>
-		import('@/components/observability/ServerStatusBreakdown').then(
-			(mod) => mod.ServerStatusBreakdown
-		),
-	{ ssr: false }
-);
 
 const FIXED_LOCALE = 'en-US';
 
@@ -444,11 +437,8 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 						</div>
 					</div>
 
-					{/* Charts & Detailed Breakdown */}
-					<div className="space-y-6">
-						<HistoryCharts />
-						<ServerStatusBreakdown />
-					</div>
+					{/* Charts */}
+					<HistoryCharts />
 
 					{/* Footer */}
 					<footer className="mt-8 border-t border-white/10 pt-8 text-center">
