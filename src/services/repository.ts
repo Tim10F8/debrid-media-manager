@@ -5,7 +5,6 @@ import {
 	CastService,
 	HashSearchService,
 	HistoryAggregationService,
-	RdObservabilityService,
 	ReportService,
 	ScrapedService,
 	SearchService,
@@ -14,7 +13,6 @@ import {
 	ZurgKeysService,
 } from './database';
 import { HashSearchParams } from './database/hashSearch';
-import { RealDebridOperation } from './database/rdObservability';
 import { StreamServerStatus } from './database/streamHealth';
 import { ScrapeSearchResult } from './mediasearch';
 import { TorrentInfoResponse } from './types';
@@ -29,7 +27,6 @@ export type RepositoryDependencies = Partial<{
 	torrentSnapshotService: TorrentSnapshotService;
 	hashSearchService: HashSearchService;
 	zurgKeysService: ZurgKeysService;
-	rdObservabilityService: RdObservabilityService;
 	streamHealthService: StreamHealthService;
 	historyAggregationService: HistoryAggregationService;
 }>;
@@ -44,7 +41,6 @@ export class Repository {
 	private torrentSnapshotService: TorrentSnapshotService;
 	private hashSearchService: HashSearchService;
 	private zurgKeysService: ZurgKeysService;
-	private rdObservabilityService: RdObservabilityService;
 	private streamHealthService: StreamHealthService;
 	private historyAggregationService: HistoryAggregationService;
 
@@ -58,7 +54,6 @@ export class Repository {
 		torrentSnapshotService,
 		hashSearchService,
 		zurgKeysService,
-		rdObservabilityService,
 		streamHealthService,
 		historyAggregationService,
 	}: RepositoryDependencies = {}) {
@@ -71,7 +66,6 @@ export class Repository {
 		this.torrentSnapshotService = torrentSnapshotService ?? new TorrentSnapshotService();
 		this.hashSearchService = hashSearchService ?? new HashSearchService();
 		this.zurgKeysService = zurgKeysService ?? new ZurgKeysService();
-		this.rdObservabilityService = rdObservabilityService ?? new RdObservabilityService();
 		this.streamHealthService = streamHealthService ?? new StreamHealthService();
 		this.historyAggregationService =
 			historyAggregationService ?? new HistoryAggregationService();
@@ -89,7 +83,6 @@ export class Repository {
 			this.torrentSnapshotService.disconnect(),
 			this.hashSearchService.disconnect(),
 			this.zurgKeysService.disconnect(),
-			this.rdObservabilityService.disconnect(),
 			this.streamHealthService.disconnect(),
 			this.historyAggregationService.disconnect(),
 		]);
@@ -427,23 +420,6 @@ export class Repository {
 		return this.zurgKeysService.listApiKeys();
 	}
 
-	// RD Observability Service Methods
-	public recordRdEvent(operation: RealDebridOperation, status: number) {
-		return this.rdObservabilityService.recordEvent(operation, status);
-	}
-
-	public getRdObservabilityStats() {
-		return this.rdObservabilityService.getStats();
-	}
-
-	public cleanupOldRdEvents() {
-		return this.rdObservabilityService.cleanupOldEvents();
-	}
-
-	public getRdEventCount() {
-		return this.rdObservabilityService.getEventCount();
-	}
-
 	// Stream Health Service Methods
 	public upsertStreamHealthResults(results: StreamServerStatus[]) {
 		return this.streamHealthService.upsertHealthResults(results);
@@ -487,14 +463,6 @@ export class Repository {
 	}
 
 	// History Aggregation Service Methods
-	public aggregateRdHourly(targetHour?: Date) {
-		return this.historyAggregationService.aggregateRdHourly(targetHour);
-	}
-
-	public rollupRdDaily(targetDate?: Date) {
-		return this.historyAggregationService.rollupRdDaily(targetDate);
-	}
-
 	public recordStreamHealthSnapshot(data: {
 		totalServers: number;
 		workingServers: number;
@@ -519,18 +487,6 @@ export class Repository {
 
 	public cleanupOldHistoryData() {
 		return this.historyAggregationService.cleanupOldData();
-	}
-
-	public getRdRawHistory(hoursBack?: number, operation?: string) {
-		return this.historyAggregationService.getRdRawHistory(hoursBack, operation);
-	}
-
-	public getRdHourlyHistory(hoursBack?: number, operation?: string) {
-		return this.historyAggregationService.getRdHourlyHistory(hoursBack, operation);
-	}
-
-	public getRdDailyHistory(daysBack?: number, operation?: string) {
-		return this.historyAggregationService.getRdDailyHistory(daysBack, operation);
 	}
 
 	public getStreamHourlyHistory(hoursBack?: number) {

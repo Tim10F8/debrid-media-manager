@@ -6,19 +6,14 @@ import handler from '@/pages/api/observability/aggregate';
 // Mock the repository
 vi.mock('@/services/repository', () => ({
 	repository: {
-		aggregateRdHourly: vi.fn().mockResolvedValue(50),
 		runDailyRollup: vi.fn().mockResolvedValue({
-			rdDailyRolled: true,
 			streamDailyRolled: true,
 		}),
 		cleanupOldHistoryData: vi.fn().mockResolvedValue({
-			rdHourlyDeleted: 10,
-			rdDailyDeleted: 0,
 			streamHourlyDeleted: 5,
 			streamDailyDeleted: 0,
 			serverReliabilityDeleted: 0,
 		}),
-		cleanupOldRdEvents: vi.fn().mockResolvedValue(100),
 	},
 }));
 
@@ -62,29 +57,9 @@ describe('aggregate API endpoint', () => {
 		expect(res.json).toHaveBeenCalledWith({ error: 'Method not allowed' });
 	});
 
-	it('runs hourly aggregation by default', async () => {
+	it('runs daily rollup by default', async () => {
 		const { repository } = await import('@/services/repository');
 		const req = createMockRequest('POST', {});
-		const res = createMockResponse();
-
-		await handler(req, res);
-
-		expect(repository.aggregateRdHourly).toHaveBeenCalled();
-		expect(res.status).toHaveBeenCalledWith(200);
-		expect(res.json).toHaveBeenCalledWith(
-			expect.objectContaining({
-				success: true,
-				action: 'hourly',
-				results: expect.objectContaining({
-					rdHourlyAggregated: 50,
-				}),
-			})
-		);
-	});
-
-	it('runs daily rollup when action=daily', async () => {
-		const { repository } = await import('@/services/repository');
-		const req = createMockRequest('POST', { action: 'daily' });
 		const res = createMockResponse();
 
 		await handler(req, res);
@@ -110,7 +85,6 @@ describe('aggregate API endpoint', () => {
 		await handler(req, res);
 
 		expect(repository.cleanupOldHistoryData).toHaveBeenCalled();
-		expect(repository.cleanupOldRdEvents).toHaveBeenCalled();
 		expect(res.status).toHaveBeenCalledWith(200);
 		expect(res.json).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -118,7 +92,6 @@ describe('aggregate API endpoint', () => {
 				action: 'cleanup',
 				results: expect.objectContaining({
 					cleanup: expect.any(Object),
-					rdEventsCleanup: 100,
 				}),
 			})
 		);
@@ -131,10 +104,8 @@ describe('aggregate API endpoint', () => {
 
 		await handler(req, res);
 
-		expect(repository.aggregateRdHourly).toHaveBeenCalled();
 		expect(repository.runDailyRollup).toHaveBeenCalled();
 		expect(repository.cleanupOldHistoryData).toHaveBeenCalled();
-		expect(repository.cleanupOldRdEvents).toHaveBeenCalled();
 		expect(res.status).toHaveBeenCalledWith(200);
 	});
 
@@ -172,7 +143,7 @@ describe('aggregate API endpoint', () => {
 
 	it('handles errors gracefully', async () => {
 		const { repository } = await import('@/services/repository');
-		vi.mocked(repository.aggregateRdHourly).mockRejectedValueOnce(
+		vi.mocked(repository.runDailyRollup).mockRejectedValueOnce(
 			new Error('Database connection failed')
 		);
 

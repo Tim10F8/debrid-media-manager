@@ -1,48 +1,8 @@
 import { DatabaseClient } from './client';
-import { RealDebridOperation } from './rdObservability';
-
-const MONITORED_OPERATIONS: RealDebridOperation[] = [
-	'GET /user',
-	'GET /torrents',
-	'GET /torrents/info/{id}',
-	'POST /torrents/addMagnet',
-	'POST /torrents/selectFiles/{id}',
-	'DELETE /torrents/delete/{id}',
-	'POST /unrestrict/link',
-];
 
 // Retention periods
 const HOURLY_RETENTION_DAYS = 7;
 const DAILY_RETENTION_DAYS = 90;
-
-export interface RdRawData {
-	timestamp: Date;
-	operation: string;
-	status: number;
-	success: boolean;
-}
-
-export interface RdHourlyData {
-	hour: Date;
-	operation: string;
-	totalCount: number;
-	successCount: number;
-	failureCount: number;
-	otherCount: number;
-	successRate: number;
-}
-
-export interface RdDailyData {
-	date: Date;
-	operation: string;
-	totalCount: number;
-	successCount: number;
-	failureCount: number;
-	avgSuccessRate: number;
-	minSuccessRate: number;
-	maxSuccessRate: number;
-	peakHour: number | null;
-}
 
 export interface StreamHourlyData {
 	hour: Date;
@@ -79,215 +39,6 @@ export interface ServerReliabilityData {
 }
 
 export class HistoryAggregationService extends DatabaseClient {
-	/**
-	 * Aggregates RD operational events into hourly buckets.
-	 * Should be called every hour (or more frequently for catch-up).
-	 * Defaults to the PREVIOUS hour to ensure all events have arrived.
-	 */
-	public async aggregateRdHourly(targetHour?: Date): Promise<number> {
-		// Default to previous hour to ensure all events have arrived
-		const now = new Date();
-		const previousHour = new Date(now.getTime() - 60 * 60 * 1000);
-		const hour = targetHour ? this.startOfHour(targetHour) : this.startOfHour(previousHour);
-		const nextHour = new Date(hour.getTime() + 60 * 60 * 1000);
-
-		try {
-			// Get events for this hour grouped by operation
-			const events = await this.prisma.rdOperationalEvent.findMany({
-				where: {
-					createdAt: {
-						gte: hour,
-						lt: nextHour,
-					},
-				},
-				select: {
-					operation: true,
-					status: true,
-				},
-			});
-
-			if (events.length === 0) {
-				return 0;
-			}
-
-			// Aggregate by operation
-			const byOperation: Record<
-				string,
-				{ total: number; success: number; failure: number; other: number }
-			> = {};
-
-			for (const op of MONITORED_OPERATIONS) {
-				byOperation[op] = { total: 0, success: 0, failure: 0, other: 0 };
-			}
-
-			for (const event of events) {
-				const stats = byOperation[event.operation];
-				if (!stats) continue;
-
-				stats.total++;
-				if (event.status >= 200 && event.status < 300) {
-					stats.success++;
-				} else if (event.status >= 500 && event.status < 600) {
-					stats.failure++;
-				} else {
-					stats.other++;
-				}
-			}
-
-			// Upsert hourly records
-			let upserted = 0;
-			for (const [operation, stats] of Object.entries(byOperation)) {
-				if (stats.total === 0) continue;
-
-				const considered = stats.success + stats.failure;
-				const successRate = considered > 0 ? stats.success / considered : 0;
-
-				await this.prisma.rdOperationalHourly.upsert({
-					where: {
-						hour_operation: { hour, operation },
-					},
-					update: {
-						totalCount: stats.total,
-						successCount: stats.success,
-						failureCount: stats.failure,
-						otherCount: stats.other,
-						successRate,
-					},
-					create: {
-						hour,
-						operation,
-						totalCount: stats.total,
-						successCount: stats.success,
-						failureCount: stats.failure,
-						otherCount: stats.other,
-						successRate,
-					},
-				});
-				upserted++;
-			}
-
-			return upserted;
-		} catch (error: any) {
-			if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
-				console.warn('History tables do not exist - cannot aggregate');
-				return 0;
-			}
-			console.error('Failed to aggregate RD hourly data:', error);
-			return 0;
-		}
-	}
-
-	/**
-	 * Rolls up hourly RD data into daily aggregates.
-	 * Should be called once per day (after midnight UTC).
-	 */
-	public async rollupRdDaily(targetDate?: Date): Promise<number> {
-		const date = targetDate ? this.startOfDay(targetDate) : this.startOfDay(new Date());
-		const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
-
-		try {
-			// Get hourly data for this day
-			const hourlyData = await this.prisma.rdOperationalHourly.findMany({
-				where: {
-					hour: {
-						gte: date,
-						lt: nextDate,
-					},
-				},
-			});
-
-			if (hourlyData.length === 0) {
-				return 0;
-			}
-
-			// Group by operation
-			const byOperation: Record<
-				string,
-				{
-					totalCount: number;
-					successCount: number;
-					failureCount: number;
-					successRates: number[];
-					hourlyTotals: { hour: number; count: number }[];
-				}
-			> = {};
-
-			for (const record of hourlyData) {
-				if (!byOperation[record.operation]) {
-					byOperation[record.operation] = {
-						totalCount: 0,
-						successCount: 0,
-						failureCount: 0,
-						successRates: [],
-						hourlyTotals: [],
-					};
-				}
-
-				const stats = byOperation[record.operation];
-				stats.totalCount += record.totalCount;
-				stats.successCount += record.successCount;
-				stats.failureCount += record.failureCount;
-				stats.successRates.push(record.successRate);
-				stats.hourlyTotals.push({
-					hour: record.hour.getUTCHours(),
-					count: record.totalCount,
-				});
-			}
-
-			// Upsert daily records
-			let upserted = 0;
-			for (const [operation, stats] of Object.entries(byOperation)) {
-				const avgSuccessRate =
-					stats.successRates.length > 0
-						? stats.successRates.reduce((a, b) => a + b, 0) / stats.successRates.length
-						: 0;
-				const minSuccessRate =
-					stats.successRates.length > 0 ? Math.min(...stats.successRates) : 0;
-				const maxSuccessRate =
-					stats.successRates.length > 0 ? Math.max(...stats.successRates) : 0;
-				const peakHour =
-					stats.hourlyTotals.length > 0
-						? stats.hourlyTotals.reduce((a, b) => (b.count > a.count ? b : a)).hour
-						: null;
-
-				await this.prisma.rdOperationalDaily.upsert({
-					where: {
-						date_operation: { date, operation },
-					},
-					update: {
-						totalCount: stats.totalCount,
-						successCount: stats.successCount,
-						failureCount: stats.failureCount,
-						avgSuccessRate,
-						minSuccessRate,
-						maxSuccessRate,
-						peakHour,
-					},
-					create: {
-						date,
-						operation,
-						totalCount: stats.totalCount,
-						successCount: stats.successCount,
-						failureCount: stats.failureCount,
-						avgSuccessRate,
-						minSuccessRate,
-						maxSuccessRate,
-						peakHour,
-					},
-				});
-				upserted++;
-			}
-
-			return upserted;
-		} catch (error: any) {
-			if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
-				return 0;
-			}
-			console.error('Failed to rollup RD daily data:', error);
-			return 0;
-		}
-	}
-
 	/**
 	 * Records a stream health snapshot for aggregation.
 	 * Called after each health check run.
@@ -530,8 +281,6 @@ export class HistoryAggregationService extends DatabaseClient {
 	 * Cleans up old historical data beyond retention periods.
 	 */
 	public async cleanupOldData(): Promise<{
-		rdHourlyDeleted: number;
-		rdDailyDeleted: number;
 		streamHourlyDeleted: number;
 		streamDailyDeleted: number;
 		serverReliabilityDeleted: number;
@@ -545,26 +294,12 @@ export class HistoryAggregationService extends DatabaseClient {
 		);
 
 		const results = {
-			rdHourlyDeleted: 0,
-			rdDailyDeleted: 0,
 			streamHourlyDeleted: 0,
 			streamDailyDeleted: 0,
 			serverReliabilityDeleted: 0,
 		};
 
 		try {
-			// Clean RD hourly (7 days)
-			const rdHourly = await this.prisma.rdOperationalHourly.deleteMany({
-				where: { hour: { lt: hourlyRetentionDate } },
-			});
-			results.rdHourlyDeleted = rdHourly.count;
-
-			// Clean RD daily (90 days)
-			const rdDaily = await this.prisma.rdOperationalDaily.deleteMany({
-				where: { date: { lt: dailyRetentionDate } },
-			});
-			results.rdDailyDeleted = rdDaily.count;
-
 			// Clean stream hourly (7 days)
 			const streamHourly = await this.prisma.streamHealthHourly.deleteMany({
 				where: { hour: { lt: hourlyRetentionDate } },
@@ -590,138 +325,6 @@ export class HistoryAggregationService extends DatabaseClient {
 		}
 
 		return results;
-	}
-
-	/**
-	 * Gets RD raw history for a time range (limited by MAX_EVENTS retention).
-	 */
-	public async getRdRawHistory(hoursBack: number = 24, operation?: string): Promise<RdRawData[]> {
-		const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
-
-		try {
-			const data = await this.prisma.rdOperationalEvent.findMany({
-				where: {
-					createdAt: { gte: since },
-					...(operation ? { operation } : {}),
-				},
-				orderBy: { createdAt: 'asc' },
-			});
-
-			return data.map((d) => ({
-				timestamp: d.createdAt,
-				operation: d.operation,
-				status: d.status,
-				success: d.status >= 200 && d.status < 300,
-			}));
-		} catch (error: any) {
-			if (
-				error?.code?.startsWith?.('P') ||
-				error?.name?.includes?.('Prisma') ||
-				error?.message?.includes('does not exist') ||
-				error?.message?.includes('Authentication failed')
-			) {
-				console.warn(
-					'getRdRawHistory: Database error, returning empty array:',
-					error?.code || error?.name
-				);
-				return [];
-			}
-			throw error;
-		}
-	}
-
-	/**
-	 * Gets RD hourly history for a time range.
-	 */
-	public async getRdHourlyHistory(
-		hoursBack: number = 24,
-		operation?: string
-	): Promise<RdHourlyData[]> {
-		const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
-
-		try {
-			const data = await this.prisma.rdOperationalHourly.findMany({
-				where: {
-					hour: { gte: since },
-					...(operation ? { operation } : {}),
-				},
-				orderBy: { hour: 'asc' },
-			});
-
-			return data.map((d) => ({
-				hour: d.hour,
-				operation: d.operation,
-				totalCount: d.totalCount,
-				successCount: d.successCount,
-				failureCount: d.failureCount,
-				otherCount: d.otherCount,
-				successRate: d.successRate,
-			}));
-		} catch (error: any) {
-			// Handle database errors gracefully - return empty array for any Prisma error
-			// Catches: P2021 (table not exist), P1000 (auth failed), PrismaClientInitializationError, etc.
-			if (
-				error?.code?.startsWith?.('P') ||
-				error?.name?.includes?.('Prisma') ||
-				error?.message?.includes('does not exist') ||
-				error?.message?.includes('Authentication failed')
-			) {
-				console.warn(
-					'getRdHourlyHistory: Database error, returning empty array:',
-					error?.code || error?.name
-				);
-				return [];
-			}
-			throw error;
-		}
-	}
-
-	/**
-	 * Gets RD daily history for a time range.
-	 */
-	public async getRdDailyHistory(
-		daysBack: number = 90,
-		operation?: string
-	): Promise<RdDailyData[]> {
-		const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-
-		try {
-			const data = await this.prisma.rdOperationalDaily.findMany({
-				where: {
-					date: { gte: since },
-					...(operation ? { operation } : {}),
-				},
-				orderBy: { date: 'asc' },
-			});
-
-			return data.map((d) => ({
-				date: d.date,
-				operation: d.operation,
-				totalCount: d.totalCount,
-				successCount: d.successCount,
-				failureCount: d.failureCount,
-				avgSuccessRate: d.avgSuccessRate,
-				minSuccessRate: d.minSuccessRate,
-				maxSuccessRate: d.maxSuccessRate,
-				peakHour: d.peakHour,
-			}));
-		} catch (error: any) {
-			// Handle database errors gracefully - return empty array for any Prisma error
-			// Catches: P2021 (table not exist), P1000 (auth failed), PrismaClientInitializationError, etc.
-			if (
-				error?.code?.startsWith?.('P') ||
-				error?.name?.includes?.('Prisma') ||
-				error?.message?.includes('does not exist') ||
-				error?.message?.includes('Authentication failed')
-			) {
-				console.warn(
-					'getRdDailyHistory: Database error, returning empty array:',
-					error?.code || error?.name
-				);
-				return [];
-			}
-			throw error;
-		}
 	}
 
 	/**
@@ -874,18 +477,13 @@ export class HistoryAggregationService extends DatabaseClient {
 
 	/**
 	 * Runs all aggregation tasks. Call this periodically (e.g., every hour).
+	 * Stream health snapshots are recorded directly from the health check module.
 	 */
 	public async runAggregation(): Promise<{
-		rdHourlyAggregated: number;
 		streamHealthRecorded: boolean;
 	}> {
-		const rdHourlyAggregated = await this.aggregateRdHourly();
-
-		// For stream health, we record snapshots directly from the health check module
-		// This method is mainly for RD event aggregation
-
+		// Stream health snapshots are recorded directly from the health check module
 		return {
-			rdHourlyAggregated,
 			streamHealthRecorded: false,
 		};
 	}
@@ -894,17 +492,14 @@ export class HistoryAggregationService extends DatabaseClient {
 	 * Runs daily rollup tasks. Call this once per day (after midnight UTC).
 	 */
 	public async runDailyRollup(targetDate?: Date): Promise<{
-		rdDailyRolled: number;
 		streamDailyRolled: boolean;
 	}> {
 		// Roll up yesterday's data by default
 		const date = targetDate ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-		const rdDailyRolled = await this.rollupRdDaily(date);
 		const streamDailyRolled = await this.rollupStreamDaily(date);
 
 		return {
-			rdDailyRolled,
 			streamDailyRolled,
 		};
 	}

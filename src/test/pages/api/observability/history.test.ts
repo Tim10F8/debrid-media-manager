@@ -6,36 +6,6 @@ import handler from '@/pages/api/observability/history';
 // Mock the repository
 vi.mock('@/services/repository', () => ({
 	repository: {
-		getRdRawHistory: vi.fn().mockResolvedValue([
-			{
-				timestamp: new Date('2024-01-15T14:30:00Z'),
-				operation: 'GET /user',
-				status: 200,
-				success: true,
-			},
-		]),
-		getRdHourlyHistory: vi.fn().mockResolvedValue([
-			{
-				hour: new Date('2024-01-15T14:00:00Z'),
-				operation: 'GET /user',
-				totalCount: 100,
-				successCount: 95,
-				failureCount: 5,
-				successRate: 0.95,
-			},
-		]),
-		getRdDailyHistory: vi.fn().mockResolvedValue([
-			{
-				date: new Date('2024-01-15T00:00:00Z'),
-				operation: 'GET /user',
-				totalCount: 2400,
-				successCount: 2300,
-				failureCount: 100,
-				avgSuccessRate: 0.96,
-				minSuccessRate: 0.9,
-				maxSuccessRate: 1.0,
-			},
-		]),
 		getStreamHourlyHistory: vi.fn().mockResolvedValue([
 			{
 				hour: new Date('2024-01-15T14:00:00Z'),
@@ -98,8 +68,8 @@ describe('history API endpoint', () => {
 		expect(res.json).toHaveBeenCalledWith({ error: 'Method not allowed' });
 	});
 
-	it('returns hourly RD data for 24h range', async () => {
-		const req = createMockRequest({ type: 'rd', range: '24h' });
+	it('returns hourly stream data for 24h range', async () => {
+		const req = createMockRequest({ type: 'stream', range: '24h' });
 		const res = createMockResponse();
 
 		await handler(req, res);
@@ -107,26 +77,9 @@ describe('history API endpoint', () => {
 		expect(res.status).toHaveBeenCalledWith(200);
 		expect(res.json).toHaveBeenCalledWith(
 			expect.objectContaining({
-				type: 'rd',
+				type: 'stream',
 				granularity: 'hourly',
 				range: '24h',
-				data: expect.any(Array),
-			})
-		);
-	});
-
-	it('returns daily RD data for 30d range', async () => {
-		const req = createMockRequest({ type: 'rd', range: '30d' });
-		const res = createMockResponse();
-
-		await handler(req, res);
-
-		expect(res.status).toHaveBeenCalledWith(200);
-		expect(res.json).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'rd',
-				granularity: 'daily',
-				range: '30d',
 				data: expect.any(Array),
 			})
 		);
@@ -208,7 +161,7 @@ describe('history API endpoint', () => {
 		expect(res.json).toHaveBeenCalledWith({ error: 'Invalid type parameter' });
 	});
 
-	it('defaults to rd type and 24h range', async () => {
+	it('defaults to stream type and 24h range', async () => {
 		const req = createMockRequest({});
 		const res = createMockResponse();
 
@@ -217,7 +170,7 @@ describe('history API endpoint', () => {
 		expect(res.status).toHaveBeenCalledWith(200);
 		expect(res.json).toHaveBeenCalledWith(
 			expect.objectContaining({
-				type: 'rd',
+				type: 'stream',
 				granularity: 'hourly',
 				range: '24h',
 			})

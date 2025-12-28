@@ -5,36 +5,7 @@ import type {
 	CompactWorkingStreamMetrics,
 	RealDebridObservabilityStats,
 } from '@/lib/observability/getRealDebridObservabilityStats';
-import type { OperationStats, RealDebridOperation } from '@/lib/observability/rdOperationalStats';
 import RealDebridStatusPage from '@/pages/is-real-debrid-down-or-just-me';
-
-const operations: RealDebridOperation[] = [
-	'GET /user',
-	'GET /torrents',
-	'GET /torrents/info/{id}',
-	'POST /torrents/addMagnet',
-	'POST /torrents/selectFiles/{id}',
-	'DELETE /torrents/delete/{id}',
-	'POST /unrestrict/link',
-];
-
-function buildEmptyByOperation(): Record<RealDebridOperation, OperationStats> {
-	return operations.reduce<Record<RealDebridOperation, OperationStats>>(
-		(acc, operation) => {
-			acc[operation] = {
-				operation,
-				totalTracked: 0,
-				successCount: 0,
-				failureCount: 0,
-				considered: 0,
-				successRate: 0,
-				lastTs: null,
-			};
-			return acc;
-		},
-		{} as Record<RealDebridOperation, OperationStats>
-	);
-}
 
 function buildWorkingStream(): CompactWorkingStreamMetrics {
 	return {
@@ -52,16 +23,6 @@ function buildWorkingStream(): CompactWorkingStreamMetrics {
 }
 
 const baseStats: RealDebridObservabilityStats = {
-	totalTracked: 0,
-	successCount: 0,
-	failureCount: 0,
-	considered: 0,
-	successRate: 0,
-	lastTs: null,
-	isDown: false,
-	monitoredOperations: operations,
-	byOperation: buildEmptyByOperation(),
-	windowSize: 10_000,
 	workingStream: buildWorkingStream(),
 };
 
@@ -95,7 +56,7 @@ describe('RealDebridStatusPage client refresh', () => {
 		}
 	});
 
-	it('renders working stream outside of the success rate card', async () => {
+	it('renders working stream card', async () => {
 		const mockFetch = vi.fn().mockResolvedValue({
 			ok: true,
 			json: () => Promise.resolve(baseStats),
@@ -105,11 +66,8 @@ describe('RealDebridStatusPage client refresh', () => {
 		const { getByTestId } = render(<RealDebridStatusPage />);
 
 		// Wait for data to load
-		await waitFor(() => expect(getByTestId('success-rate-card')).toBeTruthy());
+		await waitFor(() => expect(getByTestId('working-stream-card')).toBeTruthy());
 
-		const successCard = getByTestId('success-rate-card');
-		expect(successCard).toBeTruthy();
-		expect(within(successCard).queryByText('Stream Server Check')).toBeNull();
 		const workingStreamCard = getByTestId('working-stream-card');
 		expect(workingStreamCard).toBeTruthy();
 		expect(within(workingStreamCard).getByText('Stream Server Check')).toBeTruthy();

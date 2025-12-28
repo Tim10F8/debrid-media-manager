@@ -3,12 +3,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { repository } from '@/services/repository';
 
 export type HistoryRange = '24h' | '7d' | '30d' | '90d';
-export type HistoryType = 'rd' | 'stream' | 'servers';
+export type HistoryType = 'stream' | 'servers';
 
 interface HistoryQuery {
 	type?: HistoryType;
 	range?: HistoryRange;
-	operation?: string;
 	sortBy?: 'reliability' | 'latency';
 	limit?: string;
 }
@@ -39,39 +38,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	res.setHeader('Pragma', 'no-cache');
 
 	const query = req.query as HistoryQuery;
-	const type = query.type ?? 'rd';
+	const type = query.type ?? 'stream';
 	const range = (query.range ?? '24h') as HistoryRange;
 	const { hoursBack, daysBack } = parseRange(range);
 
 	try {
 		switch (type) {
-			case 'rd': {
-				// For 24h and 7d, use hourly data
-				if (hoursBack && hoursBack <= 168) {
-					const hourlyData = await repository.getRdHourlyHistory(
-						hoursBack,
-						query.operation
-					);
-					return res.status(200).json({
-						type: 'rd',
-						granularity: 'hourly',
-						range,
-						data: hourlyData,
-					});
-				} else {
-					const dailyData = await repository.getRdDailyHistory(
-						daysBack ?? 30,
-						query.operation
-					);
-					return res.status(200).json({
-						type: 'rd',
-						granularity: 'daily',
-						range,
-						data: dailyData,
-					});
-				}
-			}
-
 			case 'stream': {
 				// For short ranges, use hourly data; for longer ranges, use daily
 				if (hoursBack && hoursBack <= 168) {

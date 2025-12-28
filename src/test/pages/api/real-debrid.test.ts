@@ -5,36 +5,7 @@ import type {
 	RealDebridObservabilityStats,
 } from '@/lib/observability/getRealDebridObservabilityStats';
 import * as combined from '@/lib/observability/getRealDebridObservabilityStats';
-import type { OperationStats, RealDebridOperation } from '@/lib/observability/rdOperationalStats';
 import handler from '@/pages/api/observability/real-debrid';
-
-const operations: RealDebridOperation[] = [
-	'GET /user',
-	'GET /torrents',
-	'GET /torrents/info/{id}',
-	'POST /torrents/addMagnet',
-	'POST /torrents/selectFiles/{id}',
-	'DELETE /torrents/delete/{id}',
-	'POST /unrestrict/link',
-];
-
-function buildEmptyByOperation(): Record<RealDebridOperation, OperationStats> {
-	return operations.reduce<Record<RealDebridOperation, OperationStats>>(
-		(acc, operation) => {
-			acc[operation] = {
-				operation,
-				totalTracked: 0,
-				successCount: 0,
-				failureCount: 0,
-				considered: 0,
-				successRate: 0,
-				lastTs: null,
-			};
-			return acc;
-		},
-		{} as Record<RealDebridOperation, OperationStats>
-	);
-}
 
 describe('Real-Debrid observability API caching', () => {
 	afterEach(() => {
@@ -55,16 +26,6 @@ describe('Real-Debrid observability API caching', () => {
 			recentChecks: [],
 		};
 		const fakeStats: RealDebridObservabilityStats = {
-			totalTracked: 1,
-			successCount: 1,
-			failureCount: 0,
-			considered: 1,
-			successRate: 1,
-			lastTs: Date.now(),
-			isDown: false,
-			monitoredOperations: [],
-			byOperation: buildEmptyByOperation(),
-			windowSize: 10,
 			workingStream: fakeWorkingStream,
 		};
 		vi.spyOn(combined, 'getRealDebridObservabilityStatsFromDb').mockResolvedValue(fakeStats);
@@ -106,16 +67,6 @@ describe('Real-Debrid observability API caching', () => {
 			recentChecks: [],
 		};
 		const fakeStats: RealDebridObservabilityStats = {
-			totalTracked: 12,
-			successCount: 10,
-			failureCount: 2,
-			considered: 12,
-			successRate: 10 / 12,
-			lastTs: Date.now(),
-			isDown: false,
-			monitoredOperations: operations,
-			byOperation: buildEmptyByOperation(),
-			windowSize: 10,
 			workingStream: fakeWorkingStream,
 		};
 		const statsSpy = vi

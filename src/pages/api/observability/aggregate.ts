@@ -3,9 +3,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { repository } from '@/services/repository';
 
 interface AggregateQuery {
-	action?: 'hourly' | 'daily' | 'cleanup' | 'all';
+	action?: 'daily' | 'cleanup' | 'all';
 	secret?: string;
-	hoursAgo?: string; // For backfilling: aggregate data from N hours ago
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -21,24 +20,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return res.status(401).json({ error: 'Unauthorized' });
 	}
 
-	const action = query.action ?? 'hourly';
-	const hoursAgo = query.hoursAgo ? parseInt(query.hoursAgo, 10) : undefined;
+	const action = query.action ?? 'daily';
 
 	try {
 		const results: Record<string, unknown> = {};
-
-		if (action === 'hourly' || action === 'all') {
-			// Support backfilling by specifying hoursAgo
-			let targetHour: Date | undefined;
-			if (hoursAgo && hoursAgo > 0) {
-				targetHour = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
-			}
-			const rdHourlyAggregated = await repository.aggregateRdHourly(targetHour);
-			results.rdHourlyAggregated = rdHourlyAggregated;
-			if (hoursAgo) {
-				results.backfilledHoursAgo = hoursAgo;
-			}
-		}
 
 		if (action === 'daily' || action === 'all') {
 			const dailyResult = await repository.runDailyRollup();
@@ -48,10 +33,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		if (action === 'cleanup' || action === 'all') {
 			const cleanupResult = await repository.cleanupOldHistoryData();
 			results.cleanup = cleanupResult;
-
-			// Also cleanup old RD events
-			const rdEventsCleanup = await repository.cleanupOldRdEvents();
-			results.rdEventsCleanup = rdEventsCleanup;
 		}
 
 		return res.status(200).json({

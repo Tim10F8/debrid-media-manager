@@ -1,6 +1,5 @@
 import { repository } from '@/services/repository';
 
-import { type OperationStats, type RealDebridOperation } from './rdOperationalStats';
 import { getStreamMetricsFromDb, isHealthCheckInProgress } from './streamServersHealth';
 
 export interface RecentCheckResult {
@@ -24,41 +23,19 @@ export interface CompactWorkingStreamMetrics {
 }
 
 export interface RealDebridObservabilityStats {
-	totalTracked: number;
-	successCount: number;
-	failureCount: number;
-	considered: number;
-	successRate: number;
-	lastTs: number | null;
-	isDown: boolean;
-	monitoredOperations: RealDebridOperation[];
-	byOperation: Record<RealDebridOperation, OperationStats>;
-	windowSize: number;
 	workingStream: CompactWorkingStreamMetrics;
 }
 
 /**
- * Gets Real-Debrid observability stats from MySQL database.
- * This provides cross-replica consistency and should be used for API endpoints.
+ * Gets Real-Debrid stream health stats from MySQL database.
  */
 export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebridObservabilityStats> {
-	const [rdStats, streamMetrics, recentChecks] = await Promise.all([
-		repository.getRdObservabilityStats(),
+	const [streamMetrics, recentChecks] = await Promise.all([
 		getStreamMetricsFromDb(),
 		repository.getRecentStreamChecks(5),
 	]);
 
 	return {
-		totalTracked: rdStats.totalTracked,
-		successCount: rdStats.successCount,
-		failureCount: rdStats.failureCount,
-		considered: rdStats.considered,
-		successRate: rdStats.successRate,
-		lastTs: rdStats.lastTs,
-		isDown: rdStats.isDown,
-		monitoredOperations: rdStats.monitoredOperations,
-		byOperation: rdStats.byOperation,
-		windowSize: rdStats.windowSize,
 		workingStream: {
 			total: streamMetrics.total,
 			working: streamMetrics.working,

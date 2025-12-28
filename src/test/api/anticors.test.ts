@@ -11,19 +11,6 @@ vi.mock('crypto', async () => {
 	};
 });
 
-vi.mock('@/lib/observability/rdOperationalStats', () => ({
-	resolveRealDebridOperation: vi.fn(),
-	recordRdUnrestrictEvent: vi.fn(),
-}));
-
-import {
-	recordRdUnrestrictEvent,
-	resolveRealDebridOperation,
-} from '@/lib/observability/rdOperationalStats';
-
-const mockResolveOperation = vi.mocked(resolveRealDebridOperation);
-const mockRecordEvent = vi.mocked(recordRdUnrestrictEvent);
-
 const originalFetch = global.fetch;
 
 beforeAll(() => {
@@ -90,8 +77,7 @@ describe('/api/anticors', () => {
 		expect(res.status).toHaveBeenCalledWith(200);
 	});
 
-	it('proxies requests to allowed hosts and records RD stats', async () => {
-		mockResolveOperation.mockReturnValue('GET /torrents');
+	it('proxies requests to allowed hosts', async () => {
 		const upstreamResponse = new Response(JSON.stringify({ ok: true }), {
 			status: 201,
 			headers: {
@@ -131,11 +117,6 @@ describe('/api/anticors', () => {
 		);
 		expect(res.status).toHaveBeenCalledWith(201);
 		expect(res.send).toHaveBeenCalledWith(JSON.stringify({ ok: true }));
-		expect(mockRecordEvent).toHaveBeenCalledWith({
-			ts: expect.any(Number),
-			status: 201,
-			operation: 'GET /torrents',
-		});
 	});
 
 	it('returns 500 when request body cannot be parsed', async () => {
@@ -157,8 +138,7 @@ describe('/api/anticors', () => {
 		expect(res.send).toHaveBeenCalledWith('Failed to read request body');
 	});
 
-	it('handles upstream failures and records error stats', async () => {
-		mockResolveOperation.mockReturnValue('GET /torrents');
+	it('handles upstream failures', async () => {
 		const fetchMock = global.fetch as unknown as Mock;
 		fetchMock.mockRejectedValue(new Error('network'));
 
@@ -174,10 +154,5 @@ describe('/api/anticors', () => {
 
 		expect(res.status).toHaveBeenCalledWith(500);
 		expect(res.send).toHaveBeenCalledWith('Error fetching the proxy URL: network');
-		expect(mockRecordEvent).toHaveBeenCalledWith({
-			ts: expect.any(Number),
-			status: 500,
-			operation: 'GET /torrents',
-		});
 	});
 });

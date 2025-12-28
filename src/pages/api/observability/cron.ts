@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { runHealthCheckNow } from '@/lib/observability/streamServersHealth';
-import { repository } from '@/services/repository';
 
 interface CronResponse {
 	success: boolean;
@@ -11,9 +10,6 @@ interface CronResponse {
 		total: number;
 		rate: number;
 		avgLatencyMs: number | null;
-	};
-	rdAggregation?: {
-		hourlyRecords: number;
 	};
 	error?: string;
 }
@@ -43,9 +39,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 		// Run stream health check
 		const streamMetrics = await runHealthCheckNow();
 
-		// Aggregate RD API events into hourly buckets
-		const rdHourlyRecords = await repository.aggregateRdHourly();
-
 		return res.status(200).json({
 			success: true,
 			timestamp: new Date().toISOString(),
@@ -57,9 +50,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 						avgLatencyMs: streamMetrics.avgLatencyMs,
 					}
 				: undefined,
-			rdAggregation: {
-				hourlyRecords: rdHourlyRecords,
-			},
 		});
 	} catch (error) {
 		console.error('[Cron] Job failed:', error);

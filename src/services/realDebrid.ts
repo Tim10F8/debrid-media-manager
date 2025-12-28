@@ -1,7 +1,3 @@
-import {
-	recordRdUnrestrictEvent,
-	type RealDebridOperation,
-} from '@/lib/observability/rdOperationalStats';
 import axios, { InternalAxiosRequestConfig } from 'axios';
 import getConfig from 'next/config';
 import qs from 'qs';
@@ -131,40 +127,6 @@ function calculateRetryDelay(retryCount: number): number {
 	const delayWithJitter = cappedDelay * jitterFactor;
 
 	return delayWithJitter;
-}
-
-function shouldRecordMetrics(): boolean {
-	return typeof window === 'undefined' || process.env.NODE_ENV === 'test';
-}
-
-function recordOperationMetric(operation: RealDebridOperation, status: number) {
-	recordRdUnrestrictEvent({
-		ts: Date.now(),
-		status,
-		operation,
-	});
-}
-
-function recordSuccessMetric(operation: RealDebridOperation, status: number) {
-	if (!shouldRecordMetrics()) {
-		return;
-	}
-	recordOperationMetric(operation, status);
-}
-
-function recordFailureMetric(operation: RealDebridOperation, error: unknown) {
-	if (!shouldRecordMetrics()) {
-		return;
-	}
-	const extractedStatus = (() => {
-		if (axios.isAxiosError(error) && typeof error.response?.status === 'number') {
-			return error.response.status;
-		}
-		const candidate = (error as { response?: { status?: number } })?.response?.status;
-		return typeof candidate === 'number' ? candidate : undefined;
-	})();
-	const status = typeof extractedStatus === 'number' ? extractedStatus : 500;
-	recordOperationMetric(operation, status);
 }
 
 // Create a global axios instance for RealDebrid API requests
@@ -489,10 +451,8 @@ export const getCurrentUser = async (accessToken: string) => {
 					},
 				}
 			);
-			recordSuccessMetric('GET /user', response.status);
 			return response.data;
 		} catch (error: any) {
-			recordFailureMetric('GET /user', error);
 			console.error('Error fetching user information:', error.message);
 			throw error;
 		} finally {
@@ -526,7 +486,6 @@ export async function getUserTorrentsList(
 				timeout: TORRENT_REQUEST_TIMEOUT,
 			}
 		);
-		recordSuccessMetric('GET /torrents', response.status);
 		console.log(
 			`[${new Date().toISOString()}]     RD API call (page=${page}, limit=${limit}): ${Date.now() - apiStart}ms`
 		);
@@ -547,7 +506,6 @@ export async function getUserTorrentsList(
 
 		return { data, totalCount: totalCountValue };
 	} catch (error: any) {
-		recordFailureMetric('GET /torrents', error);
 		console.error('Error fetching user torrents list:', error.message);
 		throw error;
 	}
@@ -567,10 +525,8 @@ export const getTorrentInfo = async (
 				},
 			}
 		);
-		recordSuccessMetric('GET /torrents/info/{id}', response.status);
 		return response.data;
 	} catch (error: any) {
-		recordFailureMetric('GET /torrents/info/{id}', error);
 		console.error('Error fetching torrent information:', error.message);
 		throw error;
 	}
@@ -586,7 +542,6 @@ export const addHashAsMagnet = async (
 		throw new Error(`Invalid SHA40 hash: ${hash}`);
 	}
 
-	let failureRecorded = false;
 	try {
 		const response = await realDebridAxios.post(
 			`${bare ? 'https://app.real-debrid.com' : getProxyUrl(config.proxy) + config.realDebridHostname}/rest/1.0/torrents/addMagnet`,
@@ -599,18 +554,10 @@ export const addHashAsMagnet = async (
 			}
 		);
 		if (response.status !== 201) {
-			recordFailureMetric('POST /torrents/addMagnet', {
-				response: { status: response.status },
-			});
-			failureRecorded = true;
 			throw new Error('Failed to add magnet, status: ' + response.status);
 		}
-		recordSuccessMetric('POST /torrents/addMagnet', response.status);
 		return response.data.id;
 	} catch (error: any) {
-		if (!failureRecorded) {
-			recordFailureMetric('POST /torrents/addMagnet', error);
-		}
 		throw error;
 	}
 };
@@ -654,9 +601,7 @@ export const selectFiles = async (
 				},
 			}
 		);
-		recordSuccessMetric('POST /torrents/selectFiles/{id}', response.status);
 	} catch (error: any) {
-		recordFailureMetric('POST /torrents/selectFiles/{id}', error);
 		console.error('Error selecting files:', error.message);
 		throw error;
 	}
@@ -676,9 +621,7 @@ export const deleteTorrent = async (
 				},
 			}
 		);
-		recordSuccessMetric('DELETE /torrents/delete/{id}', response.status);
 	} catch (error: any) {
-		recordFailureMetric('DELETE /torrents/delete/{id}', error);
 		console.error('Error deleting torrent:', error.message);
 		throw error;
 	}
@@ -717,10 +660,8 @@ export const unrestrictLink = async (
 				},
 			}
 		);
-		recordSuccessMetric('POST /unrestrict/link', response.status);
 		return response.data;
 	} catch (error: any) {
-		recordFailureMetric('POST /unrestrict/link', error);
 		console.error('Error checking unrestrict:', error.message);
 		throw error;
 	}
@@ -743,10 +684,8 @@ export const proxyUnrestrictLink = async (
 			{ headers }
 		);
 
-		recordSuccessMetric('POST /unrestrict/link', response.status);
 		return response.data;
 	} catch (error: any) {
-		recordFailureMetric('POST /unrestrict/link', error);
 		console.error('Error checking unrestrict:', error.message);
 		throw error;
 	}

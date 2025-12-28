@@ -2,13 +2,9 @@ import { useConnectivity } from '@/hooks/useConnectivity';
 import type { RealDebridObservabilityStats } from '@/lib/observability/getRealDebridObservabilityStats';
 import type { LucideIcon } from 'lucide-react';
 import {
-	Activity,
 	AlertTriangle,
 	CheckCircle2,
 	Clock,
-	DownloadCloud,
-	Link2,
-	List,
 	Loader2,
 	RefreshCw,
 	Wifi,
@@ -27,10 +23,6 @@ const HistoryCharts = dynamic(
 
 const FIXED_LOCALE = 'en-US';
 
-function formatNumber(value: number): string {
-	return value.toLocaleString(FIXED_LOCALE);
-}
-
 function formatDateTime(timestamp: number): string {
 	return new Date(timestamp).toLocaleString(FIXED_LOCALE, {
 		month: 'short',
@@ -48,19 +40,8 @@ function isRealDebridObservabilityPayload(value: unknown): value is RealDebridOb
 		return false;
 	}
 	const candidate = value as Record<string, unknown>;
-	if (!Array.isArray(candidate.monitoredOperations)) {
-		return false;
-	}
-	if (!candidate.monitoredOperations.every((entry) => typeof entry === 'string')) {
-		return false;
-	}
-	if (typeof candidate.considered !== 'number') {
-		return false;
-	}
-	if (typeof candidate.windowSize !== 'number') {
-		return false;
-	}
-	if (!candidate.byOperation || typeof candidate.byOperation !== 'object') {
+	// Only need workingStream for stream health checks
+	if (!candidate.workingStream || typeof candidate.workingStream !== 'object') {
 		return false;
 	}
 	return true;
@@ -130,11 +111,16 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 		);
 	}
 
-	const state: StatusState = !stats.considered ? 'idle' : stats.isDown ? 'down' : 'up';
-	const successPct = Math.round(stats.successRate * 100);
-	const lastUpdated = stats.lastTs ? new Date(stats.lastTs) : null;
-	const lastUpdatedIso = lastUpdated ? lastUpdated.toISOString() : null;
-	const trackingWindowLabel = formatNumber(stats.windowSize);
+	// Stream Health Logic - determines overall status
+	const workingStream = stats.workingStream;
+	const recentChecks = workingStream?.recentChecks ?? [];
+	const passedCount = recentChecks.filter((c) => c.ok).length;
+	const totalChecks = recentChecks.length;
+	const streamPct = totalChecks > 0 ? Math.round((passedCount / totalChecks) * 100) : null;
+
+	// Determine status based on stream health
+	const state: StatusState =
+		totalChecks === 0 ? 'idle' : streamPct !== null && streamPct < 50 ? 'down' : 'up';
 
 	const statusMeta: Record<
 		StatusState,
@@ -157,7 +143,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 		},
 		up: {
 			label: 'Real-Debrid is Operational',
-			description: 'All systems operational',
+			description: 'Stream servers responding',
 			colorClass: 'text-emerald-400',
 			bgColorClass: 'bg-emerald-500/10',
 			borderColorClass: 'border-emerald-500/20',
@@ -165,7 +151,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 		},
 		down: {
 			label: 'Real-Debrid is Down',
-			description: 'Major outage detected',
+			description: 'Stream servers not responding',
 			colorClass: 'text-rose-500',
 			bgColorClass: 'bg-rose-500/10',
 			borderColorClass: 'border-rose-500/20',
@@ -174,60 +160,6 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 	};
 
 	const currentStatus = statusMeta[state];
-	const StatusIcon = currentStatus.icon;
-
-	const getPercentageColor = (pct: number) =>
-		pct >= 90 ? 'text-emerald-400' : pct >= 60 ? 'text-amber-400' : 'text-rose-500';
-
-	const unrestrictPct = stats.byOperation['POST /unrestrict/link']?.considered
-		? Math.round(stats.byOperation['POST /unrestrict/link'].successRate * 100)
-		: null;
-	const torrentsPct = stats.byOperation['GET /torrents']?.considered
-		? Math.round(stats.byOperation['GET /torrents'].successRate * 100)
-		: null;
-	const addMagnetPct = stats.byOperation['POST /torrents/addMagnet']?.considered
-		? Math.round(stats.byOperation['POST /torrents/addMagnet'].successRate * 100)
-		: null;
-
-	const summaryMetrics: Array<{
-		label: string;
-		value: string;
-		helper: string;
-		icon: LucideIcon;
-		color?: string;
-	}> = [
-		{
-			label: 'API Success Rate',
-			value: stats.considered ? `${successPct}%` : '—',
-			helper: `${formatNumber(stats.successCount)}/${formatNumber(stats.considered)} (2xx vs 5xx)`,
-			icon: Activity,
-			color: getPercentageColor(successPct),
-		},
-		{
-			label: 'Unrestrict',
-			value: unrestrictPct !== null ? `${unrestrictPct}%` : '—',
-			helper: 'Link generation',
-			icon: Link2,
-			color: unrestrictPct !== null ? getPercentageColor(unrestrictPct) : undefined,
-		},
-		{
-			label: 'Torrents',
-			value: torrentsPct !== null ? `${torrentsPct}%` : '—',
-			helper: 'List retrieval',
-			icon: List,
-			color: torrentsPct !== null ? getPercentageColor(torrentsPct) : undefined,
-		},
-		{
-			label: 'Add Magnet',
-			value: addMagnetPct !== null ? `${addMagnetPct}%` : '—',
-			helper: 'Submission',
-			icon: DownloadCloud,
-			color: addMagnetPct !== null ? getPercentageColor(addMagnetPct) : undefined,
-		},
-	];
-
-	// Stream Health Logic
-	const workingStream = stats.workingStream;
 
 	return (
 		<>
@@ -235,7 +167,6 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 				<title>{pageTitle}</title>
 				<link rel="canonical" href={canonicalUrl} />
 				<meta name="description" content={defaultDescription} />
-				{lastUpdatedIso && <meta property="og:updated_time" content={lastUpdatedIso} />}
 			</Head>
 
 			<main className="min-h-screen bg-slate-950 text-slate-100">
@@ -279,11 +210,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 						</h1>
 
 						<p className="max-w-2xl text-lg text-slate-400">
-							Live monitoring of Real-Debrid services based on the last{' '}
-							<span className="font-medium text-slate-200">
-								{trackingWindowLabel}
-							</span>{' '}
-							requests.
+							Live monitoring of Real-Debrid stream server availability.
 						</p>
 
 						<div className="flex items-center gap-4 text-xs font-medium text-slate-500">
@@ -328,36 +255,6 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 						</div>
 					</header>
 
-					{/* Primary Metrics Grid */}
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-						{summaryMetrics.map((metric) => (
-							<div
-								key={metric.label}
-								data-testid={
-									metric.label === 'API Success Rate'
-										? 'success-rate-card'
-										: undefined
-								}
-								className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-5 transition-colors hover:border-white/20 hover:bg-white/10"
-							>
-								<div className="flex items-center justify-between">
-									<p className="text-sm font-medium text-slate-400">
-										{metric.label}
-									</p>
-									<metric.icon className="h-5 w-5 text-slate-500 opacity-50 transition-opacity group-hover:opacity-100" />
-								</div>
-								<div className="mt-2 flex items-baseline gap-2">
-									<span
-										className={`text-2xl font-bold ${metric.color || 'text-slate-200'}`}
-									>
-										{metric.value}
-									</span>
-								</div>
-								<p className="mt-1 text-xs text-slate-500">{metric.helper}</p>
-							</div>
-						))}
-					</div>
-
 					{/* Stream Health & Info */}
 					<div className="grid gap-6 lg:grid-cols-3">
 						<div
@@ -369,64 +266,52 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 								Stream Server Check
 							</h3>
 							<div className="mt-4">
-								{(() => {
-									const recentChecks = workingStream?.recentChecks ?? [];
-									const passedCount = recentChecks.filter((c) => c.ok).length;
-									const totalChecks = recentChecks.length;
-									const pct =
-										totalChecks > 0
-											? Math.round((passedCount / totalChecks) * 100)
-											: null;
-									const pctColor =
-										pct === null
-											? 'text-slate-400'
-											: pct >= 80
-												? 'text-emerald-400'
-												: pct >= 40
-													? 'text-amber-400'
-													: 'text-rose-500';
-
-									return (
-										<>
-											<div className="flex items-baseline gap-2">
-												<span className={`text-3xl font-bold ${pctColor}`}>
-													{pct !== null ? `${pct}%` : '—'}
-												</span>
-												<span className="text-sm text-slate-500">
-													{totalChecks > 0
-														? `${passedCount}/${totalChecks} passed`
-														: 'no data yet'}
-												</span>
-											</div>
-											{totalChecks > 0 && (
-												<div
-													className="mt-3 flex items-center gap-1.5"
-													title="Last 5 checks (newest first)"
-												>
-													{recentChecks.map((check, i) => (
-														<span
-															key={i}
-															className={`h-3 w-3 rounded-full ${check.ok ? 'bg-emerald-500' : 'bg-rose-500'}`}
-															title={
-																check.ok
-																	? `Passed${check.latencyMs ? ` (${Math.round(check.latencyMs)}ms)` : ''}`
-																	: 'Failed'
-															}
-														/>
-													))}
-												</div>
-											)}
-											{workingStream?.avgLatencyMs && (
-												<div className="mt-3 flex justify-between text-sm text-slate-400">
-													<span>Latency</span>
-													<span className="text-slate-200">
-														{Math.round(workingStream.avgLatencyMs)}ms
-													</span>
-												</div>
-											)}
-										</>
-									);
-								})()}
+								<div className="flex items-baseline gap-2">
+									<span
+										className={`text-3xl font-bold ${
+											streamPct === null
+												? 'text-slate-400'
+												: streamPct >= 80
+													? 'text-emerald-400'
+													: streamPct >= 40
+														? 'text-amber-400'
+														: 'text-rose-500'
+										}`}
+									>
+										{streamPct !== null ? `${streamPct}%` : '—'}
+									</span>
+									<span className="text-sm text-slate-500">
+										{totalChecks > 0
+											? `${passedCount}/${totalChecks} passed`
+											: 'no data yet'}
+									</span>
+								</div>
+								{totalChecks > 0 && (
+									<div
+										className="mt-3 flex items-center gap-1.5"
+										title="Last 5 checks (newest first)"
+									>
+										{recentChecks.map((check, i) => (
+											<span
+												key={i}
+												className={`h-3 w-3 rounded-full ${check.ok ? 'bg-emerald-500' : 'bg-rose-500'}`}
+												title={
+													check.ok
+														? `Passed${check.latencyMs ? ` (${Math.round(check.latencyMs)}ms)` : ''}`
+														: 'Failed'
+												}
+											/>
+										))}
+									</div>
+								)}
+								{workingStream?.avgLatencyMs && (
+									<div className="mt-3 flex justify-between text-sm text-slate-400">
+										<span>Latency</span>
+										<span className="text-slate-200">
+											{Math.round(workingStream.avgLatencyMs)}ms
+										</span>
+									</div>
+								)}
 							</div>
 						</div>
 
@@ -437,9 +322,9 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 										About this data
 									</h3>
 									<p className="mt-2 text-sm text-slate-400">
-										This dashboard tracks API success rates from Debrid Media
-										Manager community usage (2xx vs 5xx responses). Stream
-										server health is checked via automated monitoring.
+										This dashboard monitors Real-Debrid stream server
+										availability via automated health checks that run every 5
+										minutes.
 									</p>
 								</div>
 
@@ -452,10 +337,10 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 										</span>
 									</div>
 									<p className="pl-4 text-xs text-slate-500">
-										If Real-Debrid is down for everyone, you will see the
-										failure rates spike here. If this page says
-										&quot;Operational&quot; but you can&apos;t connect, the
-										issue might be your ISP or local network.
+										If Real-Debrid is down for everyone, you will see failure
+										here. If this page says &quot;Operational&quot; but you
+										can&apos;t connect, the issue might be your ISP or local
+										network.
 									</p>
 								</div>
 							</div>
