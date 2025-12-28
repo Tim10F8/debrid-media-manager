@@ -4,7 +4,7 @@ import TvSearchResults from '@/components/TvSearchResults';
 import { showInfoForRD } from '@/components/showInfo';
 import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
-import { useAvailabilityCheck, type DebridService } from '@/hooks/useAvailabilityCheck';
+import { useAvailabilityCheck } from '@/hooks/useAvailabilityCheck';
 import { useExternalSources } from '@/hooks/useExternalSources';
 import { useMassReport } from '@/hooks/useMassReport';
 import { useTorrentManagement } from '@/hooks/useTorrentManagement';
@@ -555,34 +555,6 @@ const TvSearch: FunctionComponent = () => {
 						? `${totalAvailableCount} cached (${servicesWithCache.join(', ')})`
 						: `${totalAvailableCount} cached torrents available`;
 				toast(message, searchToastOptions);
-			}
-
-			// Auto-trigger availability check for services that have no cached torrents
-			// Only trigger after library has finished syncing to ensure accurate counts
-			if (finalResults > 0 && !isCheckingAvailability && !isLibrarySyncing) {
-				const autoCheckDisabled =
-					window.localStorage.getItem('settings:disableAutoAvailabilityCheck') === 'true';
-				const autoCheckKey = `autoAvailabilityChecked:${imdbid}:${seasonNum}`;
-				const alreadyChecked = window.localStorage.getItem(autoCheckKey) === 'true';
-
-				// Determine which services need checking (independent per service)
-				const servicesNeedingCheck: DebridService[] = [];
-				if (rdKey && (rdAvailableCount ?? 0) === 0) servicesNeedingCheck.push('RD');
-				if (adKey && (adAvailableCount ?? 0) === 0) servicesNeedingCheck.push('AD');
-				if (torboxKey && (tbAvailableCount ?? 0) === 0) servicesNeedingCheck.push('TB');
-
-				if (!autoCheckDisabled && !alreadyChecked && servicesNeedingCheck.length > 0) {
-					// Mark as checked to prevent re-triggering
-					window.localStorage.setItem(autoCheckKey, 'true');
-					const servicesList = servicesNeedingCheck.join(', ');
-					toast(
-						`No cached in ${servicesList}. Checking availability in 3 secs...`,
-						searchToastOptions
-					);
-					setTimeout(() => {
-						checkServiceAvailabilityBulk(searchResults, servicesNeedingCheck);
-					}, 3000);
-				}
 			}
 		}
 
