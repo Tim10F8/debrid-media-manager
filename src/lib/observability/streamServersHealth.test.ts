@@ -72,34 +72,52 @@ describe('streamServersHealth', () => {
 	});
 
 	it('updates ceiling when higher servers are discovered', async () => {
-		// Set initial ceiling
-		__testing.setCeiling(120);
-
-		// Mock fetch to make all DNS checks pass
-		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
+		// Initial ceiling is 100, mock servers 1-115 exist (higher than ceiling)
+		const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+			const match = url.match(/https:\/\/(\d+)\.download\.real-debrid\.com/);
+			if (match) {
+				const serverNum = parseInt(match[1], 10);
+				if (serverNum <= 115) {
+					return mockPartialContentResponse();
+				}
+				// Servers > 115 don't exist (DNS failure)
+				const error = new Error('getaddrinfo ENOTFOUND');
+				throw error;
+			}
+			return mockPartialContentResponse();
+		});
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		const server = await __testing.discoverAndPick();
 
-		// Should have picked a server
+		// Should have picked a server from top 5 (115, 114, 113, 112, 111)
 		expect(server).not.toBeNull();
-
-		// Server should be from the range that was probed (116-130)
 		const match = server!.host.match(/^(\d+)\.download\.real-debrid\.com$/);
 		expect(match).not.toBeNull();
 		const serverNum = parseInt(match![1], 10);
-		expect(serverNum).toBeGreaterThanOrEqual(116);
-		expect(serverNum).toBeLessThanOrEqual(130);
+		expect(serverNum).toBeGreaterThanOrEqual(111);
+		expect(serverNum).toBeLessThanOrEqual(115);
 
-		// Ceiling should be updated to highest found (130 since all DNS checks pass)
-		expect(__testing.getCeiling()).toBe(130);
+		// Ceiling should be updated to highest found (115 > initial 100)
+		expect(__testing.getCeiling()).toBe(115);
 	});
 
 	it('persists results to database after a run', async () => {
 		const { repository } = await import('@/services/repository');
 
-		// All requests succeed with 206 Partial Content (Range request response)
-		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
+		// Mock: only servers 1-5 exist (to limit sequential probing)
+		const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+			const match = url.match(/https:\/\/(\d+)\.download\.real-debrid\.com/);
+			if (match) {
+				const serverNum = parseInt(match[1], 10);
+				if (serverNum <= 5) {
+					return mockPartialContentResponse();
+				}
+				const error = new Error('getaddrinfo ENOTFOUND');
+				throw error;
+			}
+			return mockPartialContentResponse();
+		});
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		await __testing.runNow();
@@ -111,7 +129,19 @@ describe('streamServersHealth', () => {
 	});
 
 	it('uses correct test URL format', async () => {
-		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
+		// Mock: only servers 1-5 exist (to limit sequential probing)
+		const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+			const match = url.match(/https:\/\/(\d+)\.download\.real-debrid\.com/);
+			if (match) {
+				const serverNum = parseInt(match[1], 10);
+				if (serverNum <= 5) {
+					return mockPartialContentResponse();
+				}
+				const error = new Error('getaddrinfo ENOTFOUND');
+				throw error;
+			}
+			return mockPartialContentResponse();
+		});
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		await __testing.runNow();

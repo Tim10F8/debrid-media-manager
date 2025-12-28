@@ -10,7 +10,7 @@ import { repository } from '@/services/repository';
 const REQUEST_TIMEOUT_MS = 5000;
 const ITERATIONS_PER_SERVER = 3;
 const INITIAL_SERVER_CEILING = 100;
-const DNS_PROBE_AHEAD = 10; // Check 10 servers ahead of current ceiling
+const DNS_PROBE_AHEAD = 20; // Check 20 servers ahead of current ceiling
 const TOP_SERVERS_TO_PICK_FROM = 5;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 2000]; // 1s, then 2s between retries
@@ -59,36 +59,32 @@ export interface WorkingStreamServerStatus {
  * Updates the known ceiling if higher servers are discovered.
  */
 async function discoverAndPickServer(): Promise<{ id: string; host: string } | null> {
-	// Probe from (ceiling - 4) to (ceiling + DNS_PROBE_AHEAD)
-	const startNum = Math.max(1, knownServerCeiling - (TOP_SERVERS_TO_PICK_FROM - 1));
-	const endNum = knownServerCeiling + DNS_PROBE_AHEAD;
+	// Probe dynamically: extend ceiling by DNS_PROBE_AHEAD each time we find a server
+	const existingServers: number[] = [];
+	let current = 1;
+	let ceiling = DNS_PROBE_AHEAD; // Start with initial probe range
 
-	const candidates: number[] = [];
-	for (let i = startNum; i <= endNum; i++) {
-		candidates.push(i);
+	while (current <= ceiling) {
+		const host = `${current}.${DOMAIN}`;
+		const exists = await hostExists(host);
+
+		if (exists) {
+			existingServers.push(current);
+			ceiling = current + DNS_PROBE_AHEAD; // Extend ceiling
+		}
+
+		current++;
 	}
-
-	// Check DNS for all candidates in parallel
-	const existenceResults = await Promise.all(
-		candidates.map(async (num) => {
-			const host = `${num}.${DOMAIN}`;
-			const exists = await hostExists(host);
-			return { num, host, exists };
-		})
-	);
-
-	// Filter to only existing servers
-	const existingServers = existenceResults
-		.filter((r) => r.exists)
-		.map((r) => r.num)
-		.sort((a, b) => b - a); // Sort descending
 
 	if (existingServers.length === 0) {
 		console.warn('[StreamHealth] No servers found via DNS check');
 		return null;
 	}
 
-	// Update ceiling if we found higher servers
+	// Sort descending to get highest first
+	existingServers.sort((a, b) => b - a);
+
+	// Update module-level ceiling if we found higher servers
 	const highestFound = existingServers[0];
 	if (highestFound > knownServerCeiling) {
 		console.log(
