@@ -1,8 +1,14 @@
 import axios, { AxiosRequestConfig } from 'axios';
+import getConfig from 'next/config';
 import { getMdblistCacheService } from './database/mdblistCache';
 
 export class MetadataCacheService {
 	private cache = getMdblistCacheService();
+
+	private get runtimeConfig() {
+		const config = getConfig();
+		return config?.publicRuntimeConfig || {};
+	}
 
 	// Cache durations in milliseconds
 	private readonly CACHE_DURATIONS = {
@@ -49,8 +55,12 @@ export class MetadataCacheService {
 
 		// Fetch from API
 		console.log(`[MetadataCache] Fetching ${cacheType} data from: ${url}`);
-		const response = await axios.get<T>(url, config || {});
-		const data = response.data;
+		const response = await axios.get(url, config || {});
+		const data = response?.data;
+
+		if (data === undefined) {
+			throw new Error(`Failed to fetch ${cacheType} data from: ${url}`);
+		}
 
 		// Cache the response (non-blocking)
 		try {
@@ -125,7 +135,7 @@ export class MetadataCacheService {
 	 * Search OMDB with caching
 	 */
 	async searchOmdb(keyword: string, year?: number, mediaType?: string): Promise<any> {
-		const omdbKey = process.env.OMDB_KEY;
+		const omdbKey = process.env.OMDB_KEY || this.runtimeConfig.omdbKey;
 		if (!omdbKey) {
 			throw new Error('OMDB_KEY environment variable is not set');
 		}
@@ -145,7 +155,7 @@ export class MetadataCacheService {
 	 * Get OMDB info by IMDB ID with caching
 	 */
 	async getOmdbInfo(imdbId: string): Promise<any> {
-		const omdbKey = process.env.OMDB_KEY;
+		const omdbKey = process.env.OMDB_KEY || this.runtimeConfig.omdbKey;
 		if (!omdbKey) {
 			throw new Error('OMDB_KEY environment variable is not set');
 		}
@@ -159,7 +169,7 @@ export class MetadataCacheService {
 	 * Search TMDB by IMDB ID with caching
 	 */
 	async searchTmdbByImdb(imdbId: string): Promise<any> {
-		const tmdbKey = process.env.TMDB_KEY;
+		const tmdbKey = process.env.TMDB_KEY || this.runtimeConfig.tmdbKey;
 		if (!tmdbKey) {
 			throw new Error('TMDB_KEY environment variable is not set');
 		}
@@ -173,7 +183,7 @@ export class MetadataCacheService {
 	 * Get TMDB movie info with caching
 	 */
 	async getTmdbMovieInfo(tmdbId: string | number): Promise<any> {
-		const tmdbKey = process.env.TMDB_KEY;
+		const tmdbKey = process.env.TMDB_KEY || this.runtimeConfig.tmdbKey;
 		if (!tmdbKey) {
 			throw new Error('TMDB_KEY environment variable is not set');
 		}
@@ -187,7 +197,7 @@ export class MetadataCacheService {
 	 * Get TMDB TV info with caching
 	 */
 	async getTmdbTvInfo(tmdbId: string | number): Promise<any> {
-		const tmdbKey = process.env.TMDB_KEY;
+		const tmdbKey = process.env.TMDB_KEY || this.runtimeConfig.tmdbKey;
 		if (!tmdbKey) {
 			throw new Error('TMDB_KEY environment variable is not set');
 		}
@@ -205,7 +215,7 @@ export class MetadataCacheService {
 		genre?: string,
 		limit: number = 20
 	): Promise<any> {
-		const clientId = process.env.TRAKT_CLIENT_ID;
+		const clientId = process.env.TRAKT_CLIENT_ID || this.runtimeConfig.traktClientId;
 		if (!clientId) {
 			throw new Error('TRAKT_CLIENT_ID environment variable is not set');
 		}
@@ -238,7 +248,7 @@ export class MetadataCacheService {
 		genre?: string,
 		limit: number = 20
 	): Promise<any> {
-		const clientId = process.env.TRAKT_CLIENT_ID;
+		const clientId = process.env.TRAKT_CLIENT_ID || this.runtimeConfig.traktClientId;
 		if (!clientId) {
 			throw new Error('TRAKT_CLIENT_ID environment variable is not set');
 		}
@@ -267,7 +277,7 @@ export class MetadataCacheService {
 	 * Search Trakt with caching
 	 */
 	async searchTrakt(query: string, type?: 'movie' | 'show'): Promise<any> {
-		const clientId = process.env.TRAKT_CLIENT_ID;
+		const clientId = process.env.TRAKT_CLIENT_ID || this.runtimeConfig.traktClientId;
 		if (!clientId) {
 			throw new Error('TRAKT_CLIENT_ID environment variable is not set');
 		}

@@ -504,6 +504,10 @@ export class Repository {
 		return this.historyAggregationService.cleanupOldData();
 	}
 
+	public getRdRawHistory(hoursBack?: number, operation?: string) {
+		return this.historyAggregationService.getRdRawHistory(hoursBack, operation);
+	}
+
 	public getRdHourlyHistory(hoursBack?: number, operation?: string) {
 		return this.historyAggregationService.getRdHourlyHistory(hoursBack, operation);
 	}

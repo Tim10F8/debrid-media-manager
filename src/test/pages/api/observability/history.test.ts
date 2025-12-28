@@ -6,6 +6,14 @@ import handler from '@/pages/api/observability/history';
 // Mock the repository
 vi.mock('@/services/repository', () => ({
 	repository: {
+		getRdRawHistory: vi.fn().mockResolvedValue([
+			{
+				timestamp: new Date('2024-01-15T14:30:00Z'),
+				operation: 'GET /user',
+				status: 200,
+				success: true,
+			},
+		]),
 		getRdHourlyHistory: vi.fn().mockResolvedValue([
 			{
 				hour: new Date('2024-01-15T14:00:00Z'),
@@ -90,7 +98,7 @@ describe('history API endpoint', () => {
 		expect(res.json).toHaveBeenCalledWith({ error: 'Method not allowed' });
 	});
 
-	it('returns hourly RD data for 24h range', async () => {
+	it('returns raw RD data for 24h range', async () => {
 		const req = createMockRequest({ type: 'rd', range: '24h' });
 		const res = createMockResponse();
 
@@ -100,7 +108,7 @@ describe('history API endpoint', () => {
 		expect(res.json).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'rd',
-				granularity: 'hourly',
+				granularity: 'raw',
 				range: '24h',
 				data: expect.any(Array),
 			})
@@ -210,7 +218,7 @@ describe('history API endpoint', () => {
 		expect(res.json).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'rd',
-				granularity: 'hourly',
+				granularity: 'raw',
 				range: '24h',
 			})
 		);

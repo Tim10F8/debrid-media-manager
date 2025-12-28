@@ -12,6 +12,13 @@ import {
 
 type HistoryRange = '24h' | '7d' | '30d' | '90d';
 
+interface RdRawData {
+	timestamp: string;
+	operation: string;
+	status: number;
+	success: boolean;
+}
+
 interface RdHourlyData {
 	hour: string;
 	operation: string;
@@ -74,17 +81,26 @@ function formatShortTime(dateStr: string): string {
 	});
 }
 
+function formatTimeWithSeconds(dateStr: string): string {
+	const date = new Date(dateStr);
+	return date.toLocaleTimeString(FIXED_LOCALE, {
+		hour: '2-digit',
+		minute: '2-digit',
+		second: '2-digit',
+	});
+}
+
 function formatPercent(value: number): string {
 	return `${Math.round(value * 100)}%`;
 }
 
 export function HistoryCharts() {
 	const [range, setRange] = useState<HistoryRange>('24h');
-	const [rdData, setRdData] = useState<(RdHourlyData | RdDailyData)[]>([]);
+	const [rdData, setRdData] = useState<(RdRawData | RdHourlyData | RdDailyData)[]>([]);
 	const [streamData, setStreamData] = useState<(StreamHourlyData | StreamDailyData)[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [granularity, setGranularity] = useState<'hourly' | 'daily'>('hourly');
+	const [granularity, setGranularity] = useState<'raw' | 'hourly' | 'daily'>('hourly');
 
 	const fetchHistory = useCallback(async () => {
 		setLoading(true);
@@ -105,14 +121,16 @@ export function HistoryCharts() {
 				throw new Error('Failed to fetch history data');
 			}
 
-			const rdJson = (await rdResponse.json()) as HistoryResponse<RdHourlyData | RdDailyData>;
+			const rdJson = (await rdResponse.json()) as HistoryResponse<
+				RdRawData | RdHourlyData | RdDailyData
+			>;
 			const streamJson = (await streamResponse.json()) as HistoryResponse<
 				StreamHourlyData | StreamDailyData
 			>;
 
 			setRdData(rdJson.data ?? []);
 			setStreamData(streamJson.data ?? []);
-			setGranularity((rdJson.granularity as 'hourly' | 'daily') ?? 'hourly');
+			setGranularity((rdJson.granularity as 'raw' | 'hourly' | 'daily') ?? 'hourly');
 		} catch (err) {
 			console.error('Failed to fetch history:', err);
 			setError(err instanceof Error ? err.message : 'Failed to load history');
@@ -128,7 +146,31 @@ export function HistoryCharts() {
 	// Aggregate RD data for the chart (combine all operations)
 	const aggregatedRdData = (rdData ?? []).reduce(
 		(acc, item) => {
-			const key = 'hour' in item ? item.hour : item.date;
+			let key: string;
+			let successRate: number;
+			let totalCount = 1;
+			let successCount = 0;
+			let failureCount = 0;
+
+			if ('timestamp' in item) {
+				key = item.timestamp;
+				successRate = item.success ? 1 : 0;
+				successCount = item.success ? 1 : 0;
+				failureCount = item.success ? 0 : 1;
+			} else if ('hour' in item) {
+				key = item.hour;
+				successRate = item.successRate;
+				totalCount = item.totalCount;
+				successCount = item.successCount;
+				failureCount = item.failureCount;
+			} else {
+				key = item.date;
+				successRate = 'avgSuccessRate' in item ? item.avgSuccessRate : 0;
+				totalCount = item.totalCount;
+				successCount = item.successCount;
+				failureCount = item.failureCount;
+			}
+
 			if (!acc[key]) {
 				acc[key] = {
 					time: key,
@@ -139,11 +181,25 @@ export function HistoryCharts() {
 					operationCount: 0,
 				};
 			}
-			acc[key].totalCount += item.totalCount;
-			acc[key].successCount += item.successCount;
-			acc[key].failureCount += item.failureCount;
-			acc[key].successRate +=
-				'avgSuccessRate' in item ? item.avgSuccessRate : item.successRate;
+
+			if ('timestamp' in item) {
+				// For raw data, we average the success rates if they happen at the exact same timestamp
+				// But more importantly, we just want to accumulate the counts
+				acc[key].totalCount += totalCount;
+				acc[key].successCount += successCount;
+				acc[key].failureCount += failureCount;
+				// For raw, successRate is 0 or 1.
+				// We sum them up and divide by count later?
+				// Actually, `successRate` in acc is sum of rates.
+				acc[key].successRate += successRate;
+			} else {
+				// For aggregated data
+				acc[key].totalCount += totalCount;
+				acc[key].successCount += successCount;
+				acc[key].failureCount += failureCount;
+				acc[key].successRate += successRate;
+			}
+
 			acc[key].operationCount += 1;
 			return acc;
 		},
@@ -161,26 +217,46 @@ export function HistoryCharts() {
 	);
 
 	const rdChartData = Object.values(aggregatedRdData)
-		.map((item) => ({
-			time: item.time,
-			successRate: item.operationCount > 0 ? item.successRate / item.operationCount : 0,
-			totalCount: item.totalCount,
-			label:
-				granularity === 'hourly' ? formatShortTime(item.time) : formatShortDate(item.time),
-		}))
+		.map((item) => {
+			// Determine format based on granularity
+			// If granularity is raw, we might have many points.
+			// But we also want to support 'hourly'/'daily' formatting correctly.
+			let label: string;
+			// Detect type by checking if the time string looks like a date or time,
+			// or just rely on the granularity state (or range).
+			if (granularity === 'raw') {
+				label = formatTimeWithSeconds(item.time);
+			} else if (granularity === 'hourly') {
+				label = formatShortTime(item.time);
+			} else {
+				label = formatShortDate(item.time);
+			}
+
+			return {
+				time: item.time,
+				// For raw: successRate sum / operationCount.
+				// For hourly: successRate sum / operationCount (avg of rates).
+				successRate: item.operationCount > 0 ? item.successRate / item.operationCount : 0,
+				totalCount: item.totalCount,
+				label,
+			};
+		})
 		.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 
 	// Format stream data for chart
 	const streamChartData = (streamData ?? [])
-		.map((item) => ({
-			time: 'hour' in item ? item.hour : item.date,
-			workingRate: 'avgWorkingRate' in item ? item.avgWorkingRate : item.workingRate,
-			avgLatencyMs: item.avgLatencyMs,
-			label:
-				granularity === 'hourly'
-					? formatShortTime('hour' in item ? item.hour : item.date)
-					: formatShortDate('hour' in item ? item.hour : item.date),
-		}))
+		.map((item) => {
+			const isHourly = 'hour' in item;
+			const time = isHourly ? item.hour : item.date;
+			const label = isHourly ? formatShortTime(time) : formatShortDate(time);
+
+			return {
+				time,
+				workingRate: 'avgWorkingRate' in item ? item.avgWorkingRate : item.workingRate,
+				avgLatencyMs: item.avgLatencyMs,
+				label,
+			};
+		})
 		.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 
 	const rangeOptions: { value: HistoryRange; label: string }[] = [
@@ -189,6 +265,9 @@ export function HistoryCharts() {
 		{ value: '30d', label: '30 Days' },
 		{ value: '90d', label: '90 Days' },
 	];
+
+	const granularityLabel =
+		granularity === 'raw' ? 'Every check' : granularity === 'hourly' ? 'Hourly' : 'Daily';
 
 	if (loading) {
 		return (
@@ -240,8 +319,7 @@ export function HistoryCharts() {
 					<div>
 						<h2 className="text-lg font-semibold text-white">Historical Data</h2>
 						<p className="text-xs text-slate-400">
-							{granularity === 'hourly' ? 'Hourly' : 'Daily'} aggregates for the past{' '}
-							{range}
+							{granularityLabel} aggregates for the past {range}
 						</p>
 					</div>
 				</div>
@@ -309,6 +387,7 @@ export function HistoryCharts() {
 										tickLine={false}
 										axisLine={{ stroke: '#475569' }}
 										interval="preserveStartEnd"
+										minTickGap={20}
 									/>
 									<YAxis
 										tick={{ fill: '#94a3b8', fontSize: 10 }}
@@ -330,7 +409,10 @@ export function HistoryCharts() {
 										]}
 									/>
 									<Area
-										type="monotone"
+										type="monotone" // Use 'monotone' or 'step' for raw data? 'step' is better for 0/1 but monotone looks nicer.
+										// 'monotone' with 0/1 data might overshoot.
+										// For raw data, if it's high frequency, it looks like a line.
+										// Let's stick to monotone for consistency.
 										dataKey="successRate"
 										stroke="#10b981"
 										fill="url(#successGradient)"
@@ -380,6 +462,7 @@ export function HistoryCharts() {
 										tickLine={false}
 										axisLine={{ stroke: '#475569' }}
 										interval="preserveStartEnd"
+										minTickGap={20}
 									/>
 									<YAxis
 										tick={{ fill: '#94a3b8', fontSize: 10 }}

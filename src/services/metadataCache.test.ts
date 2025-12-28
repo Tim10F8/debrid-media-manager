@@ -1,6 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MetadataCacheService, getMetadataCache } from './metadataCache';
 
+vi.mock('next/config', () => ({
+	default: () => ({
+		publicRuntimeConfig: {},
+	}),
+}));
+
 const cacheFactory: { current: CacheStub | null } = { current: null };
 
 vi.mock('./database/mdblistCache', () => ({

@@ -15,6 +15,13 @@ const MONITORED_OPERATIONS: RealDebridOperation[] = [
 const HOURLY_RETENTION_DAYS = 7;
 const DAILY_RETENTION_DAYS = 90;
 
+export interface RdRawData {
+	timestamp: Date;
+	operation: string;
+	status: number;
+	success: boolean;
+}
+
 export interface RdHourlyData {
 	hour: Date;
 	operation: string;
@@ -583,6 +590,44 @@ export class HistoryAggregationService extends DatabaseClient {
 		}
 
 		return results;
+	}
+
+	/**
+	 * Gets RD raw history for a time range (limited by MAX_EVENTS retention).
+	 */
+	public async getRdRawHistory(hoursBack: number = 24, operation?: string): Promise<RdRawData[]> {
+		const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+
+		try {
+			const data = await this.prisma.rdOperationalEvent.findMany({
+				where: {
+					createdAt: { gte: since },
+					...(operation ? { operation } : {}),
+				},
+				orderBy: { createdAt: 'asc' },
+			});
+
+			return data.map((d) => ({
+				timestamp: d.createdAt,
+				operation: d.operation,
+				status: d.status,
+				success: d.status >= 200 && d.status < 300,
+			}));
+		} catch (error: any) {
+			if (
+				error?.code?.startsWith?.('P') ||
+				error?.name?.includes?.('Prisma') ||
+				error?.message?.includes('does not exist') ||
+				error?.message?.includes('Authentication failed')
+			) {
+				console.warn(
+					'getRdRawHistory: Database error, returning empty array:',
+					error?.code || error?.name
+				);
+				return [];
+			}
+			throw error;
+		}
 	}
 
 	/**

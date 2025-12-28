@@ -112,8 +112,8 @@ describe('RealDebridStatusPage client refresh', () => {
 		const workingStreamCard = getByTestId('working-stream-card');
 		expect(workingStreamCard).toBeTruthy();
 		expect(within(workingStreamCard).getByText('Working Stream')).toBeTruthy();
-		expect(getByTestId('status-answer-mobile').textContent).toBe('Waiting for data');
-		expect(getByTestId('status-freshness').textContent).toBe('As of —');
+		expect(getByTestId('status-answer-mobile').textContent).toBe(' collecting data');
+		expect(getByTestId('status-freshness').textContent?.startsWith('Last updated:')).toBe(true);
 	});
 
 	it('promotes Debrid Media Manager with an external CTA link', async () => {
