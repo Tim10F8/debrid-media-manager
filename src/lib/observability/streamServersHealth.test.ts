@@ -16,6 +16,7 @@ vi.mock('@/services/repository', () => ({
 			failedServers: [],
 		}),
 		deleteStreamHealthHosts: vi.fn().mockResolvedValue(0),
+		deleteDeprecatedStreamHosts: vi.fn().mockResolvedValue(0),
 		getAllStreamStatuses: vi.fn().mockResolvedValue([]),
 		recordStreamHealthSnapshot: vi.fn().mockResolvedValue(undefined),
 		recordServerReliability: vi.fn().mockResolvedValue(undefined),
@@ -58,30 +59,40 @@ describe('streamServersHealth', () => {
 		__testing.reset();
 	});
 
-	it('generates correct server list (1-120 on both domains with IPv4 variants)', () => {
+	it('returns top 5 servers based on current ceiling', () => {
+		// Default ceiling is 100
+		expect(__testing.getCeiling()).toBe(100);
+
 		const servers = __testing.getServerList();
 
-		// Should have 120 servers on each domain, plus 120 IPv4 variants for .download.real-debrid.com
-		// Total: 120 * 2 (both domains) + 120 (-4 variants) = 360
-		expect(servers.length).toBe(360);
+		// Should return top 5 servers (100, 99, 98, 97, 96)
+		expect(servers.length).toBe(5);
+		expect(servers[0].host).toBe('100.download.real-debrid.com');
+		expect(servers[4].host).toBe('96.download.real-debrid.com');
+	});
 
-		// Check first few servers
-		expect(servers[0]).toEqual({
-			id: '1.download.real-debrid.com',
-			host: '1.download.real-debrid.com',
-		});
-		expect(servers[1]).toEqual({
-			id: '1-4.download.real-debrid.com',
-			host: '1-4.download.real-debrid.com',
-		});
-		expect(servers[2]).toEqual({
-			id: '1.download.real-debrid.cloud',
-			host: '1.download.real-debrid.cloud',
-		});
+	it('updates ceiling when higher servers are discovered', async () => {
+		// Set initial ceiling
+		__testing.setCeiling(120);
 
-		// Check last server
-		const lastServer = servers[servers.length - 1];
-		expect(lastServer.host).toContain('120');
+		// Mock fetch to make all DNS checks pass
+		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		const server = await __testing.discoverAndPick();
+
+		// Should have picked a server
+		expect(server).not.toBeNull();
+
+		// Server should be from the range that was probed (116-130)
+		const match = server!.host.match(/^(\d+)\.download\.real-debrid\.com$/);
+		expect(match).not.toBeNull();
+		const serverNum = parseInt(match![1], 10);
+		expect(serverNum).toBeGreaterThanOrEqual(116);
+		expect(serverNum).toBeLessThanOrEqual(130);
+
+		// Ceiling should be updated to highest found (130 since all DNS checks pass)
+		expect(__testing.getCeiling()).toBe(130);
 	});
 
 	it('persists results to database after a run', async () => {

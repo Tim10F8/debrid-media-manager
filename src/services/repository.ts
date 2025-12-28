@@ -461,6 +461,10 @@ export class Repository {
 		return this.streamHealthService.deleteHosts(hosts);
 	}
 
+	public deleteDeprecatedStreamHosts() {
+		return this.streamHealthService.deleteDeprecatedHosts();
+	}
+
 	public cleanupOldStreamHealth(olderThanHours?: number) {
 		return this.streamHealthService.cleanupOldEntries(olderThanHours);
 	}

@@ -127,6 +127,40 @@ export class StreamHealthService extends DatabaseClient {
 	}
 
 	/**
+	 * Deletes all stream server health entries for deprecated hosts (.cloud and -4 IPv4 variants).
+	 */
+	public async deleteDeprecatedHosts(): Promise<number> {
+		try {
+			const result = await this.prisma.streamServerHealth.deleteMany({
+				where: {
+					OR: [
+						{ host: { contains: '.download.real-debrid.cloud' } },
+						{ host: { contains: '-4.download.real-debrid.com' } },
+					],
+				},
+			});
+			if (result.count > 0) {
+				console.log(`[StreamHealth] Deleted ${result.count} deprecated host entries`);
+			}
+			return result.count;
+		} catch (error: any) {
+			if (
+				error?.code?.startsWith?.('P') ||
+				error?.name?.includes?.('Prisma') ||
+				error?.message?.includes('does not exist') ||
+				error?.message?.includes('Authentication failed')
+			) {
+				console.warn(
+					'deleteDeprecatedHosts: Database error, returning 0:',
+					error?.code || error?.name
+				);
+				return 0;
+			}
+			throw error;
+		}
+	}
+
+	/**
 	 * Gets aggregated stream health metrics.
 	 */
 	public async getMetrics(): Promise<StreamHealthMetrics> {

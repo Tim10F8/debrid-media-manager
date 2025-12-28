@@ -1,20 +1,26 @@
 // Stream server health check module using zurg-style network testing.
-// Tests Real-Debrid download servers 1-120 on both domains with latency measurement.
-// All data is stored in MySQL - no in-memory caching.
-// Uses actual unrestricted RD links for testing (like zurg does).
+// Dynamically discovers Real-Debrid download servers via DNS and tests 1 random
+// server from the top 5. Updates the known ceiling when higher servers are found.
+// All data is stored in MySQL.
+// Health checks are triggered by cron job, not in-memory scheduler.
 
 import { unrestrictLink } from '@/services/realDebrid';
 import { repository } from '@/services/repository';
 
-const GLOBAL_KEY = '__DMM_STREAM_HEALTH_SCHEDULER__';
-const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-const MAX_CONCURRENT_REQUESTS = 8;
 const REQUEST_TIMEOUT_MS = 5000;
 const ITERATIONS_PER_SERVER = 3;
-const MAX_SERVER_NUMBER = 120;
+const INITIAL_SERVER_CEILING = 100;
+const DNS_PROBE_AHEAD = 10; // Check 10 servers ahead of current ceiling
+const TOP_SERVERS_TO_PICK_FROM = 5;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 2000]; // 1s, then 2s between retries
-const DOMAINS = ['download.real-debrid.com', 'download.real-debrid.cloud'] as const;
+const DOMAIN = 'download.real-debrid.com';
+
+// Track the known highest server number (dynamically updated)
+let knownServerCeiling = INITIAL_SERVER_CEILING;
+
+// Track if a check is currently running (to prevent concurrent runs)
+let checkInProgress = false;
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,42 +54,75 @@ export interface WorkingStreamServerStatus {
 	latencyMs: number | null;
 }
 
-interface SchedulerState {
-	interval?: NodeJS.Timeout;
-	runPromise: Promise<void> | null;
-	inProgress: boolean;
-}
+/**
+ * Probes DNS to discover existing servers and picks 1 random from the top 5.
+ * Updates the known ceiling if higher servers are discovered.
+ */
+async function discoverAndPickServer(): Promise<{ id: string; host: string } | null> {
+	// Probe from (ceiling - 4) to (ceiling + DNS_PROBE_AHEAD)
+	const startNum = Math.max(1, knownServerCeiling - (TOP_SERVERS_TO_PICK_FROM - 1));
+	const endNum = knownServerCeiling + DNS_PROBE_AHEAD;
 
-type SchedulerGlobalKey = typeof GLOBAL_KEY;
-type SchedulerGlobal = typeof globalThis & {
-	[K in SchedulerGlobalKey]?: SchedulerState;
-};
+	const candidates: number[] = [];
+	for (let i = startNum; i <= endNum; i++) {
+		candidates.push(i);
+	}
 
-function getGlobalStore(): SchedulerGlobal {
-	return globalThis as SchedulerGlobal;
+	// Check DNS for all candidates in parallel
+	const existenceResults = await Promise.all(
+		candidates.map(async (num) => {
+			const host = `${num}.${DOMAIN}`;
+			const exists = await hostExists(host);
+			return { num, host, exists };
+		})
+	);
+
+	// Filter to only existing servers
+	const existingServers = existenceResults
+		.filter((r) => r.exists)
+		.map((r) => r.num)
+		.sort((a, b) => b - a); // Sort descending
+
+	if (existingServers.length === 0) {
+		console.warn('[StreamHealth] No servers found via DNS check');
+		return null;
+	}
+
+	// Update ceiling if we found higher servers
+	const highestFound = existingServers[0];
+	if (highestFound > knownServerCeiling) {
+		console.log(
+			`[StreamHealth] Discovered higher server: ${highestFound} (was ${knownServerCeiling})`
+		);
+		knownServerCeiling = highestFound;
+	}
+
+	// Pick 1 random server from the top 5 existing servers
+	const topServers = existingServers.slice(0, TOP_SERVERS_TO_PICK_FROM);
+	const pickedNum = topServers[Math.floor(Math.random() * topServers.length)];
+	const host = `${pickedNum}.${DOMAIN}`;
+
+	console.log(
+		`[StreamHealth] Picked server ${pickedNum} from top ${topServers.length} (ceiling: ${knownServerCeiling})`
+	);
+
+	return { id: host, host };
 }
 
 /**
- * Generates all server hostnames to test (1-120 on both domains).
- * Also includes IPv4 variants (-4) for .download.real-debrid.com servers.
+ * Legacy function for test compatibility - returns current ceiling info.
  */
 function generateServerHosts(): Array<{ id: string; host: string }> {
-	const servers: Array<{ id: string; host: string }> = [];
-
-	for (let i = 1; i <= MAX_SERVER_NUMBER; i++) {
-		for (const domain of DOMAINS) {
-			const host = `${i}.${domain}`;
-			servers.push({ id: host, host });
-
-			// Add IPv4-specific variant for .download.real-debrid.com
-			if (domain === 'download.real-debrid.com') {
-				const ipv4Host = `${i}-4.${domain}`;
-				servers.push({ id: ipv4Host, host: ipv4Host });
-			}
+	// For testing: return a placeholder based on current ceiling
+	const topServers: Array<{ id: string; host: string }> = [];
+	for (let i = 0; i < TOP_SERVERS_TO_PICK_FROM; i++) {
+		const num = knownServerCeiling - i;
+		if (num >= 1) {
+			const host = `${num}.${DOMAIN}`;
+			topServers.push({ id: host, host });
 		}
 	}
-
-	return servers;
+	return topServers;
 }
 
 /**
@@ -148,14 +187,6 @@ function buildTestUrl(host: string, baseTestUrl: string): string {
 	const url = new URL(baseTestUrl);
 	url.hostname = host;
 	return url.toString();
-}
-
-function getBaseComHostForCloud(host: string): string | null {
-	const match = /^(\d+)\.download\.real-debrid\.cloud$/u.exec(host);
-	if (!match) {
-		return null;
-	}
-	return `${match[1]}.download.real-debrid.com`;
 }
 
 const DNS_ERROR_CODES = new Set(['ENOTFOUND', 'EAI_NONAME', 'ENODATA']);
@@ -228,10 +259,6 @@ async function hostExists(hostname: string): Promise<boolean> {
  * 1. null - Server doesn't exist (DNS doesn't resolve) → excluded from results
  * 2. ok: false - Server exists but is failing (timeout, HTTP error, etc.) → counted as failing
  * 3. ok: true - Server exists and is working → counted as working
- *
- * Note: DNS existence check is only done for .download.real-debrid.com domains.
- * The .download.real-debrid.cloud domains are behind Cloudflare which always resolves
- * DNS but returns HTTP errors for non-existent hosts - those are counted as failures.
  */
 async function testServerLatency(
 	server: { id: string; host: string },
@@ -239,22 +266,10 @@ async function testServerLatency(
 	hostExistenceCache: Map<string, Promise<boolean>>,
 	randomByte: number
 ): Promise<WorkingStreamServerStatus | null> {
-	// If the base .com host doesn't resolve, skip the .cloud proxy host too.
-	const baseComHost = getBaseComHostForCloud(server.host);
-	if (baseComHost) {
-		const exists = await hostExistsCached(baseComHost, hostExistenceCache);
-		if (!exists) {
-			return null;
-		}
-	}
-
-	// Only check DNS existence for .com domains
-	// .cloud domains are behind Cloudflare which always resolves DNS
-	if (server.host.endsWith('.download.real-debrid.com')) {
-		const exists = await hostExistsCached(server.host, hostExistenceCache);
-		if (!exists) {
-			return null; // Server doesn't exist - exclude from results entirely
-		}
+	// Check if DNS resolves - if not, exclude from results
+	const exists = await hostExistsCached(server.host, hostExistenceCache);
+	if (!exists) {
+		return null;
 	}
 
 	const checkedAt = Date.now();
@@ -360,204 +375,130 @@ function hostExistsCached(
 }
 
 /**
- * Runs the network test against all Real-Debrid download servers.
- * Tests servers in parallel with a limited concurrency pool.
- * Servers that don't exist (DNS failure) are excluded from results.
+ * Discovers servers via DNS and tests a single randomly picked server.
+ * Updates the known ceiling if higher servers are discovered.
  *
  * @param rdToken - Optional RD token to unrestrict test links (for more realistic testing)
  */
 async function inspectServers(rdToken?: string): Promise<WorkingStreamServerStatus[]> {
+	// Discover existing servers and pick one to test
+	const server = await discoverAndPickServer();
+	if (!server) {
+		return [];
+	}
+
 	// Get the test URL (unrestricted if token available, fallback to speedtest)
 	const baseTestUrl = await getTestUrl(rdToken);
 	console.log(`[StreamHealth] Using test URL: ${baseTestUrl}`);
 
-	// Generate a single random byte offset to use for all servers (1-1023)
+	// Generate a single random byte offset (1-1023)
 	const randomByte = Math.floor(Math.random() * 1023) + 1;
 
-	const servers = generateServerHosts();
-	const results: WorkingStreamServerStatus[] = [];
+	// Test the single picked server (DNS already verified in discoverAndPickServer)
 	const hostExistenceCache = new Map<string, Promise<boolean>>();
+	// Pre-populate cache since we already know it exists
+	hostExistenceCache.set(server.host, Promise.resolve(true));
 
-	// Process hosts in batches with limited concurrency
-	let index = 0;
+	const result = await testServerLatency(server, baseTestUrl, hostExistenceCache, randomByte);
 
-	async function processNext(): Promise<void> {
-		while (index < servers.length) {
-			const currentIndex = index++;
-			const server = servers[currentIndex];
-			const result = await testServerLatency(
-				server,
-				baseTestUrl,
-				hostExistenceCache,
-				randomByte
-			);
-			// Only include servers that exist (non-null result)
-			if (result !== null) {
-				results.push(result);
-			}
-		}
-	}
-
-	// Start worker pool
-	const workers = Array.from({ length: Math.min(MAX_CONCURRENT_REQUESTS, servers.length) }, () =>
-		processNext()
-	);
-
-	await Promise.all(workers);
-
-	// Sort by latency (working servers first, then by latency ascending)
-	results.sort((a, b) => {
-		if (a.ok && !b.ok) return -1;
-		if (!a.ok && b.ok) return 1;
-		if (a.ok && b.ok) {
-			return (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity);
-		}
-		return 0;
-	});
-
-	return results;
-}
-
-function getScheduler(): SchedulerState {
-	const g = getGlobalStore();
-	if (!g[GLOBAL_KEY]) {
-		g[GLOBAL_KEY] = {
-			runPromise: null,
-			inProgress: false,
-		};
-		scheduleJobs(g[GLOBAL_KEY]!);
-	}
-	return g[GLOBAL_KEY]!;
-}
-
-function scheduleJobs(state: SchedulerState) {
-	const run = () => {
-		const promise = executeCheck(state);
-		promise.catch(() => {});
-		return promise;
-	};
-	run();
-	state.interval = setInterval(run, REFRESH_INTERVAL_MS);
-	if (typeof state.interval.unref === 'function') {
-		state.interval.unref();
-	}
-}
-
-async function executeCheck(state: SchedulerState): Promise<void> {
-	if (state.runPromise) {
-		return state.runPromise;
-	}
-	const promise = (async () => {
-		state.inProgress = true;
-		try {
-			// Get RD token from environment if available for more realistic testing
-			const rdToken = process.env.RD_ACCESS_TOKEN || undefined;
-			const statuses = await inspectServers(rdToken);
-			const allHosts = generateServerHosts().map((server) => server.id);
-			const includedHosts = new Set(statuses.map((status) => status.id));
-			const excludedHosts = allHosts.filter((host) => !includedHosts.has(host));
-			const workingServers = statuses.filter((status) => status.ok);
-			const working = workingServers.length;
-
-			// Calculate average latency of working servers
-			let avgLatencyMs: number | null = null;
-			if (workingServers.length > 0) {
-				const totalLatency = workingServers.reduce((sum, s) => sum + (s.latencyMs ?? 0), 0);
-				avgLatencyMs = totalLatency / workingServers.length;
-			}
-
-			// Get fastest server
-			const fastestServer = workingServers[0]?.id ?? null;
-
-			// Persist to MySQL
-			if (excludedHosts.length > 0) {
-				await repository.deleteStreamHealthHosts(excludedHosts);
-			}
-			const dbResults = statuses.map((s) => ({
-				host: s.id,
-				status: s.status,
-				latencyMs: s.latencyMs,
-				ok: s.ok,
-				error: s.error,
-				checkedAt: new Date(s.checkedAt),
-			}));
-			await repository.upsertStreamHealthResults(dbResults);
-
-			// Record to history for 90-day tracking
-			const failedServers = statuses.filter((s) => !s.ok).map((s) => s.id);
-			const minLatencyMs =
-				workingServers.length > 0
-					? Math.min(...workingServers.map((s) => s.latencyMs ?? Infinity))
-					: null;
-			const maxLatencyMs =
-				workingServers.length > 0
-					? Math.max(...workingServers.map((s) => s.latencyMs ?? 0))
-					: null;
-
-			await repository.recordStreamHealthSnapshot({
-				totalServers: statuses.length,
-				workingServers: working,
-				avgLatencyMs,
-				minLatencyMs: minLatencyMs === Infinity ? null : minLatencyMs,
-				maxLatencyMs,
-				fastestServer,
-				failedServers,
-			});
-
-			// Record per-server reliability
-			await repository.recordServerReliability(
-				statuses.map((s) => ({
-					host: s.id,
-					ok: s.ok,
-					latencyMs: s.latencyMs,
-				}))
-			);
-
-			console.log(
-				`[StreamHealth] Check complete: ${working}/${statuses.length} servers working`
-			);
-		} catch (error) {
-			console.error('[StreamHealth] Check failed:', error);
-		}
-	})().finally(() => {
-		state.inProgress = false;
-		state.runPromise = null;
-	});
-	state.runPromise = promise;
-	return promise;
-}
-
-function clearScheduler() {
-	const g = getGlobalStore();
-	const current = g[GLOBAL_KEY];
-	if (current?.interval) {
-		clearInterval(current.interval);
-	}
-	g[GLOBAL_KEY] = undefined;
+	return result ? [result] : [];
 }
 
 /**
- * Ensures the stream health check scheduler is running.
- * Call this on app startup or when the API is first accessed.
+ * Executes a health check. Called by cron job.
  */
-export function ensureStreamHealthScheduler(): void {
-	getScheduler();
+async function executeCheck(): Promise<void> {
+	if (checkInProgress) {
+		console.log('[StreamHealth] Check already in progress, skipping');
+		return;
+	}
+
+	checkInProgress = true;
+	try {
+		// Get RD token from environment if available for more realistic testing
+		const rdToken = process.env.RD_ACCESS_TOKEN || undefined;
+		const statuses = await inspectServers(rdToken);
+		const allHosts = generateServerHosts().map((server) => server.id);
+		const includedHosts = new Set(statuses.map((status) => status.id));
+		const excludedHosts = allHosts.filter((host) => !includedHosts.has(host));
+		const workingServers = statuses.filter((status) => status.ok);
+		const working = workingServers.length;
+
+		// Calculate average latency of working servers
+		let avgLatencyMs: number | null = null;
+		if (workingServers.length > 0) {
+			const totalLatency = workingServers.reduce((sum, s) => sum + (s.latencyMs ?? 0), 0);
+			avgLatencyMs = totalLatency / workingServers.length;
+		}
+
+		// Get fastest server
+		const fastestServer = workingServers[0]?.id ?? null;
+
+		// Persist to MySQL
+		if (excludedHosts.length > 0) {
+			await repository.deleteStreamHealthHosts(excludedHosts);
+		}
+		// Clean up deprecated host entries (.cloud and -4 variants no longer tested)
+		await repository.deleteDeprecatedStreamHosts();
+		const dbResults = statuses.map((s) => ({
+			host: s.id,
+			status: s.status,
+			latencyMs: s.latencyMs,
+			ok: s.ok,
+			error: s.error,
+			checkedAt: new Date(s.checkedAt),
+		}));
+		await repository.upsertStreamHealthResults(dbResults);
+
+		// Record to history for 90-day tracking
+		const failedServers = statuses.filter((s) => !s.ok).map((s) => s.id);
+		const minLatencyMs =
+			workingServers.length > 0
+				? Math.min(...workingServers.map((s) => s.latencyMs ?? Infinity))
+				: null;
+		const maxLatencyMs =
+			workingServers.length > 0
+				? Math.max(...workingServers.map((s) => s.latencyMs ?? 0))
+				: null;
+
+		await repository.recordStreamHealthSnapshot({
+			totalServers: statuses.length,
+			workingServers: working,
+			avgLatencyMs,
+			minLatencyMs: minLatencyMs === Infinity ? null : minLatencyMs,
+			maxLatencyMs,
+			fastestServer,
+			failedServers,
+		});
+
+		// Record per-server reliability
+		await repository.recordServerReliability(
+			statuses.map((s) => ({
+				host: s.id,
+				ok: s.ok,
+				latencyMs: s.latencyMs,
+			}))
+		);
+
+		console.log(`[StreamHealth] Check complete: ${working}/${statuses.length} servers working`);
+	} catch (error) {
+		console.error('[StreamHealth] Check failed:', error);
+	} finally {
+		checkInProgress = false;
+	}
 }
 
 /**
  * Checks if a health check is currently in progress.
  */
 export function isHealthCheckInProgress(): boolean {
-	const g = getGlobalStore();
-	return g[GLOBAL_KEY]?.inProgress ?? false;
+	return checkInProgress;
 }
 
 /**
  * Gets stream health metrics from MySQL database.
- * Also ensures the health check scheduler is running.
  */
 export async function getStreamMetricsFromDb() {
-	ensureStreamHealthScheduler();
 	return repository.getStreamHealthMetrics();
 }
 
@@ -570,24 +511,34 @@ export function getStreamStatusesFromDb() {
 
 /**
  * Runs the stream health check immediately (on-demand).
+ * Called by cron job endpoint.
  * Returns the updated metrics after the check completes.
  */
 export async function runHealthCheckNow() {
-	const state = getScheduler();
-	await executeCheck(state);
+	await executeCheck();
 	return repository.getStreamHealthMetrics();
 }
 
 export const __testing = {
 	reset() {
-		clearScheduler();
 		cachedTestUrl = null;
 		cachedTestUrlExpiry = 0;
+		knownServerCeiling = INITIAL_SERVER_CEILING;
+		checkInProgress = false;
 	},
 	async runNow() {
 		return runHealthCheckNow();
 	},
 	getServerList() {
 		return generateServerHosts();
+	},
+	getCeiling() {
+		return knownServerCeiling;
+	},
+	setCeiling(value: number) {
+		knownServerCeiling = value;
+	},
+	async discoverAndPick() {
+		return discoverAndPickServer();
 	},
 };
