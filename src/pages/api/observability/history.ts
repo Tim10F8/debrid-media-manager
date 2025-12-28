@@ -46,20 +46,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	try {
 		switch (type) {
 			case 'rd': {
-				// For 24h, use raw data (every check)
-				if (range === '24h') {
-					const rawData = await repository.getRdRawHistory(24, query.operation);
-					return res.status(200).json({
-						type: 'rd',
-						granularity: 'raw',
-						range,
-						data: rawData,
-					});
-				}
-				// For 7d (168h), use hourly data
-				else if (range === '7d' || (hoursBack && hoursBack <= 168)) {
+				// For 24h and 7d, use hourly data
+				if (hoursBack && hoursBack <= 168) {
 					const hourlyData = await repository.getRdHourlyHistory(
-						hoursBack ?? 168,
+						hoursBack,
 						query.operation
 					);
 					return res.status(200).json({

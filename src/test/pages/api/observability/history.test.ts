@@ -98,7 +98,7 @@ describe('history API endpoint', () => {
 		expect(res.json).toHaveBeenCalledWith({ error: 'Method not allowed' });
 	});
 
-	it('returns raw RD data for 24h range', async () => {
+	it('returns hourly RD data for 24h range', async () => {
 		const req = createMockRequest({ type: 'rd', range: '24h' });
 		const res = createMockResponse();
 
@@ -108,7 +108,7 @@ describe('history API endpoint', () => {
 		expect(res.json).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'rd',
-				granularity: 'raw',
+				granularity: 'hourly',
 				range: '24h',
 				data: expect.any(Array),
 			})
@@ -218,7 +218,7 @@ describe('history API endpoint', () => {
 		expect(res.json).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'rd',
-				granularity: 'raw',
+				granularity: 'hourly',
 				range: '24h',
 			})
 		);
