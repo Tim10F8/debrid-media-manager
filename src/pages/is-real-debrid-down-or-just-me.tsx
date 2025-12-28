@@ -13,6 +13,7 @@ import {
 	RefreshCw,
 	Wifi,
 	WifiOff,
+	XCircle,
 } from 'lucide-react';
 import type { NextPage } from 'next';
 import dynamic from 'next/dynamic';
@@ -228,14 +229,6 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 
 	// Stream Health Logic
 	const workingStream = stats.workingStream;
-	const workingStreamPct = workingStream ? Math.round(workingStream.rate * 100) : null;
-	const workingStreamColor = !workingStream
-		? 'text-slate-400'
-		: workingStream.rate >= 0.9
-			? 'text-emerald-400'
-			: workingStream.rate >= 0.6
-				? 'text-amber-400'
-				: 'text-rose-500';
 
 	return (
 		<>
@@ -374,37 +367,34 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 						>
 							<h3 className="flex items-center gap-2 text-sm font-medium text-slate-300">
 								<Wifi className="h-4 w-4" />
-								Working Stream
-							</h3>{' '}
+								Stream Server Check
+							</h3>
 							<div className="mt-4">
-								<div className="flex items-baseline gap-2">
-									<span className={`text-3xl font-bold ${workingStreamColor}`}>
-										{workingStreamPct !== null ? `${workingStreamPct}%` : '—'}
-									</span>
-									<span className="text-sm text-slate-500">server check</span>
-								</div>
-								<div className="mt-4 space-y-2 text-sm text-slate-400">
-									<div className="flex justify-between">
-										<span>Working</span>
-										<span className="text-slate-200">
-											{workingStream?.working ?? 0}
-										</span>
-									</div>
-									<div className="flex justify-between">
-										<span>Server Tested</span>
-										<span className="text-slate-200">
-											{workingStream?.total ?? 0}
-										</span>
-									</div>
-									{workingStream?.avgLatencyMs && (
-										<div className="flex justify-between">
-											<span>Avg Latency</span>
-											<span className="text-slate-200">
-												{Math.round(workingStream.avgLatencyMs)}ms
+								<div className="flex items-center gap-2">
+									{workingStream?.working ? (
+										<>
+											<CheckCircle2 className="h-6 w-6 text-emerald-400" />
+											<span className="text-2xl font-bold text-emerald-400">
+												Passed
 											</span>
-										</div>
+										</>
+									) : (
+										<>
+											<XCircle className="h-6 w-6 text-rose-500" />
+											<span className="text-2xl font-bold text-rose-500">
+												Failed
+											</span>
+										</>
 									)}
 								</div>
+								{workingStream?.avgLatencyMs && (
+									<div className="mt-4 flex justify-between text-sm text-slate-400">
+										<span>Latency</span>
+										<span className="text-slate-200">
+											{Math.round(workingStream.avgLatencyMs)}ms
+										</span>
+									</div>
+								)}
 							</div>
 						</div>
 

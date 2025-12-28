@@ -108,10 +108,10 @@ describe('RealDebridStatusPage client refresh', () => {
 
 		const successCard = getByTestId('success-rate-card');
 		expect(successCard).toBeTruthy();
-		expect(within(successCard).queryByText('Working Stream')).toBeNull();
+		expect(within(successCard).queryByText('Stream Server Check')).toBeNull();
 		const workingStreamCard = getByTestId('working-stream-card');
 		expect(workingStreamCard).toBeTruthy();
-		expect(within(workingStreamCard).getByText('Working Stream')).toBeTruthy();
+		expect(within(workingStreamCard).getByText('Stream Server Check')).toBeTruthy();
 		expect(getByTestId('status-answer-mobile').textContent).toBe(' collecting data');
 		expect(getByTestId('status-freshness').textContent?.startsWith('Last updated:')).toBe(true);
 	});
