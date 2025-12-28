@@ -199,7 +199,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 		{
 			label: 'API Success Rate',
 			value: stats.considered ? `${successPct}%` : '—',
-			helper: `${formatNumber(stats.successCount)}/${formatNumber(stats.considered)} requests`,
+			helper: `${formatNumber(stats.successCount)}/${formatNumber(stats.considered)} (2xx vs 5xx)`,
 			icon: Activity,
 			color: getPercentageColor(successPct),
 		},
@@ -381,9 +381,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 									<span className={`text-3xl font-bold ${workingStreamColor}`}>
 										{workingStreamPct !== null ? `${workingStreamPct}%` : '—'}
 									</span>
-									<span className="text-sm text-slate-500">
-										servers operational
-									</span>
+									<span className="text-sm text-slate-500">server check</span>
 								</div>
 								<div className="mt-4 space-y-2 text-sm text-slate-400">
 									<div className="flex justify-between">
@@ -393,7 +391,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 										</span>
 									</div>
 									<div className="flex justify-between">
-										<span>Total Scanned</span>
+										<span>Server Tested</span>
 										<span className="text-slate-200">
 											{workingStream?.total ?? 0}
 										</span>
@@ -417,9 +415,9 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 										About this data
 									</h3>
 									<p className="mt-2 text-sm text-slate-400">
-										This dashboard aggregates data from the Debrid Media Manager
-										community. It tracks success rates for API calls and direct
-										stream checks to Real-Debrid servers.
+										This dashboard tracks API success rates from Debrid Media
+										Manager community usage (2xx vs 5xx responses). Stream
+										server health is checked via automated monitoring.
 									</p>
 								</div>
 
