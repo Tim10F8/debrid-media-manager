@@ -65,8 +65,18 @@ interface HistoryResponse<T> {
 
 const FIXED_LOCALE = 'en-US';
 
+// Ensure UTC timestamps are parsed correctly (append Z if missing timezone)
+function parseUtcDate(dateStr: string): Date {
+	// If already has timezone info (Z or +/-), parse as-is
+	if (/[Z+-]\d{0,4}$/.test(dateStr)) {
+		return new Date(dateStr);
+	}
+	// Otherwise treat as UTC by appending Z
+	return new Date(dateStr + 'Z');
+}
+
 function formatShortDate(dateStr: string): string {
-	const date = new Date(dateStr);
+	const date = parseUtcDate(dateStr);
 	return date.toLocaleDateString(FIXED_LOCALE, {
 		month: 'short',
 		day: 'numeric',
@@ -74,7 +84,7 @@ function formatShortDate(dateStr: string): string {
 }
 
 function formatShortTime(dateStr: string): string {
-	const date = new Date(dateStr);
+	const date = parseUtcDate(dateStr);
 	return date.toLocaleTimeString(FIXED_LOCALE, {
 		hour: '2-digit',
 		minute: '2-digit',
@@ -82,7 +92,7 @@ function formatShortTime(dateStr: string): string {
 }
 
 function formatTimeWithSeconds(dateStr: string): string {
-	const date = new Date(dateStr);
+	const date = parseUtcDate(dateStr);
 	return date.toLocaleTimeString(FIXED_LOCALE, {
 		hour: '2-digit',
 		minute: '2-digit',
