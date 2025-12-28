@@ -1,4 +1,4 @@
-import { BarChart3, Clock, Server, TrendingUp } from 'lucide-react';
+import { BarChart3, Clock, TrendingUp } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import {
 	Area,
@@ -49,14 +49,6 @@ interface StreamDailyData {
 	checksCount: number;
 }
 
-interface ServerReliabilityData {
-	host: string;
-	checksCount: number;
-	successCount: number;
-	avgLatencyMs: number | null;
-	reliability: number;
-}
-
 interface HistoryResponse<T> {
 	type: string;
 	granularity?: string;
@@ -90,7 +82,6 @@ export function HistoryCharts() {
 	const [range, setRange] = useState<HistoryRange>('24h');
 	const [rdData, setRdData] = useState<(RdHourlyData | RdDailyData)[]>([]);
 	const [streamData, setStreamData] = useState<(StreamHourlyData | StreamDailyData)[]>([]);
-	const [serverData, setServerData] = useState<ServerReliabilityData[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [granularity, setGranularity] = useState<'hourly' | 'daily'>('hourly');
@@ -105,15 +96,12 @@ export function HistoryCharts() {
 					? window.location.origin
 					: 'http://localhost:3000';
 
-			const [rdResponse, streamResponse, serverResponse] = await Promise.all([
+			const [rdResponse, streamResponse] = await Promise.all([
 				fetch(`${origin}/api/observability/history?type=rd&range=${range}`),
 				fetch(`${origin}/api/observability/history?type=stream&range=${range}`),
-				fetch(
-					`${origin}/api/observability/history?type=servers&range=${range}&sortBy=reliability&limit=20`
-				),
 			]);
 
-			if (!rdResponse.ok || !streamResponse.ok || !serverResponse.ok) {
+			if (!rdResponse.ok || !streamResponse.ok) {
 				throw new Error('Failed to fetch history data');
 			}
 
@@ -121,12 +109,9 @@ export function HistoryCharts() {
 			const streamJson = (await streamResponse.json()) as HistoryResponse<
 				StreamHourlyData | StreamDailyData
 			>;
-			const serverJson =
-				(await serverResponse.json()) as HistoryResponse<ServerReliabilityData>;
 
 			setRdData(rdJson.data ?? []);
 			setStreamData(streamJson.data ?? []);
-			setServerData(serverJson.data ?? []);
 			setGranularity((rdJson.granularity as 'hourly' | 'daily') ?? 'hourly');
 		} catch (err) {
 			console.error('Failed to fetch history:', err);
@@ -429,63 +414,6 @@ export function HistoryCharts() {
 								No stream data available
 							</div>
 						)}
-					</div>
-				</div>
-			)}
-
-			{/* Server Reliability Table */}
-			{(serverData ?? []).length > 0 && (
-				<div className="rounded-xl border border-white/10 bg-black/20 p-4">
-					<div className="mb-4 flex items-center gap-2">
-						<Server className="h-4 w-4 text-slate-400" />
-						<h3 className="text-sm font-medium text-slate-200">
-							Top Reliable Servers ({range})
-						</h3>
-					</div>
-					<div className="overflow-x-auto">
-						<table className="w-full text-left text-xs">
-							<thead>
-								<tr className="border-b border-slate-700 text-slate-400">
-									<th className="pb-2 font-medium">Server</th>
-									<th className="pb-2 text-right font-medium">Reliability</th>
-									<th className="pb-2 text-right font-medium">Avg Latency</th>
-									<th className="pb-2 text-right font-medium">Checks</th>
-								</tr>
-							</thead>
-							<tbody>
-								{(serverData ?? []).slice(0, 10).map((server) => (
-									<tr
-										key={server.host}
-										className="border-b border-slate-800 text-slate-300"
-									>
-										<td className="py-2 font-mono text-[11px]">
-											{server.host}
-										</td>
-										<td className="py-2 text-right">
-											<span
-												className={
-													server.reliability >= 0.9
-														? 'text-emerald-400'
-														: server.reliability >= 0.6
-															? 'text-amber-400'
-															: 'text-rose-400'
-												}
-											>
-												{formatPercent(server.reliability)}
-											</span>
-										</td>
-										<td className="py-2 text-right text-slate-400">
-											{server.avgLatencyMs != null
-												? `${Math.round(server.avgLatencyMs)}ms`
-												: '—'}
-										</td>
-										<td className="py-2 text-right text-slate-500">
-											{server.checksCount}
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
 					</div>
 				</div>
 			)}

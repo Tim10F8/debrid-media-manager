@@ -12,7 +12,13 @@ const MAX_CONCURRENT_REQUESTS = 8;
 const REQUEST_TIMEOUT_MS = 5000;
 const ITERATIONS_PER_SERVER = 3;
 const MAX_SERVER_NUMBER = 120;
+const MAX_RETRIES = 3;
+const RETRY_DELAYS_MS = [1000, 2000]; // 1s, then 2s between retries
 const DOMAINS = ['download.real-debrid.com', 'download.real-debrid.cloud'] as const;
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // Hardcoded Real-Debrid links used for network testing (same as zurg)
 // One of these is unrestricted to get a real download URL for testing
@@ -230,7 +236,8 @@ async function hostExists(hostname: string): Promise<boolean> {
 async function testServerLatency(
 	server: { id: string; host: string },
 	baseTestUrl: string,
-	hostExistenceCache: Map<string, Promise<boolean>>
+	hostExistenceCache: Map<string, Promise<boolean>>,
+	randomByte: number
 ): Promise<WorkingStreamServerStatus | null> {
 	// If the base .com host doesn't resolve, skip the .cloud proxy host too.
 	const baseComHost = getBaseComHostForCloud(server.host);
@@ -259,51 +266,66 @@ async function testServerLatency(
 
 	for (let i = 0; i < ITERATIONS_PER_SERVER; i++) {
 		const testUrl = buildTestUrl(server.host, baseTestUrl);
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+		let iterationSuccess = false;
 
-		// Request a random single byte using Range header
-		const randomByte = Math.floor(Math.random() * 1000);
-
-		try {
-			const startTime = performance.now();
-			const response = await fetch(testUrl, {
-				method: 'GET',
-				headers: {
-					Range: `bytes=${randomByte}-${randomByte}`,
-				},
-				signal: controller.signal,
-			});
-			const endTime = performance.now();
-
-			clearTimeout(timeoutId);
-			lastStatus = response.status;
-
-			const header = response.headers.get('content-length');
-			lastContentLength = header ? Number(header) : null;
-
-			// 206 Partial Content is the expected response for Range requests
-			if (response.status === 206) {
-				totalLatencyMs += endTime - startTime;
-				successfulIterations++;
-			} else {
-				lastError =
-					response.status === 200
-						? 'HTTP 200 (Range ignored)'
-						: `HTTP ${response.status}`;
+		// Retry loop for each iteration
+		for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+			// Wait before retry (not on first attempt)
+			if (attempt > 0) {
+				const delayMs = RETRY_DELAYS_MS[attempt - 1] ?? RETRY_DELAYS_MS.at(-1) ?? 1000;
+				await sleep(delayMs);
 			}
-		} catch (error) {
-			clearTimeout(timeoutId);
-			if (error instanceof Error) {
-				if (error.name === 'AbortError') {
-					lastError = 'Timeout';
+
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+			try {
+				const startTime = performance.now();
+				const response = await fetch(testUrl, {
+					method: 'GET',
+					headers: {
+						Range: `bytes=${randomByte}-${randomByte}`,
+					},
+					signal: controller.signal,
+				});
+				const endTime = performance.now();
+
+				clearTimeout(timeoutId);
+				lastStatus = response.status;
+
+				const header = response.headers.get('content-length');
+				lastContentLength = header ? Number(header) : null;
+
+				// 206 Partial Content is the expected response for Range requests
+				if (response.status === 206) {
+					totalLatencyMs += endTime - startTime;
+					successfulIterations++;
+					iterationSuccess = true;
+					break; // Success, no need to retry
 				} else {
-					lastError = error.message;
+					lastError =
+						response.status === 200
+							? 'HTTP 200 (Range ignored)'
+							: `HTTP ${response.status}`;
+					// Non-206 response, retry
 				}
-			} else {
-				lastError = 'Unknown error';
+			} catch (error) {
+				clearTimeout(timeoutId);
+				if (error instanceof Error) {
+					if (error.name === 'AbortError') {
+						lastError = 'Timeout';
+					} else {
+						lastError = error.message;
+					}
+				} else {
+					lastError = 'Unknown error';
+				}
+				// Error occurred, retry
 			}
-			// Don't continue iterations if we hit an error
+		}
+
+		// If all retries failed for this iteration, stop testing this server
+		if (!iterationSuccess) {
 			break;
 		}
 	}
@@ -349,6 +371,9 @@ async function inspectServers(rdToken?: string): Promise<WorkingStreamServerStat
 	const baseTestUrl = await getTestUrl(rdToken);
 	console.log(`[StreamHealth] Using test URL: ${baseTestUrl}`);
 
+	// Generate a single random byte offset to use for all servers (1-1023)
+	const randomByte = Math.floor(Math.random() * 1023) + 1;
+
 	const servers = generateServerHosts();
 	const results: WorkingStreamServerStatus[] = [];
 	const hostExistenceCache = new Map<string, Promise<boolean>>();
@@ -360,7 +385,12 @@ async function inspectServers(rdToken?: string): Promise<WorkingStreamServerStat
 		while (index < servers.length) {
 			const currentIndex = index++;
 			const server = servers[currentIndex];
-			const result = await testServerLatency(server, baseTestUrl, hostExistenceCache);
+			const result = await testServerLatency(
+				server,
+				baseTestUrl,
+				hostExistenceCache,
+				randomByte
+			);
 			// Only include servers that exist (non-null result)
 			if (result !== null) {
 				results.push(result);
@@ -473,18 +503,6 @@ async function executeCheck(state: SchedulerState): Promise<void> {
 				fastestServer,
 				failedServers,
 			});
-
-			// Save individual server statuses for the breakdown view
-			await repository.upsertStreamHealthResults(
-				statuses.map((s) => ({
-					host: s.id,
-					status: s.status,
-					latencyMs: s.latencyMs,
-					ok: s.ok,
-					error: s.error,
-					checkedAt: new Date(),
-				}))
-			);
 
 			// Record per-server reliability
 			await repository.recordServerReliability(
