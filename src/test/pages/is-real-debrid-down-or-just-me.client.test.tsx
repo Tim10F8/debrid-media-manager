@@ -47,6 +47,7 @@ function buildWorkingStream(): CompactWorkingStreamMetrics {
 		inProgress: false,
 		avgLatencyMs: null,
 		fastestServer: null,
+		recentChecks: [],
 	};
 }
 

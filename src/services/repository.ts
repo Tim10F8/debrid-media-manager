@@ -473,6 +473,19 @@ export class Repository {
 		return this.streamHealthService.getCount();
 	}
 
+	public recordStreamCheckResult(result: {
+		ok: boolean;
+		latencyMs: number | null;
+		server: string | null;
+		error: string | null;
+	}) {
+		return this.streamHealthService.recordCheckResult(result);
+	}
+
+	public getRecentStreamChecks(limit?: number) {
+		return this.streamHealthService.getRecentChecks(limit);
+	}
+
 	// History Aggregation Service Methods
 	public aggregateRdHourly(targetHour?: Date) {
 		return this.historyAggregationService.aggregateRdHourly(targetHour);

@@ -13,7 +13,6 @@ import {
 	RefreshCw,
 	Wifi,
 	WifiOff,
-	XCircle,
 } from 'lucide-react';
 import type { NextPage } from 'next';
 import dynamic from 'next/dynamic';
@@ -370,31 +369,64 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 								Stream Server Check
 							</h3>
 							<div className="mt-4">
-								<div className="flex items-center gap-2">
-									{workingStream?.working ? (
+								{(() => {
+									const recentChecks = workingStream?.recentChecks ?? [];
+									const passedCount = recentChecks.filter((c) => c.ok).length;
+									const totalChecks = recentChecks.length;
+									const pct =
+										totalChecks > 0
+											? Math.round((passedCount / totalChecks) * 100)
+											: null;
+									const pctColor =
+										pct === null
+											? 'text-slate-400'
+											: pct >= 80
+												? 'text-emerald-400'
+												: pct >= 40
+													? 'text-amber-400'
+													: 'text-rose-500';
+
+									return (
 										<>
-											<CheckCircle2 className="h-6 w-6 text-emerald-400" />
-											<span className="text-2xl font-bold text-emerald-400">
-												Passed
-											</span>
+											<div className="flex items-baseline gap-2">
+												<span className={`text-3xl font-bold ${pctColor}`}>
+													{pct !== null ? `${pct}%` : '—'}
+												</span>
+												<span className="text-sm text-slate-500">
+													{totalChecks > 0
+														? `${passedCount}/${totalChecks} passed`
+														: 'no data yet'}
+												</span>
+											</div>
+											{totalChecks > 0 && (
+												<div
+													className="mt-3 flex items-center gap-1.5"
+													title="Last 5 checks (newest first)"
+												>
+													{recentChecks.map((check, i) => (
+														<span
+															key={i}
+															className={`h-3 w-3 rounded-full ${check.ok ? 'bg-emerald-500' : 'bg-rose-500'}`}
+															title={
+																check.ok
+																	? `Passed${check.latencyMs ? ` (${Math.round(check.latencyMs)}ms)` : ''}`
+																	: 'Failed'
+															}
+														/>
+													))}
+												</div>
+											)}
+											{workingStream?.avgLatencyMs && (
+												<div className="mt-3 flex justify-between text-sm text-slate-400">
+													<span>Latency</span>
+													<span className="text-slate-200">
+														{Math.round(workingStream.avgLatencyMs)}ms
+													</span>
+												</div>
+											)}
 										</>
-									) : (
-										<>
-											<XCircle className="h-6 w-6 text-rose-500" />
-											<span className="text-2xl font-bold text-rose-500">
-												Failed
-											</span>
-										</>
-									)}
-								</div>
-								{workingStream?.avgLatencyMs && (
-									<div className="mt-4 flex justify-between text-sm text-slate-400">
-										<span>Latency</span>
-										<span className="text-slate-200">
-											{Math.round(workingStream.avgLatencyMs)}ms
-										</span>
-									</div>
-								)}
+									);
+								})()}
 							</div>
 						</div>
 

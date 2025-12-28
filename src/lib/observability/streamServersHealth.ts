@@ -476,6 +476,17 @@ async function executeCheck(): Promise<void> {
 			}))
 		);
 
+		// Record individual check result for recent checks display
+		const firstStatus = statuses[0];
+		if (firstStatus) {
+			await repository.recordStreamCheckResult({
+				ok: firstStatus.ok,
+				latencyMs: firstStatus.latencyMs,
+				server: firstStatus.id,
+				error: firstStatus.error,
+			});
+		}
+
 		console.log(`[StreamHealth] Check complete: ${working}/${statuses.length} servers working`);
 	} catch (error) {
 		console.error('[StreamHealth] Check failed:', error);

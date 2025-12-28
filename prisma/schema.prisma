@@ -310,6 +310,18 @@ model RdOperationalDaily {
   @@index([operation, date])
 }
 
+// Stream Health - Individual check results (kept for 24 hours, last 50 max)
+model StreamCheckResult {
+  id        Int      @id @default(autoincrement())
+  ok        Boolean  // Whether the check passed
+  latencyMs Float?   // Latency if passed
+  server    String?  // Server that was tested
+  error     String?  // Error message if failed
+  checkedAt DateTime @default(now())
+
+  @@index([checkedAt])
+}
+
 // Stream Health - Hourly snapshots (kept for 7 days)
 model StreamHealthHourly {
   id             Int      @id @default(autoincrement())

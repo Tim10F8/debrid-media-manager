@@ -45,6 +45,7 @@ function buildEmptyStats(): RealDebridObservabilityStats {
 		inProgress: false,
 		avgLatencyMs: null,
 		fastestServer: null,
+		recentChecks: [],
 	};
 	return {
 		totalTracked: 0,

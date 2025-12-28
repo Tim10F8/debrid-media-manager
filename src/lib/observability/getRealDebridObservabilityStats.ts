@@ -3,6 +3,13 @@ import { repository } from '@/services/repository';
 import { type OperationStats, type RealDebridOperation } from './rdOperationalStats';
 import { getStreamMetricsFromDb, isHealthCheckInProgress } from './streamServersHealth';
 
+export interface RecentCheckResult {
+	ok: boolean;
+	latencyMs: number | null;
+	server: string | null;
+	checkedAt: number;
+}
+
 export interface CompactWorkingStreamMetrics {
 	total: number;
 	working: number;
@@ -13,6 +20,7 @@ export interface CompactWorkingStreamMetrics {
 	inProgress: boolean;
 	avgLatencyMs: number | null;
 	fastestServer: string | null;
+	recentChecks: RecentCheckResult[];
 }
 
 export interface RealDebridObservabilityStats {
@@ -34,9 +42,10 @@ export interface RealDebridObservabilityStats {
  * This provides cross-replica consistency and should be used for API endpoints.
  */
 export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebridObservabilityStats> {
-	const [rdStats, streamMetrics] = await Promise.all([
+	const [rdStats, streamMetrics, recentChecks] = await Promise.all([
 		repository.getRdObservabilityStats(),
 		getStreamMetricsFromDb(),
+		repository.getRecentStreamChecks(5),
 	]);
 
 	return {
@@ -60,6 +69,12 @@ export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebri
 			inProgress: isHealthCheckInProgress(),
 			avgLatencyMs: streamMetrics.avgLatencyMs,
 			fastestServer: streamMetrics.fastestServer,
+			recentChecks: recentChecks.map((check) => ({
+				ok: check.ok,
+				latencyMs: check.latencyMs,
+				server: check.server,
+				checkedAt: check.checkedAt.getTime(),
+			})),
 		},
 	};
 }

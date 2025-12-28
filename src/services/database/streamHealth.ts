@@ -19,6 +19,14 @@ export interface StreamHealthMetrics {
 	failedServers: string[];
 }
 
+export interface StreamCheckResultData {
+	ok: boolean;
+	latencyMs: number | null;
+	server: string | null;
+	error: string | null;
+	checkedAt: Date;
+}
+
 export class StreamHealthService extends DatabaseClient {
 	/**
 	 * Upserts a batch of stream server health results.
@@ -261,6 +269,78 @@ export class StreamHealthService extends DatabaseClient {
 		} catch (error: any) {
 			if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
 				return 0;
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Records an individual stream check result.
+	 */
+	public async recordCheckResult(result: {
+		ok: boolean;
+		latencyMs: number | null;
+		server: string | null;
+		error: string | null;
+	}): Promise<void> {
+		try {
+			await this.prisma.streamCheckResult.create({
+				data: {
+					ok: result.ok,
+					latencyMs: result.latencyMs,
+					server: result.server,
+					error: result.error,
+				},
+			});
+
+			// Keep only last 50 results
+			const count = await this.prisma.streamCheckResult.count();
+			if (count > 50) {
+				const toDelete = count - 50;
+				const oldestRecords = await this.prisma.streamCheckResult.findMany({
+					orderBy: { checkedAt: 'asc' },
+					take: toDelete,
+					select: { id: true },
+				});
+				await this.prisma.streamCheckResult.deleteMany({
+					where: { id: { in: oldestRecords.map((r) => r.id) } },
+				});
+			}
+		} catch (error: any) {
+			if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
+				console.warn('StreamCheckResult table does not exist - cannot record result');
+				return;
+			}
+			console.error('Failed to record stream check result:', error);
+		}
+	}
+
+	/**
+	 * Gets the most recent N stream check results.
+	 */
+	public async getRecentChecks(limit: number = 5): Promise<StreamCheckResultData[]> {
+		try {
+			const results = await this.prisma.streamCheckResult.findMany({
+				orderBy: { checkedAt: 'desc' },
+				take: limit,
+			});
+
+			return results.map((r) => ({
+				ok: r.ok,
+				latencyMs: r.latencyMs,
+				server: r.server,
+				error: r.error,
+				checkedAt: r.checkedAt,
+			}));
+		} catch (error: any) {
+			if (
+				error?.code?.startsWith?.('P') ||
+				error?.name?.includes?.('Prisma') ||
+				error?.message?.includes('does not exist') ||
+				error?.message?.includes('Authentication failed')
+			) {
+				console.warn('getRecentChecks: Database error, returning empty array');
+				return [];
 			}
 			throw error;
 		}

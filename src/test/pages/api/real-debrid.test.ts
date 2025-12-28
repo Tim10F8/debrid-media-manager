@@ -52,6 +52,7 @@ describe('Real-Debrid observability API caching', () => {
 			inProgress: false,
 			avgLatencyMs: 50,
 			fastestServer: '1.download.real-debrid.com',
+			recentChecks: [],
 		};
 		const fakeStats: RealDebridObservabilityStats = {
 			totalTracked: 1,
@@ -102,6 +103,7 @@ describe('Real-Debrid observability API caching', () => {
 			inProgress: false,
 			avgLatencyMs: 75,
 			fastestServer: '1.download.real-debrid.com',
+			recentChecks: [],
 		};
 		const fakeStats: RealDebridObservabilityStats = {
 			totalTracked: 12,
