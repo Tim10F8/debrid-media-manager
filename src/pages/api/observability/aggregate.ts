@@ -5,6 +5,7 @@ import { repository } from '@/services/repository';
 interface AggregateQuery {
 	action?: 'hourly' | 'daily' | 'cleanup' | 'all';
 	secret?: string;
+	hoursAgo?: string; // For backfilling: aggregate data from N hours ago
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -21,13 +22,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 
 	const action = query.action ?? 'hourly';
+	const hoursAgo = query.hoursAgo ? parseInt(query.hoursAgo, 10) : undefined;
 
 	try {
 		const results: Record<string, unknown> = {};
 
 		if (action === 'hourly' || action === 'all') {
-			const rdHourlyAggregated = await repository.aggregateRdHourly();
+			// Support backfilling by specifying hoursAgo
+			let targetHour: Date | undefined;
+			if (hoursAgo && hoursAgo > 0) {
+				targetHour = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+			}
+			const rdHourlyAggregated = await repository.aggregateRdHourly(targetHour);
 			results.rdHourlyAggregated = rdHourlyAggregated;
+			if (hoursAgo) {
+				results.backfilledHoursAgo = hoursAgo;
+			}
 		}
 
 		if (action === 'daily' || action === 'all') {
