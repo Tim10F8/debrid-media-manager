@@ -474,6 +474,18 @@ async function executeCheck(state: SchedulerState): Promise<void> {
 				failedServers,
 			});
 
+			// Save individual server statuses for the breakdown view
+			await repository.upsertStreamHealthResults(
+				statuses.map((s) => ({
+					host: s.id,
+					status: s.status,
+					latencyMs: s.latencyMs,
+					ok: s.ok,
+					error: s.error,
+					checkedAt: new Date(),
+				}))
+			);
+
 			// Record per-server reliability
 			await repository.recordServerReliability(
 				statuses.map((s) => ({
