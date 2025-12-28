@@ -1,14 +1,6 @@
 import type { RealDebridObservabilityStats } from '@/lib/observability/getRealDebridObservabilityStats';
 import type { LucideIcon } from 'lucide-react';
-import {
-	Activity,
-	AlertTriangle,
-	CheckCircle2,
-	Clock,
-	Link2,
-	Loader2,
-	PlusCircle,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Link2, List, Loader2, PlusCircle } from 'lucide-react';
 import type { NextPage } from 'next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
@@ -225,31 +217,19 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 				? 'bg-amber-400'
 				: 'bg-rose-500';
 
-	const summaryMetrics: Array<{
-		label: string;
-		value: string;
-		helper: string;
-		icon: LucideIcon;
-	}> = [
-		{
-			label: 'Considered (2xx + 5xx)',
-			value: formatNumber(stats.considered),
-			helper: 'Responses counted toward the availability calculation.',
-			icon: Activity,
-		},
-		{
-			label: '2xx / 5xx responses',
-			value: `${formatNumber(stats.successCount)} / ${formatNumber(stats.failureCount)}`,
-			helper: 'Successful proxy calls to Real-Debrid vs upstream failures surfaced recently.',
-			icon: CheckCircle2,
-		},
-	];
 	const unrestrictStats = stats.byOperation['POST /unrestrict/link'];
 	const unrestrictSuccessPct = unrestrictStats?.considered
 		? Math.round(unrestrictStats.successRate * 100)
 		: null;
 	const unrestrictSummary = unrestrictStats?.considered
 		? `${formatNumber(unrestrictStats.successCount)}/${formatNumber(unrestrictStats.considered)} (2xx)`
+		: 'No samples yet.';
+	const getTorrentsStats = stats.byOperation['GET /torrents'];
+	const getTorrentsPct = getTorrentsStats?.considered
+		? Math.round(getTorrentsStats.successRate * 100)
+		: null;
+	const getTorrentsSummary = getTorrentsStats?.considered
+		? `${formatNumber(getTorrentsStats.successCount)}/${formatNumber(getTorrentsStats.considered)} (2xx)`
 		: 'No samples yet.';
 	const addTorrentStats = stats.byOperation['POST /torrents/addMagnet'];
 	const addTorrentSuccessPct = addTorrentStats?.considered
@@ -258,18 +238,38 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 	const addTorrentSummary = addTorrentStats?.considered
 		? `${formatNumber(addTorrentStats.successCount)}/${formatNumber(addTorrentStats.considered)} (2xx)`
 		: 'No samples yet.';
-	summaryMetrics.push({
-		label: 'Add torrent success rate',
-		value: addTorrentSuccessPct !== null ? `${addTorrentSuccessPct}%` : '—',
-		helper: addTorrentSummary,
-		icon: PlusCircle,
-	});
-	summaryMetrics.push({
-		label: 'Unrestrict success rate',
-		value: unrestrictSuccessPct !== null ? `${unrestrictSuccessPct}%` : '—',
-		helper: unrestrictSummary,
-		icon: Link2,
-	});
+
+	const summaryMetrics: Array<{
+		label: string;
+		value: string;
+		helper: string;
+		icon: LucideIcon;
+	}> = [
+		{
+			label: '2xx / 5xx responses',
+			value: `${formatNumber(stats.successCount)} / ${formatNumber(stats.failureCount)}`,
+			helper: 'Successful proxy calls to Real-Debrid vs upstream failures surfaced recently.',
+			icon: CheckCircle2,
+		},
+		{
+			label: 'Get torrents list success rate',
+			value: getTorrentsPct !== null ? `${getTorrentsPct}%` : '—',
+			helper: getTorrentsSummary,
+			icon: List,
+		},
+		{
+			label: 'Add torrent success rate',
+			value: addTorrentSuccessPct !== null ? `${addTorrentSuccessPct}%` : '—',
+			helper: addTorrentSummary,
+			icon: PlusCircle,
+		},
+		{
+			label: 'Unrestrict success rate',
+			value: unrestrictSuccessPct !== null ? `${unrestrictSuccessPct}%` : '—',
+			helper: unrestrictSummary,
+			icon: Link2,
+		},
+	];
 
 	const operationHealthMeta = (
 		successRate: number,

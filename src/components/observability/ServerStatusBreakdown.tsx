@@ -92,7 +92,8 @@ interface ExpandableSectionProps {
 	count: number;
 	type: 'working' | 'failed';
 	children: React.ReactNode;
-	defaultExpanded?: boolean;
+	isExpanded: boolean;
+	onToggle: () => void;
 }
 
 function ExpandableSection({
@@ -100,10 +101,9 @@ function ExpandableSection({
 	count,
 	type,
 	children,
-	defaultExpanded = false,
+	isExpanded,
+	onToggle,
 }: ExpandableSectionProps) {
-	const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-
 	const Icon = type === 'working' ? CheckCircle2 : AlertTriangle;
 	const iconColor = type === 'working' ? 'text-emerald-400' : 'text-rose-400';
 	const countColor = type === 'working' ? 'text-emerald-400' : 'text-rose-400';
@@ -113,7 +113,7 @@ function ExpandableSection({
 	return (
 		<div className={`rounded-lg border ${borderColor} ${bgColor}`}>
 			<button
-				onClick={() => setIsExpanded(!isExpanded)}
+				onClick={onToggle}
 				className="flex w-full items-center justify-between p-3 text-left transition-colors hover:bg-white/5"
 			>
 				<div className="flex items-center gap-2">
@@ -138,6 +138,7 @@ export function ServerStatusBreakdown() {
 	const [data, setData] = useState<StreamServersResponse | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [isExpanded, setIsExpanded] = useState(false);
 
 	const fetchData = useCallback(async () => {
 		setLoading(true);
@@ -258,7 +259,8 @@ export function ServerStatusBreakdown() {
 					title="Working Servers"
 					count={data.working}
 					type="working"
-					defaultExpanded={false}
+					isExpanded={isExpanded}
+					onToggle={() => setIsExpanded(!isExpanded)}
 				>
 					<ServerList servers={data.workingServers} type="working" />
 				</ExpandableSection>
@@ -267,7 +269,8 @@ export function ServerStatusBreakdown() {
 					title="Failed Servers"
 					count={data.failed}
 					type="failed"
-					defaultExpanded={false}
+					isExpanded={isExpanded}
+					onToggle={() => setIsExpanded(!isExpanded)}
 				>
 					<ServerList servers={data.failedServers} type="failed" />
 				</ExpandableSection>
