@@ -3,6 +3,7 @@ import { handleRestartTorrent } from '@/utils/addMagnet';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
 import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorrent';
 import { magnetToastOptions } from '@/utils/toastOptions';
+import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { handleShare } from '../../utils/hashList';
 import { isVideo } from '../../utils/selectable';
@@ -12,6 +13,23 @@ import { renderTorrentInfo } from './render';
 import { icons } from './styles';
 import { ApiTorrentFile, MagnetLink } from './types';
 import { buildSearchQueryFromFilename, fetchMediaInfo, getStreamInfo } from './utils';
+
+// RD: { error: "infringing_file", error_code: 35 }
+const getRdError = (error: unknown): string | null => {
+	if (error instanceof AxiosError) {
+		return error.response?.data?.error || null;
+	}
+	return null;
+};
+
+// AD: { status: "error", error: { code: "...", message: "..." } }
+const getAdError = (error: unknown): string | null => {
+	if (error instanceof AxiosError) {
+		const data = error.response?.data;
+		return data?.error?.message || data?.error || null;
+	}
+	return null;
+};
 
 type ShowInfoHandlers = {
 	onDeleteRd?: (rdKey: string, id: string) => Promise<void>;
@@ -519,7 +537,11 @@ export const showInfoForRD = async (
 						hash: info.hash,
 						error: e instanceof Error ? e.message : String(e),
 					});
-					toast.error('Failed to export download links.', magnetToastOptions);
+					const apiError = getRdError(e);
+					toast.error(
+						apiError ? `RD error: ${apiError}` : 'Failed to export download links.',
+						magnetToastOptions
+					);
 				} finally {
 					toast.dismiss(toastId);
 				}
@@ -582,7 +604,11 @@ export const showInfoForRD = async (
 						hash: info.hash,
 						error: e instanceof Error ? e.message : String(e),
 					});
-					toast.error('Failed to generate STRM files.', magnetToastOptions);
+					const apiError = getRdError(e);
+					toast.error(
+						apiError ? `RD error: ${apiError}` : 'Failed to generate STRM files.',
+						magnetToastOptions
+					);
 				} finally {
 					toast.dismiss(toastId);
 				}
@@ -861,7 +887,11 @@ export const showInfoForAD = async (
 						hash: info.hash,
 						error: e instanceof Error ? e.message : String(e),
 					});
-					toast.error('Failed to export links.', magnetToastOptions);
+					const apiError = getAdError(e);
+					toast.error(
+						apiError ? `AD error: ${apiError}` : 'Failed to export links.',
+						magnetToastOptions
+					);
 				}
 			});
 
@@ -906,7 +936,11 @@ export const showInfoForAD = async (
 						hash: info.hash,
 						error: e instanceof Error ? e.message : String(e),
 					});
-					toast.error('Failed to generate STRM files.', magnetToastOptions);
+					const apiError = getAdError(e);
+					toast.error(
+						apiError ? `AD error: ${apiError}` : 'Failed to generate STRM files.',
+						magnetToastOptions
+					);
 				}
 			});
 		},

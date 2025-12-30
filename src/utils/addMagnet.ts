@@ -25,6 +25,25 @@ import { convertToTbUserTorrent } from './fetchTorrents';
 import { isVideo } from './selectable';
 import { magnetToastOptions } from './toastOptions';
 
+// Extract error message from API response based on service type
+// RD: { error: "message" } or { error: "code", error_code: 35 }
+// AD: { error: { code: "...", message: "..." } }
+// TB: { detail: "message" } or { error: "message" }
+const getRdError = (error: unknown): string | null => {
+	if (error instanceof AxiosError) {
+		return error.response?.data?.error || null;
+	}
+	return null;
+};
+
+const getTbError = (error: unknown): string | null => {
+	if (error instanceof AxiosError) {
+		const data = error.response?.data;
+		return data?.detail || data?.error || null;
+	}
+	return null;
+};
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const retryDelay = process.env.VITEST_WORKER_ID ? 0 : 5000;
 
@@ -57,17 +76,13 @@ export const handleAddAsMagnetInRd = async (
 			await delay(retryDelay);
 			await handleAddAsMagnetInRd(rdKey, hash, callback, deleteIfNotInstant);
 			return;
-		} else if (error instanceof AxiosError && error.response?.status === 503) {
-			toast.error('RD blocked infringing files; cannot add.', {
-				...magnetToastOptions,
-			});
-			return;
 		}
+		const rdError = getRdError(error);
 		console.error(
 			'Error adding hash:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error('Failed to add hash.', magnetToastOptions);
+		toast.error(rdError ? `RD error: ${rdError}` : 'Failed to add hash.', magnetToastOptions);
 	}
 };
 
@@ -95,17 +110,16 @@ export const handleAddTorrentFileInRd = async (
 			await delay(retryDelay);
 			await handleAddTorrentFileInRd(rdKey, file, callback);
 			return;
-		} else if (error instanceof AxiosError && error.response?.status === 503) {
-			toast.error('RD blocked infringing files; cannot add.', {
-				...magnetToastOptions,
-			});
-			return;
 		}
+		const rdError = getRdError(error);
 		console.error(
 			'Error adding torrent file:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error('Failed to add torrent file.', magnetToastOptions);
+		toast.error(
+			rdError ? `RD error: ${rdError}` : 'Failed to add torrent file.',
+			magnetToastOptions
+		);
 	}
 };
 
@@ -121,11 +135,12 @@ export const handleAddMultipleTorrentFilesInRd = async (
 			await handleSelectFilesInRd(rdKey, `rd:${id}`);
 		} catch (error) {
 			errorCount++;
+			const rdError = error instanceof AxiosError ? error.response?.data?.error : null;
 			console.error(
 				'Error adding torrent file:',
 				error instanceof Error ? error.message : 'Unknown error'
 			);
-			toast.error('Failed to add torrent file.');
+			toast.error(rdError ? `RD error: ${rdError}` : 'Failed to add torrent file.');
 		}
 	}
 	if (callback) await callback();
@@ -144,11 +159,12 @@ export const handleAddMultipleHashesInRd = async (
 			await handleSelectFilesInRd(rdKey, `rd:${id}`);
 		} catch (error) {
 			errorCount++;
+			const rdError = error instanceof AxiosError ? error.response?.data?.error : null;
 			console.error(
 				'Error adding hash:',
 				error instanceof Error ? error.message : 'Unknown error'
 			);
-			toast.error('Failed to add hash.');
+			toast.error(rdError ? `RD error: ${rdError}` : 'Failed to add hash.');
 		}
 	}
 	if (callback) await callback();
@@ -436,7 +452,11 @@ export const handleAddAsMagnetInTb = async (
 			'Error adding torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error('Failed to add torrent.', magnetToastOptions);
+		const tbError = getTbError(error);
+		toast.error(
+			tbError ? `TorBox error: ${tbError}` : 'Failed to add torrent.',
+			magnetToastOptions
+		);
 		throw error;
 	}
 };
@@ -456,7 +476,8 @@ export const handleAddMultipleHashesInTb = async (
 				'Error adding hash in TB:',
 				error instanceof Error ? error.message : 'Unknown error'
 			);
-			toast.error('Failed to add hash.');
+			const tbError = getTbError(error);
+			toast.error(tbError ? `TorBox error: ${tbError}` : 'Failed to add hash.');
 		}
 	}
 	if (callback) await callback();
@@ -498,7 +519,8 @@ export const handleAddMultipleTorrentFilesInTb = async (
 				'Error adding torrent file in TB:',
 				error instanceof Error ? error.message : 'Unknown error'
 			);
-			toast.error('Failed to add torrent file.');
+			const tbError = getTbError(error);
+			toast.error(tbError ? `TorBox error: ${tbError}` : 'Failed to add torrent file.');
 		}
 	}
 	if (callback) await callback();

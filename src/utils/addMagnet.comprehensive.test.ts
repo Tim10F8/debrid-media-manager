@@ -103,16 +103,19 @@ describe('addMagnet utilities', () => {
 			expect(addHashAsMagnet).toHaveBeenCalledTimes(2);
 		});
 
-		it('should handle 503 error for infringing content', async () => {
+		it('should show RD API error when present in response', async () => {
 			const error = new AxiosError('Infringing content');
-			error.response = { status: 503 } as any;
+			error.response = {
+				status: 403,
+				data: { error: 'infringing_file', error_code: 35 },
+			} as any;
 
 			vi.mocked(addHashAsMagnet).mockRejectedValue(error);
 
 			await handleAddAsMagnetInRd(rdKey, hash);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'RD blocked infringing files; cannot add.',
+				'RD error: infringing_file',
 				expect.any(Object)
 			);
 		});
@@ -240,16 +243,19 @@ describe('addMagnet utilities', () => {
 			expect(addTorrentFile).toHaveBeenCalledTimes(2);
 		});
 
-		it('should handle 503 error for infringing content', async () => {
+		it('should show RD API error when present in response', async () => {
 			const error = new AxiosError('Infringing content');
-			error.response = { status: 503 } as any;
+			error.response = {
+				status: 403,
+				data: { error: 'infringing_file', error_code: 35 },
+			} as any;
 
 			vi.mocked(addTorrentFile).mockRejectedValue(error);
 
 			await handleAddTorrentFileInRd(rdKey, file);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'RD blocked infringing files; cannot add.',
+				'RD error: infringing_file',
 				expect.any(Object)
 			);
 		});

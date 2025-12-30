@@ -4,12 +4,39 @@ import { getTorrentList } from '@/services/torbox';
 import { TorBoxTorrentInfo, UserTorrentResponse } from '@/services/types';
 import { UserTorrent, UserTorrentStatus } from '@/torrent/userTorrent';
 import { ParsedFilename, filenameParse } from '@ctrl/video-filename-parser';
+import { AxiosError } from 'axios';
 import { every, some } from 'lodash';
 import toast from 'react-hot-toast';
 import { getMediaId } from './mediaId';
 import { getTypeByNameAndFileCount } from './mediaType';
 import { checkArithmeticSequenceInFilenames, isVideo } from './selectable';
 import { genericToastOptions } from './toastOptions';
+
+// RD: { error: "infringing_file", error_code: 35 }
+const getRdError = (error: unknown): string | null => {
+	if (error instanceof AxiosError) {
+		return error.response?.data?.error || null;
+	}
+	return null;
+};
+
+// AD: { status: "error", error: { code: "...", message: "..." } }
+const getAdError = (error: unknown): string | null => {
+	if (error instanceof AxiosError) {
+		const data = error.response?.data;
+		return data?.error?.message || data?.error || null;
+	}
+	return null;
+};
+
+// TB: { success: false, error: "BOZO_TORRENT", detail: "Invalid Magnet Link..." }
+const getTbError = (error: unknown): string | null => {
+	if (error instanceof AxiosError) {
+		const data = error.response?.data;
+		return data?.detail || data?.error || null;
+	}
+	return null;
+};
 
 // Custom queue implementation for controlled concurrency
 class RequestQueue {
@@ -111,7 +138,11 @@ export const fetchRealDebrid = async (
 		await callback(torrents);
 	} catch (error) {
 		await callback([]);
-		toast.error('Failed to fetch Real-Debrid torrents.', genericToastOptions);
+		const apiError = getRdError(error);
+		toast.error(
+			apiError ? `RD error: ${apiError}` : 'Failed to fetch Real-Debrid torrents.',
+			genericToastOptions
+		);
 		console.error(error);
 	}
 };
@@ -220,7 +251,11 @@ export const fetchAllDebrid = async (
 		});
 	} catch (error) {
 		await callback([]);
-		toast.error('Failed to fetch AllDebrid torrents.', genericToastOptions);
+		const apiError = getAdError(error);
+		toast.error(
+			apiError ? `AD error: ${apiError}` : 'Failed to fetch AllDebrid torrents.',
+			genericToastOptions
+		);
 		console.error(error);
 		console.error('[AllDebridFetch] error', {
 			elapsedMs: Date.now() - startedAt,
@@ -564,7 +599,11 @@ export const fetchTorBox = async (
 		});
 	} catch (error) {
 		await callback([]);
-		toast.error('Failed to fetch TorBox torrents.', genericToastOptions);
+		const apiError = getTbError(error);
+		toast.error(
+			apiError ? `TorBox error: ${apiError}` : 'Failed to fetch TorBox torrents.',
+			genericToastOptions
+		);
 		console.error(error);
 		console.error('[TorBoxFetch] error', {
 			elapsedMs: Date.now() - startedAt,
