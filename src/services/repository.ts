@@ -5,6 +5,7 @@ import {
 	CastService,
 	HashSearchService,
 	HistoryAggregationService,
+	RdOperationalService,
 	ReportService,
 	ScrapedService,
 	SearchService,
@@ -13,6 +14,7 @@ import {
 	ZurgKeysService,
 } from './database';
 import { HashSearchParams } from './database/hashSearch';
+import { RealDebridOperation } from './database/rdOperational';
 import { StreamServerStatus } from './database/streamHealth';
 import { ScrapeSearchResult } from './mediasearch';
 import { TorrentInfoResponse } from './types';
@@ -29,6 +31,7 @@ export type RepositoryDependencies = Partial<{
 	zurgKeysService: ZurgKeysService;
 	streamHealthService: StreamHealthService;
 	historyAggregationService: HistoryAggregationService;
+	rdOperationalService: RdOperationalService;
 }>;
 
 export class Repository {
@@ -43,6 +46,7 @@ export class Repository {
 	private zurgKeysService: ZurgKeysService;
 	private streamHealthService: StreamHealthService;
 	private historyAggregationService: HistoryAggregationService;
+	private rdOperationalService: RdOperationalService;
 
 	constructor({
 		availabilityService,
@@ -56,6 +60,7 @@ export class Repository {
 		zurgKeysService,
 		streamHealthService,
 		historyAggregationService,
+		rdOperationalService,
 	}: RepositoryDependencies = {}) {
 		this.availabilityService = availabilityService ?? new AvailabilityService();
 		this.scrapedService = scrapedService ?? new ScrapedService();
@@ -69,6 +74,7 @@ export class Repository {
 		this.streamHealthService = streamHealthService ?? new StreamHealthService();
 		this.historyAggregationService =
 			historyAggregationService ?? new HistoryAggregationService();
+		this.rdOperationalService = rdOperationalService ?? new RdOperationalService();
 	}
 
 	// Ensure connection is properly closed when repository is no longer needed
@@ -85,6 +91,7 @@ export class Repository {
 			this.zurgKeysService.disconnect(),
 			this.streamHealthService.disconnect(),
 			this.historyAggregationService.disconnect(),
+			this.rdOperationalService.disconnect(),
 		]);
 	}
 
@@ -511,6 +518,31 @@ export class Repository {
 
 	public runDailyRollup(targetDate?: Date) {
 		return this.historyAggregationService.runDailyRollup(targetDate);
+	}
+
+	// RD Operational Service Methods
+	public recordRdOperation(operation: RealDebridOperation, status: number) {
+		return this.rdOperationalService.recordOperation(operation, status);
+	}
+
+	public getRdStats(hoursBack?: number) {
+		return this.rdOperationalService.getStats(hoursBack);
+	}
+
+	public getRdHourlyHistory(hoursBack?: number) {
+		return this.rdOperationalService.getHourlyHistory(hoursBack);
+	}
+
+	public getRdDailyHistory(daysBack?: number) {
+		return this.rdOperationalService.getDailyHistory(daysBack);
+	}
+
+	public rollupRdDaily(targetDate?: Date) {
+		return this.rdOperationalService.rollupDaily(targetDate);
+	}
+
+	public cleanupOldRdData() {
+		return this.rdOperationalService.cleanupOldData();
 	}
 }
 

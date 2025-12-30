@@ -20,6 +20,7 @@ function buildEmptyStats(): RealDebridObservabilityStats {
 	};
 	return {
 		workingStream: fakeWorkingStream,
+		rdApi: null,
 	};
 }
 

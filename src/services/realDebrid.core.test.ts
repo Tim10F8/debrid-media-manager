@@ -11,7 +11,7 @@ vi.mock('next/config', () => ({
 }));
 
 vi.mock('@/lib/observability/rdOperationalStats', () => ({
-	recordRdUnrestrictEvent: vi.fn(),
+	recordRdOperationEvent: vi.fn(),
 }));
 
 import {

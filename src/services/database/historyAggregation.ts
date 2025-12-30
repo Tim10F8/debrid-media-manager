@@ -1,4 +1,5 @@
 import { DatabaseClient } from './client';
+import { RdOperationalService } from './rdOperational';
 
 // Retention periods
 const HOURLY_RETENTION_DAYS = 7;
@@ -39,6 +40,12 @@ export interface ServerReliabilityData {
 }
 
 export class HistoryAggregationService extends DatabaseClient {
+	private rdOperationalService: RdOperationalService;
+
+	constructor() {
+		super();
+		this.rdOperationalService = new RdOperationalService();
+	}
 	/**
 	 * Records a stream health snapshot for aggregation.
 	 * Called after each health check run.
@@ -284,6 +291,8 @@ export class HistoryAggregationService extends DatabaseClient {
 		streamHourlyDeleted: number;
 		streamDailyDeleted: number;
 		serverReliabilityDeleted: number;
+		rdHourlyDeleted: number;
+		rdDailyDeleted: number;
 	}> {
 		const now = new Date();
 		const hourlyRetentionDate = new Date(
@@ -297,6 +306,8 @@ export class HistoryAggregationService extends DatabaseClient {
 			streamHourlyDeleted: 0,
 			streamDailyDeleted: 0,
 			serverReliabilityDeleted: 0,
+			rdHourlyDeleted: 0,
+			rdDailyDeleted: 0,
 		};
 
 		try {
@@ -317,6 +328,11 @@ export class HistoryAggregationService extends DatabaseClient {
 				where: { date: { lt: dailyRetentionDate } },
 			});
 			results.serverReliabilityDeleted = serverReliability.count;
+
+			// Clean RD operational data
+			const rdCleanup = await this.rdOperationalService.cleanupOldData();
+			results.rdHourlyDeleted = rdCleanup.hourlyDeleted;
+			results.rdDailyDeleted = rdCleanup.dailyDeleted;
 		} catch (error: any) {
 			if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
 				return results;
@@ -493,14 +509,19 @@ export class HistoryAggregationService extends DatabaseClient {
 	 */
 	public async runDailyRollup(targetDate?: Date): Promise<{
 		streamDailyRolled: boolean;
+		rdDailyRolled: boolean;
 	}> {
 		// Roll up yesterday's data by default
 		const date = targetDate ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-		const streamDailyRolled = await this.rollupStreamDaily(date);
+		const [streamDailyRolled] = await Promise.all([
+			this.rollupStreamDaily(date),
+			this.rdOperationalService.rollupDaily(date),
+		]);
 
 		return {
 			streamDailyRolled,
+			rdDailyRolled: true,
 		};
 	}
 

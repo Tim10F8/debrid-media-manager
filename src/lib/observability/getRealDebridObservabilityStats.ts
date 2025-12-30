@@ -1,3 +1,4 @@
+import { RdOverallStats } from '@/services/database/rdOperational';
 import { repository } from '@/services/repository';
 
 import { getStreamMetricsFromDb, isHealthCheckInProgress } from './streamServersHealth';
@@ -24,15 +25,17 @@ export interface CompactWorkingStreamMetrics {
 
 export interface RealDebridObservabilityStats {
 	workingStream: CompactWorkingStreamMetrics;
+	rdApi: RdOverallStats | null;
 }
 
 /**
  * Gets Real-Debrid stream health stats from MySQL database.
  */
 export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebridObservabilityStats> {
-	const [streamMetrics, recentChecks] = await Promise.all([
+	const [streamMetrics, recentChecks, rdStats] = await Promise.all([
 		getStreamMetricsFromDb(),
 		repository.getRecentStreamChecks(5),
+		repository.getRdStats(24),
 	]);
 
 	return {
@@ -53,6 +56,7 @@ export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebri
 				checkedAt: check.checkedAt.getTime(),
 			})),
 		},
+		rdApi: rdStats,
 	};
 }
 

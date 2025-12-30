@@ -1,3 +1,4 @@
+import { recordRdOperationEvent } from '@/lib/observability/rdOperationalStats';
 import axios, { InternalAxiosRequestConfig } from 'axios';
 import getConfig from 'next/config';
 import qs from 'qs';
@@ -451,8 +452,11 @@ export const getCurrentUser = async (accessToken: string) => {
 					},
 				}
 			);
+			recordRdOperationEvent('GET /user', response.status);
 			return response.data;
 		} catch (error: any) {
+			const status = axios.isAxiosError(error) ? (error.response?.status ?? 500) : 500;
+			recordRdOperationEvent('GET /user', status);
 			console.error('Error fetching user information:', error.message);
 			throw error;
 		} finally {
@@ -486,6 +490,7 @@ export async function getUserTorrentsList(
 				timeout: TORRENT_REQUEST_TIMEOUT,
 			}
 		);
+		recordRdOperationEvent('GET /torrents', response.status);
 		console.log(
 			`[${new Date().toISOString()}]     RD API call (page=${page}, limit=${limit}): ${Date.now() - apiStart}ms`
 		);
@@ -506,6 +511,8 @@ export async function getUserTorrentsList(
 
 		return { data, totalCount: totalCountValue };
 	} catch (error: any) {
+		const status = axios.isAxiosError(error) ? (error.response?.status ?? 500) : 500;
+		recordRdOperationEvent('GET /torrents', status);
 		console.error('Error fetching user torrents list:', error.message);
 		throw error;
 	}
@@ -525,8 +532,11 @@ export const getTorrentInfo = async (
 				},
 			}
 		);
+		recordRdOperationEvent('GET /torrents/info/{id}', response.status);
 		return response.data;
 	} catch (error: any) {
+		const status = axios.isAxiosError(error) ? (error.response?.status ?? 500) : 500;
+		recordRdOperationEvent('GET /torrents/info/{id}', status);
 		console.error('Error fetching torrent information:', error.message);
 		throw error;
 	}
@@ -554,10 +564,14 @@ export const addHashAsMagnet = async (
 			}
 		);
 		if (response.status !== 201) {
+			recordRdOperationEvent('POST /torrents/addMagnet', response.status);
 			throw new Error('Failed to add magnet, status: ' + response.status);
 		}
+		recordRdOperationEvent('POST /torrents/addMagnet', response.status);
 		return response.data.id;
 	} catch (error: any) {
+		const status = axios.isAxiosError(error) ? (error.response?.status ?? 500) : 500;
+		recordRdOperationEvent('POST /torrents/addMagnet', status);
 		throw error;
 	}
 };
@@ -601,7 +615,10 @@ export const selectFiles = async (
 				},
 			}
 		);
+		recordRdOperationEvent('POST /torrents/selectFiles/{id}', response.status);
 	} catch (error: any) {
+		const status = axios.isAxiosError(error) ? (error.response?.status ?? 500) : 500;
+		recordRdOperationEvent('POST /torrents/selectFiles/{id}', status);
 		console.error('Error selecting files:', error.message);
 		throw error;
 	}
@@ -621,7 +638,10 @@ export const deleteTorrent = async (
 				},
 			}
 		);
+		recordRdOperationEvent('DELETE /torrents/delete/{id}', response.status);
 	} catch (error: any) {
+		const status = axios.isAxiosError(error) ? (error.response?.status ?? 500) : 500;
+		recordRdOperationEvent('DELETE /torrents/delete/{id}', status);
 		console.error('Error deleting torrent:', error.message);
 		throw error;
 	}
@@ -660,8 +680,11 @@ export const unrestrictLink = async (
 				},
 			}
 		);
+		recordRdOperationEvent('POST /unrestrict/link', response.status);
 		return response.data;
 	} catch (error: any) {
+		const status = axios.isAxiosError(error) ? (error.response?.status ?? 500) : 500;
+		recordRdOperationEvent('POST /unrestrict/link', status);
 		console.error('Error checking unrestrict:', error.message);
 		throw error;
 	}
@@ -684,8 +707,11 @@ export const proxyUnrestrictLink = async (
 			{ headers }
 		);
 
+		recordRdOperationEvent('POST /unrestrict/link', response.status);
 		return response.data;
 	} catch (error: any) {
+		const status = axios.isAxiosError(error) ? (error.response?.status ?? 500) : 500;
+		recordRdOperationEvent('POST /unrestrict/link', status);
 		console.error('Error checking unrestrict:', error.message);
 		throw error;
 	}

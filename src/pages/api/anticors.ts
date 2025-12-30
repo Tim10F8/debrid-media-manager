@@ -1,3 +1,7 @@
+import {
+	recordRdOperationEvent,
+	resolveRealDebridOperation,
+} from '@/lib/observability/rdOperationalStats';
 import { randomUUID } from 'crypto';
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 
@@ -200,8 +204,31 @@ const handler: NextApiHandler = async (req: NextApiRequest, res: NextApiResponse
 
 		res.status(upstreamResponse.status);
 		res.send(responseBody);
+
+		// Record tracked Real-Debrid operations
+		const operation = resolveRealDebridOperation(req.method, parsedProxyUrl.pathname);
+		if (
+			operation &&
+			(parsedProxyUrl.hostname === 'app.real-debrid.com' ||
+				parsedProxyUrl.hostname === 'api.real-debrid.com')
+		) {
+			recordRdOperationEvent(operation, upstreamResponse.status);
+		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unknown error';
+
+		// Record failure for RD operations
+		try {
+			const operation = resolveRealDebridOperation(req.method, parsedProxyUrl.pathname);
+			if (
+				operation &&
+				(parsedProxyUrl.hostname === 'app.real-debrid.com' ||
+					parsedProxyUrl.hostname === 'api.real-debrid.com')
+			) {
+				recordRdOperationEvent(operation, 500);
+			}
+		} catch {}
+
 		res.status(500).send(`Error fetching the proxy URL: ${message}`);
 	}
 };

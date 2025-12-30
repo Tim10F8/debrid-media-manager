@@ -24,6 +24,7 @@ function buildWorkingStream(): CompactWorkingStreamMetrics {
 
 const baseStats: RealDebridObservabilityStats = {
 	workingStream: buildWorkingStream(),
+	rdApi: null,
 };
 
 type GlobalWithFetch = typeof globalThis & {

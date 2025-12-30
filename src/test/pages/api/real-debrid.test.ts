@@ -27,6 +27,7 @@ describe('Real-Debrid observability API caching', () => {
 		};
 		const fakeStats: RealDebridObservabilityStats = {
 			workingStream: fakeWorkingStream,
+			rdApi: null,
 		};
 		vi.spyOn(combined, 'getRealDebridObservabilityStatsFromDb').mockResolvedValue(fakeStats);
 
@@ -68,6 +69,7 @@ describe('Real-Debrid observability API caching', () => {
 		};
 		const fakeStats: RealDebridObservabilityStats = {
 			workingStream: fakeWorkingStream,
+			rdApi: null,
 		};
 		const statsSpy = vi
 			.spyOn(combined, 'getRealDebridObservabilityStatsFromDb')

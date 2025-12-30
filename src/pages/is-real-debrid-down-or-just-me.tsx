@@ -2,6 +2,7 @@ import { useConnectivity } from '@/hooks/useConnectivity';
 import type { RealDebridObservabilityStats } from '@/lib/observability/getRealDebridObservabilityStats';
 import type { LucideIcon } from 'lucide-react';
 import {
+	Activity,
 	AlertTriangle,
 	CheckCircle2,
 	Clock,
@@ -118,7 +119,12 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 	const totalChecks = recentChecks.length;
 	const streamPct = totalChecks > 0 ? Math.round((passedCount / totalChecks) * 100) : null;
 
-	// Determine status based on stream health
+	// RD API Health
+	const rdApi = stats.rdApi;
+	const rdApiPct = rdApi && rdApi.totalCount > 0 ? Math.round(rdApi.successRate * 100) : null;
+	const rdApiConsidered = rdApi ? rdApi.successCount + rdApi.failureCount : 0;
+
+	// Determine status based on stream health (and optionally RD API)
 	const state: StatusState =
 		totalChecks === 0 ? 'idle' : streamPct !== null && streamPct < 50 ? 'down' : 'up';
 
@@ -256,10 +262,10 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 					</header>
 
 					{/* Stream Health & Info */}
-					<div className="grid gap-6 lg:grid-cols-3">
+					<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 						<div
 							data-testid="working-stream-card"
-							className="rounded-xl border border-white/10 bg-white/5 p-6 lg:col-span-1"
+							className="rounded-xl border border-white/10 bg-white/5 p-6"
 						>
 							<h3 className="flex items-center gap-2 text-sm font-medium text-slate-300">
 								<Wifi className="h-4 w-4" />
@@ -315,7 +321,55 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 							</div>
 						</div>
 
-						<div className="rounded-xl border border-white/10 bg-white/5 p-6 lg:col-span-2">
+						<div
+							data-testid="rd-api-card"
+							className="rounded-xl border border-white/10 bg-white/5 p-6"
+						>
+							<h3 className="flex items-center gap-2 text-sm font-medium text-slate-300">
+								<Activity className="h-4 w-4" />
+								API Success Rate (24h)
+							</h3>
+							<div className="mt-4">
+								<div className="flex items-baseline gap-2">
+									<span
+										className={`text-3xl font-bold ${
+											rdApiPct === null
+												? 'text-slate-400'
+												: rdApiPct >= 95
+													? 'text-emerald-400'
+													: rdApiPct >= 80
+														? 'text-amber-400'
+														: 'text-rose-500'
+										}`}
+									>
+										{rdApiPct !== null ? `${rdApiPct}%` : '—'}
+									</span>
+									<span className="text-sm text-slate-500">
+										{rdApiConsidered > 0
+											? `${rdApi?.successCount ?? 0} of ${rdApiConsidered}`
+											: 'no data yet'}
+									</span>
+								</div>
+								{rdApi && rdApi.totalCount > 0 && (
+									<div className="mt-3 space-y-1 text-xs text-slate-500">
+										<div className="flex justify-between">
+											<span>Total requests</span>
+											<span className="text-slate-300">
+												{rdApi.totalCount.toLocaleString()}
+											</span>
+										</div>
+										{rdApi.failureCount > 0 && (
+											<div className="flex justify-between text-rose-400">
+												<span>5xx errors</span>
+												<span>{rdApi.failureCount}</span>
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+						</div>
+
+						<div className="rounded-xl border border-white/10 bg-white/5 p-6 md:col-span-2 lg:col-span-1">
 							<div className="flex h-full flex-col justify-center gap-4">
 								<div>
 									<h3 className="text-lg font-medium text-white">

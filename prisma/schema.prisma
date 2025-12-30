@@ -261,6 +261,43 @@ model StreamServerHealth {
 // HISTORICAL DATA FOR 90-DAY OBSERVABILITY
 // ═══════════════════════════════════════════════════════════════
 
+// RD Operations - Hourly aggregates (kept for 7 days, then rolled into daily)
+// This table is updated via atomic increments, no raw events stored
+model RdOperationalHourly {
+  id           Int      @id @default(autoincrement())
+  hour         DateTime // Start of hour (UTC), e.g., 2024-01-15T14:00:00Z
+  operation    String   // "GET /user", "GET /torrents", etc.
+  totalCount   Int      @default(0) // Total requests in this hour
+  successCount Int      @default(0) // 2xx responses
+  failureCount Int      @default(0) // 5xx responses
+  otherCount   Int      @default(0) // 3xx, 4xx (not counted in availability)
+  successRate  Float    @default(0) // Pre-computed: successCount / (successCount + failureCount)
+  createdAt    DateTime @default(now())
+
+  @@unique([hour, operation])
+  @@index([hour])
+  @@index([operation, hour])
+}
+
+// RD Operations - Daily aggregates (kept for 90 days)
+model RdOperationalDaily {
+  id             Int      @id @default(autoincrement())
+  date           DateTime // Start of day (UTC)
+  operation      String
+  totalCount     Int      // Sum of hourly totals
+  successCount   Int
+  failureCount   Int
+  avgSuccessRate Float    // Average of hourly success rates
+  minSuccessRate Float    // Worst hour of the day
+  maxSuccessRate Float    // Best hour of the day
+  peakHour       Int?     // Hour with most traffic (0-23)
+  createdAt      DateTime @default(now())
+
+  @@unique([date, operation])
+  @@index([date])
+  @@index([operation, date])
+}
+
 // Stream Health - Individual check results (kept for 24 hours, last 50 max)
 model StreamCheckResult {
   id        Int      @id @default(autoincrement())
