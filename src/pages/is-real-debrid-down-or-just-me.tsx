@@ -293,29 +293,43 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 									</span>
 								</div>
 								{totalChecks > 0 && (
-									<div
-										className="mt-3 flex items-center gap-1.5"
-										title="Last 5 checks (newest first)"
-									>
+									<div className="mt-3 space-y-1.5">
+										<div className="text-xs font-medium text-slate-500">
+											Last {totalChecks} checks
+										</div>
 										{recentChecks.map((check, i) => (
-											<span
+											<div
 												key={i}
-												className={`h-3 w-3 rounded-full ${check.ok ? 'bg-emerald-500' : 'bg-rose-500'}`}
-												title={
-													check.ok
-														? `Passed${check.latencyMs ? ` (${Math.round(check.latencyMs)}ms)` : ''}`
-														: 'Failed'
-												}
-											/>
+												className="flex items-center justify-between text-xs"
+											>
+												<div className="flex items-center gap-2">
+													<span
+														className={`h-2 w-2 rounded-full ${check.ok ? 'bg-emerald-500' : 'bg-rose-500'}`}
+													/>
+													<span className="text-slate-400">
+														{new Date(
+															check.checkedAt
+														).toLocaleTimeString(FIXED_LOCALE, {
+															hour: '2-digit',
+															minute: '2-digit',
+														})}
+													</span>
+												</div>
+												<span
+													className={
+														check.ok
+															? 'text-emerald-400'
+															: 'text-rose-400'
+													}
+												>
+													{check.ok
+														? check.latencyMs
+															? `${Math.round(check.latencyMs)}ms`
+															: 'OK'
+														: 'Failed'}
+												</span>
+											</div>
 										))}
-									</div>
-								)}
-								{workingStream?.avgLatencyMs && (
-									<div className="mt-3 flex justify-between text-sm text-slate-400">
-										<span>Latency</span>
-										<span className="text-slate-200">
-											{Math.round(workingStream.avgLatencyMs)}ms
-										</span>
 									</div>
 								)}
 							</div>
@@ -351,19 +365,53 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 									</span>
 								</div>
 								{rdApi && rdApi.totalCount > 0 && (
-									<div className="mt-3 space-y-1 text-xs text-slate-500">
-										<div className="flex justify-between">
-											<span>Total requests</span>
-											<span className="text-slate-300">
-												{rdApi.totalCount.toLocaleString()}
-											</span>
+									<div className="mt-3 space-y-2">
+										<div className="text-xs font-medium text-slate-500">
+											By operation
 										</div>
-										{rdApi.failureCount > 0 && (
-											<div className="flex justify-between text-rose-400">
-												<span>5xx errors</span>
-												<span>{rdApi.failureCount}</span>
-											</div>
-										)}
+										{Object.values(rdApi.byOperation)
+											.filter((op) => op.totalCount > 0)
+											.sort((a, b) => b.totalCount - a.totalCount)
+											.map((op) => {
+												const pct = Math.round(op.successRate * 100);
+												const label = op.operation
+													.replace('GET ', '')
+													.replace('POST ', '')
+													.replace('DELETE ', '')
+													.replace('/torrents/', '')
+													.replace('{id}', '');
+												return (
+													<div
+														key={op.operation}
+														className="flex items-center justify-between text-xs"
+													>
+														<span
+															className="truncate text-slate-400"
+															title={op.operation}
+														>
+															{label}
+														</span>
+														<div className="flex items-center gap-2">
+															{op.failureCount > 0 && (
+																<span className="text-rose-400">
+																	{op.failureCount} err
+																</span>
+															)}
+															<span
+																className={
+																	pct >= 95
+																		? 'text-emerald-400'
+																		: pct >= 80
+																			? 'text-amber-400'
+																			: 'text-rose-400'
+																}
+															>
+																{pct}%
+															</span>
+														</div>
+													</div>
+												);
+											})}
 									</div>
 								)}
 							</div>
