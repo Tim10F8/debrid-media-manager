@@ -3,59 +3,21 @@ import { createMockRequest, createMockResponse } from '@/test/utils/api';
 import type { Mock } from 'vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-	searchOmdbMock,
-	searchCinemetaMoviesMock,
-	searchCinemetaSeriesMock,
-	mdblistSearchMock,
-	getSearchResultsMock,
-	saveSearchResultsMock,
-} = vi.hoisted(() => {
+const { searchImdbTitlesMock } = vi.hoisted(() => {
 	return {
-		searchOmdbMock: vi.fn(),
-		searchCinemetaMoviesMock: vi.fn(),
-		searchCinemetaSeriesMock: vi.fn(),
-		mdblistSearchMock: vi.fn(),
-		getSearchResultsMock: vi.fn(),
-		saveSearchResultsMock: vi.fn(),
+		searchImdbTitlesMock: vi.fn(),
 	};
 });
 
-vi.mock('@/services/metadataCache', () => ({
-	getMetadataCache: () => ({
-		searchOmdb: searchOmdbMock,
-		searchCinemetaMovies: searchCinemetaMoviesMock,
-		searchCinemetaSeries: searchCinemetaSeriesMock,
-	}),
-}));
-
-vi.mock('@/services/mdblistClient', () => ({
-	getMdblistClient: () => ({
-		search: mdblistSearchMock,
-	}),
-}));
-
 vi.mock('@/services/repository', () => ({
 	repository: {
-		getSearchResults: getSearchResultsMock,
-		saveSearchResults: saveSearchResultsMock,
+		searchImdbTitles: searchImdbTitlesMock,
 	},
-}));
-
-vi.mock('user-agents', () => ({
-	default: vi.fn().mockImplementation(() => ({
-		toString: () => 'test-agent',
-	})),
 }));
 
 describe('/api/search/title', () => {
 	beforeEach(() => {
-		searchOmdbMock.mockReset();
-		searchCinemetaMoviesMock.mockReset();
-		searchCinemetaSeriesMock.mockReset();
-		mdblistSearchMock.mockReset();
-		getSearchResultsMock.mockReset();
-		saveSearchResultsMock.mockReset();
+		searchImdbTitlesMock.mockReset();
 	});
 
 	it('returns 400 when keyword is missing', async () => {
@@ -71,79 +33,99 @@ describe('/api/search/title', () => {
 		});
 	});
 
-	it('returns cached results when available', async () => {
-		getSearchResultsMock.mockResolvedValue([
-			{ imdbid: 'tt1', type: 'movie', title: 'Cached', searchTitle: 'cached' },
+	it('returns results from local IMDB database', async () => {
+		searchImdbTitlesMock.mockResolvedValue([
+			{
+				imdbId: 'tt0133093',
+				type: 'movie',
+				year: 1999,
+				title: 'The Matrix',
+				originalTitle: 'The Matrix',
+				rating: 8.7,
+				votes: 2000000,
+				isOriginalMatch: true,
+			},
+			{
+				imdbId: 'tt0234215',
+				type: 'movie',
+				year: 2003,
+				title: 'The Matrix Reloaded',
+				originalTitle: 'The Matrix Reloaded',
+				rating: 7.2,
+				votes: 600000,
+				isOriginalMatch: true,
+			},
 		]);
-		const req = createMockRequest({ query: { keyword: 'cached' } });
+		const req = createMockRequest({ query: { keyword: 'matrix' } });
 		const res = createMockResponse();
 
 		await handler(req, res);
 
 		expect(res.status).toHaveBeenCalledWith(200);
-		expect(res.json).toHaveBeenCalledWith({
-			results: [{ imdbid: 'tt1', type: 'movie', title: 'Cached', searchTitle: 'cached' }],
+		expect(searchImdbTitlesMock).toHaveBeenCalledWith('matrix', {
+			limit: 50,
+			year: undefined,
+			mediaType: undefined,
 		});
-		expect(saveSearchResultsMock).not.toHaveBeenCalled();
+		const payload = (res.json as Mock).mock.calls[0][0] as { results: any[] };
+		expect(payload.results.length).toBe(2);
+		expect(payload.results[0].imdbid).toBe('tt0133093');
 	});
 
-	it('aggregates external sources and caches new results', async () => {
-		getSearchResultsMock.mockResolvedValue(null);
-		searchOmdbMock.mockResolvedValue({
-			Response: 'True',
-			Search: [
-				{
-					Title: 'Matrix',
-					Year: '1999',
-					imdbID: 'tt0133093',
-					Type: 'movie',
-					Poster: 'http://poster',
-				},
-			],
-		});
-		mdblistSearchMock.mockResolvedValue({
-			response: true,
-			search: [
-				{
-					id: 'tt0234215',
-					title: 'Matrix Reloaded',
-					year: 2003,
-					imdbid: 'tt0234215',
-					type: 'movie',
-					score: 2,
-					score_average: 2,
-				},
-			],
-		});
-		const cinemetaPayload = {
-			metas: [
-				{
-					id: 'matrix',
-					imdb_id: 'tt0234215',
-					type: 'movie',
-					name: 'Matrix Reloaded',
-					releaseInfo: '2003',
-					poster: 'http://poster2',
-				},
-			],
-		};
-		searchCinemetaMoviesMock.mockResolvedValue(cinemetaPayload);
-		searchCinemetaSeriesMock.mockResolvedValue({ metas: [] });
-
+	it('parses year from search query', async () => {
+		searchImdbTitlesMock.mockResolvedValue([
+			{
+				imdbId: 'tt0133093',
+				type: 'movie',
+				year: 1999,
+				title: 'The Matrix',
+				originalTitle: 'The Matrix',
+				rating: 8.7,
+				votes: 2000000,
+				isOriginalMatch: true,
+			},
+		]);
 		const req = createMockRequest({ query: { keyword: 'matrix 1999' } });
 		const res = createMockResponse();
 
 		await handler(req, res);
 
 		expect(res.status).toHaveBeenCalledWith(200);
-		const payload = (res.json as Mock).mock.calls[0][0] as { results: any[] };
-		expect(payload.results.length).toBeGreaterThan(0);
-		expect(saveSearchResultsMock).toHaveBeenCalledWith('matrix 1999', expect.any(Array));
+		expect(searchImdbTitlesMock).toHaveBeenCalledWith('matrix', {
+			limit: 50,
+			year: 1999,
+			mediaType: undefined,
+		});
 	});
 
-	it('handles upstream errors gracefully', async () => {
-		getSearchResultsMock.mockResolvedValue(null);
-		searchOmdbMock.mockRejectedValue(new Error('omdb down'));
+	it('parses media type from search query', async () => {
+		searchImdbTitlesMock.mockResolvedValue([]);
+		const req = createMockRequest({ query: { keyword: 'breaking bad show' } });
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(200);
+		expect(searchImdbTitlesMock).toHaveBeenCalledWith('breaking bad', {
+			limit: 50,
+			year: undefined,
+			mediaType: 'show',
+		});
+	});
+
+	it('handles empty results gracefully', async () => {
+		searchImdbTitlesMock.mockResolvedValue([]);
+		const req = createMockRequest({ query: { keyword: 'nonexistent movie xyz' } });
+		const res = createMockResponse();
+
+		await handler(req, res);
+
+		expect(res.status).toHaveBeenCalledWith(200);
+		expect(res.json).toHaveBeenCalledWith({ results: [] });
+	});
+
+	it('handles database errors gracefully', async () => {
+		searchImdbTitlesMock.mockRejectedValue(new Error('Database connection failed'));
 		const req = createMockRequest({ query: { keyword: 'matrix' } });
 		const res = createMockResponse();
 

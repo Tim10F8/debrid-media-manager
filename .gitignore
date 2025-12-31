@@ -69,3 +69,6 @@ public/fallback-*.js
 credentials.txt
 
 .data/
+
+AGENTS.md
+CLAUDE.md

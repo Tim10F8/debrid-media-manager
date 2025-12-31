@@ -27,7 +27,7 @@ export class ZurgKeysService extends DatabaseClient {
 
 	/**
 	 * Validate an API key
-	 * Returns true if the key exists and is not expired
+	 * Returns true if the key exists and is not expired (or has no expiration)
 	 */
 	public async validateApiKey(apiKey: string): Promise<boolean> {
 		const key = await this.prisma.zurgKeys.findUnique({
@@ -36,6 +36,11 @@ export class ZurgKeysService extends DatabaseClient {
 
 		if (!key) {
 			return false;
+		}
+
+		// If no expiration set, key is always valid
+		if (!key.validUntil) {
+			return true;
 		}
 
 		// Check if the key is still valid
@@ -48,7 +53,7 @@ export class ZurgKeysService extends DatabaseClient {
 	 */
 	public async getApiKey(apiKey: string): Promise<{
 		apiKey: string;
-		validUntil: Date;
+		validUntil: Date | null;
 		createdAt: Date;
 	} | null> {
 		const key = await this.prisma.zurgKeys.findUnique({
@@ -96,7 +101,7 @@ export class ZurgKeysService extends DatabaseClient {
 	public async listApiKeys(): Promise<
 		Array<{
 			apiKey: string;
-			validUntil: Date;
+			validUntil: Date | null;
 			createdAt: Date;
 			isExpired: boolean;
 		}>
@@ -111,7 +116,7 @@ export class ZurgKeysService extends DatabaseClient {
 			apiKey: key.apiKey,
 			validUntil: key.validUntil,
 			createdAt: key.createdAt,
-			isExpired: key.validUntil <= now,
+			isExpired: key.validUntil ? key.validUntil <= now : false,
 		}));
 	}
 }

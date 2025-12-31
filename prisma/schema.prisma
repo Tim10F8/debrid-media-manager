@@ -234,9 +234,9 @@ model MdblistCache {
 }
 
 model ZurgKeys {
-  apiKey     String   @id
-  validUntil DateTime
-  createdAt  DateTime @default(now())
+  apiKey     String    @id
+  validUntil DateTime?
+  createdAt  DateTime  @default(now())
 
   @@index([validUntil])
 }
@@ -362,4 +362,206 @@ model ServerReliabilityDaily {
   @@index([date])
   @@index([host])
   @@index([reliability])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMDB DATA TABLES
+// ═══════════════════════════════════════════════════════════════
+
+model ImdbTitleBasics {
+  tconst         String   @id @map("tconst") @db.VarChar(12)
+  titleType      String   @map("title_type") @db.VarChar(20)
+  primaryTitle   String?  @map("primary_title") @db.VarChar(500)
+  originalTitle  String?  @map("original_title") @db.VarChar(500)
+  isAdult        Boolean? @default(false) @map("is_adult")
+  startYear      Int?     @map("start_year") @db.UnsignedSmallInt
+  endYear        Int?     @map("end_year") @db.UnsignedSmallInt
+  runtimeMinutes Int?     @map("runtime_minutes") @db.UnsignedInt
+
+  @@index([titleType], map: "idx_title_type")
+  @@index([isAdult], map: "idx_is_adult")
+  @@index([startYear], map: "idx_start_year")
+  @@fulltext([primaryTitle], map: "ft_primary_title")
+  @@map("imdb_title_basics")
+}
+
+model ImdbTitleAkas {
+  id              Int      @id @default(autoincrement()) @db.UnsignedInt
+  titleId         String   @map("title_id") @db.VarChar(12)
+  ordering        Int      @db.UnsignedSmallInt
+  title           String?  @db.Text
+  region          String?  @db.VarChar(10)
+  language        String?  @db.VarChar(10)
+  types           String?  @db.Text
+  attributes      String?  @db.Text
+  isOriginalTitle Boolean? @default(false) @map("is_original_title")
+
+  @@unique([titleId, ordering], map: "uk_title_ordering")
+  @@index([region], map: "idx_region")
+  @@index([language], map: "idx_language")
+  @@fulltext([title], map: "ft_title")
+  @@map("imdb_title_akas")
+}
+
+model ImdbTitleRatings {
+  tconst        String  @id @map("tconst") @db.VarChar(12)
+  averageRating Decimal @map("average_rating") @db.Decimal(3, 1)
+  numVotes      Int     @map("num_votes") @db.UnsignedInt
+
+  @@index([averageRating], map: "idx_rating")
+  @@index([averageRating, numVotes], map: "idx_rating_votes")
+  @@index([numVotes], map: "idx_votes")
+  @@map("imdb_title_ratings")
+}
+
+model ImdbTitleEpisode {
+  tconst        String @id @db.VarChar(12)
+  parentTconst  String @map("parent_tconst") @db.VarChar(12)
+  seasonNumber  Int?   @map("season_number") @db.UnsignedSmallInt
+  episodeNumber Int?   @map("episode_number") @db.UnsignedInt
+
+  @@index([parentTconst], map: "idx_parent")
+  @@index([parentTconst, seasonNumber, episodeNumber], map: "idx_season_episode")
+  @@map("imdb_title_episode")
+}
+
+model ImdbTitleGenres {
+  titleId String @map("title_id") @db.VarChar(12)
+  genreId Int    @map("genre_id") @db.UnsignedSmallInt
+
+  @@id([titleId, genreId])
+  @@index([genreId], map: "fk_tg_genre")
+  @@map("imdb_title_genres")
+}
+
+model ImdbGenres {
+  id   Int    @id @default(autoincrement()) @db.UnsignedSmallInt
+  name String @unique(map: "name") @db.VarChar(50)
+
+  @@map("imdb_genres")
+}
+
+model ImdbNameBasics {
+  nconst      String  @id @db.VarChar(12)
+  primaryName String? @map("primary_name") @db.VarChar(255)
+  birthYear   Int?    @map("birth_year") @db.UnsignedSmallInt
+  deathYear   Int?    @map("death_year") @db.UnsignedSmallInt
+
+  @@index([birthYear], map: "idx_birth_year")
+  @@map("imdb_name_basics")
+}
+
+model ImdbNameKnownTitles {
+  nameId  String @map("name_id") @db.VarChar(12)
+  titleId String @map("title_id") @db.VarChar(12)
+
+  @@id([nameId, titleId])
+  @@index([titleId], map: "idx_title")
+  @@map("imdb_name_known_titles")
+}
+
+model ImdbNameProfessions {
+  nameId       String @map("name_id") @db.VarChar(12)
+  professionId Int    @map("profession_id") @db.UnsignedSmallInt
+
+  @@id([nameId, professionId])
+  @@index([professionId], map: "fk_np_profession")
+  @@map("imdb_name_professions")
+}
+
+model ImdbProfessions {
+  id   Int    @id @default(autoincrement()) @db.UnsignedSmallInt
+  name String @unique(map: "name") @db.VarChar(100)
+
+  @@map("imdb_professions")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SPONSORSHIP & ACCESS TABLES
+// ═══════════════════════════════════════════════════════════════
+
+model DonationHistory {
+  id             String   @id
+  createdAt      DateTime @default(now())
+  githubUsername String
+  amountInCents  Int
+  donationDate   DateTime @default(now())
+  donationMethod String
+  transactionId  String?
+  notes          String?
+  durationDays   Int
+  endDate        DateTime
+
+  @@index([donationDate])
+  @@index([githubUsername, createdAt])
+}
+
+model PatreonUsageHistory {
+  id             String    @id
+  createdAt      DateTime  @default(now())
+  patreonUserId  String
+  githubUsername String
+  action         String
+  cooldownUntil  DateTime?
+
+  @@index([githubUsername])
+  @@index([patreonUserId, createdAt])
+}
+
+model RepoAccess {
+  id             String    @id
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  githubUsername String
+  repoOwner      String
+  repoName       String
+  hasAccess      Boolean   @default(true)
+  grantedAt      DateTime  @default(now())
+  revokedAt      DateTime?
+  grantReason    String?
+  revokeReason   String?
+
+  @@unique([githubUsername, repoOwner, repoName])
+  @@index([githubUsername])
+  @@index([hasAccess, updatedAt])
+  @@index([repoOwner, repoName, hasAccess])
+}
+
+model Sponsors {
+  id                     String    @id
+  shortId                String    @unique
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  githubUsername         String    @unique
+  githubSponsoring       Boolean   @default(false)
+  patreonUserId          String?   @unique
+  patreonEmail           String?
+  patreonAmount          Int       @default(0)
+  oneTimeDonationAmount  Int?
+  oneTimeDonationDate    DateTime?
+  oneTimeDonationEndDate DateTime?
+  discordUserId          String?   @unique
+  discordUsername        String?
+  zurgApiKey             String?   @unique
+  zurgApiKeyVersion      Int       @default(1)
+
+  @@index([githubSponsoring, patreonAmount])
+  @@index([updatedAt])
+}
+
+model TempAuthData {
+  id              String   @id
+  token           String   @unique
+  createdAt       DateTime @default(now())
+  githubUsername  String?
+  githubId        String?
+  patreonUserId   String?
+  patreonEmail    String?
+  patreonFullName String?
+  discordUserId   String?
+  discordUsername String?
+  expiresAt       DateTime
+
+  @@index([expiresAt])
+  @@index([token])
 }

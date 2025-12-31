@@ -3,6 +3,7 @@ import { AvailabilityService } from './availability';
 import { CastService } from './cast';
 import { HashSearchService } from './hashSearch';
 import { HistoryAggregationService } from './historyAggregation';
+import { ImdbSearchService } from './imdbSearch';
 import { RdOperationalService } from './rdOperational';
 import { ReportService } from './report';
 import { ScrapedService } from './scraped';
@@ -17,6 +18,7 @@ export {
 	CastService,
 	HashSearchService,
 	HistoryAggregationService,
+	ImdbSearchService,
 	RdOperationalService,
 	ReportService,
 	ScrapedService,

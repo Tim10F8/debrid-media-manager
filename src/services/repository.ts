@@ -5,6 +5,7 @@ import {
 	CastService,
 	HashSearchService,
 	HistoryAggregationService,
+	ImdbSearchService,
 	RdOperationalService,
 	ReportService,
 	ScrapedService,
@@ -32,6 +33,7 @@ export type RepositoryDependencies = Partial<{
 	streamHealthService: StreamHealthService;
 	historyAggregationService: HistoryAggregationService;
 	rdOperationalService: RdOperationalService;
+	imdbSearchService: ImdbSearchService;
 }>;
 
 export class Repository {
@@ -47,6 +49,7 @@ export class Repository {
 	private streamHealthService: StreamHealthService;
 	private historyAggregationService: HistoryAggregationService;
 	private rdOperationalService: RdOperationalService;
+	private imdbSearchService: ImdbSearchService;
 
 	constructor({
 		availabilityService,
@@ -61,6 +64,7 @@ export class Repository {
 		streamHealthService,
 		historyAggregationService,
 		rdOperationalService,
+		imdbSearchService,
 	}: RepositoryDependencies = {}) {
 		this.availabilityService = availabilityService ?? new AvailabilityService();
 		this.scrapedService = scrapedService ?? new ScrapedService();
@@ -75,6 +79,7 @@ export class Repository {
 		this.historyAggregationService =
 			historyAggregationService ?? new HistoryAggregationService();
 		this.rdOperationalService = rdOperationalService ?? new RdOperationalService();
+		this.imdbSearchService = imdbSearchService ?? new ImdbSearchService();
 	}
 
 	// Ensure connection is properly closed when repository is no longer needed
@@ -92,6 +97,7 @@ export class Repository {
 			this.streamHealthService.disconnect(),
 			this.historyAggregationService.disconnect(),
 			this.rdOperationalService.disconnect(),
+			this.imdbSearchService.disconnect(),
 		]);
 	}
 
@@ -543,6 +549,18 @@ export class Repository {
 
 	public cleanupOldRdData() {
 		return this.rdOperationalService.cleanupOldData();
+	}
+
+	// IMDB Search Service Methods
+	public searchImdbTitles(
+		keyword: string,
+		options?: { limit?: number; year?: number; mediaType?: 'movie' | 'show' }
+	) {
+		return this.imdbSearchService.searchTitles(keyword, options);
+	}
+
+	public getImdbTitleById(imdbId: string) {
+		return this.imdbSearchService.getTitleById(imdbId);
 	}
 }
 
