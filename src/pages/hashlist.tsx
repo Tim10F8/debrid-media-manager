@@ -1,15 +1,26 @@
 import { useLibraryCache } from '@/contexts/LibraryCacheContext';
-import { useAllDebridApiKey, useRealDebridAccessToken } from '@/hooks/auth';
+import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
 import { adInstantCheck, getMagnetStatus, uploadMagnet } from '@/services/allDebrid';
 import { EnrichedHashlistTorrent, Hashlist, HashlistTorrent } from '@/services/mediasearch';
+import { checkCachedStatus, createTorrent, getTorrentList } from '@/services/torbox';
+import { TorBoxTorrentInfo } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
 import { handleAddAsMagnetInRd } from '@/utils/addMagnet';
 import { runConcurrentFunctions } from '@/utils/batch';
-import { handleDeleteAdTorrent, handleDeleteRdTorrent } from '@/utils/deleteTorrent';
-import { convertToAllDebridUserTorrent, convertToUserTorrent } from '@/utils/fetchTorrents';
+import {
+	handleDeleteAdTorrent,
+	handleDeleteRdTorrent,
+	handleDeleteTbTorrent,
+} from '@/utils/deleteTorrent';
+import {
+	convertToAllDebridUserTorrent,
+	convertToTbUserTorrent,
+	convertToUserTorrent,
+} from '@/utils/fetchTorrents';
 import {
 	checkDatabaseAvailabilityAd2,
 	checkDatabaseAvailabilityRd2,
+	checkDatabaseAvailabilityTb2,
 	wrapLoading,
 } from '@/utils/instantChecks';
 import { getMediaId } from '@/utils/mediaId';
@@ -48,6 +59,7 @@ function HashlistPage() {
 
 	const [rdKey] = useRealDebridAccessToken();
 	const adKey = useAllDebridApiKey();
+	const tbKey = useTorBoxAccessToken();
 	const { addTorrent: addToCache, removeTorrent: removeFromCache } = useLibraryCache();
 
 	const [currentPage, setCurrentPage] = useState(1);
@@ -68,7 +80,7 @@ function HashlistPage() {
 		if (userTorrentsList.length !== 0) return;
 		initialize();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [rdKey, adKey]);
+	}, [rdKey, adKey, tbKey]);
 
 	async function decodeJsonStringFromUrl(): Promise<string> {
 		const hash = window.location.hash;
@@ -132,6 +144,11 @@ function HashlistPage() {
 				wrapLoading(
 					'AD',
 					checkDatabaseAvailabilityAd2(adKey, hashArr, setUserTorrentsList)
+				);
+			if (tbKey)
+				wrapLoading(
+					'TB',
+					checkDatabaseAvailabilityTb2(tbKey, hashArr, setUserTorrentsList)
 				);
 		} catch (error) {
 			console.error('Error fetching user torrents list:', error);
@@ -215,8 +232,8 @@ function HashlistPage() {
 		tmpList = tmpList.filter((t, i, self) => self.findIndex((s) => s.hash === t.hash) === i);
 
 		// Filter for instantly available torrents if enabled and keys are present
-		if (showOnlyAvailable && (rdKey || adKey)) {
-			tmpList = tmpList.filter((t) => t.rdAvailable || t.adAvailable);
+		if (showOnlyAvailable && (rdKey || adKey || tbKey)) {
+			tmpList = tmpList.filter((t) => t.rdAvailable || t.adAvailable || t.tbAvailable);
 		}
 
 		if (Object.keys(router.query).length === 0) {
@@ -400,6 +417,56 @@ function HashlistPage() {
 		}
 	}
 
+	function wrapDownloadFilesInTbFn(t: EnrichedHashlistTorrent) {
+		return async () => await addTb(t.hash);
+	}
+	async function downloadNonDupeTorrentsInTb() {
+		const libraryHashes = await torrentDB.hashes();
+		const yetToDownload = filteredList
+			.filter((t) => !libraryHashes.has(t.hash))
+			.map(wrapDownloadFilesInTbFn);
+		if (yetToDownload.length === 0) {
+			toast.custom(
+				(t) => (
+					<div className="flex items-center rounded-lg bg-gray-800 px-4 py-3 text-white shadow-lg">
+						<CheckCircle className="mr-2 h-5 w-5 text-green-500" />
+						<span>Everything already downloaded</span>
+					</div>
+				),
+				genericToastOptions
+			);
+			return;
+		}
+
+		const progressToast = toast.loading(`Downloading 0/${yetToDownload.length} torrents...`);
+
+		const [results, errors] = await runConcurrentFunctions(
+			yetToDownload,
+			4,
+			0,
+			(completed, total, errorCount) => {
+				const message =
+					errorCount > 0
+						? `Downloading ${completed}/${total} torrents (${errorCount} errors)...`
+						: `Downloading ${completed}/${total} torrents...`;
+				toast.loading(message, { id: progressToast });
+			}
+		);
+
+		// Update the progress toast to show final result
+		if (errors.length && results.length) {
+			toast.error(`Downloaded ${results.length}; ${errors.length} failed.`, {
+				id: progressToast,
+			});
+		} else if (errors.length) {
+			toast.error(`Failed to download ${errors.length} torrents.`, { id: progressToast });
+		} else if (results.length) {
+			toast.success(`Started ${results.length} downloads.`, { id: progressToast });
+		} else {
+			toast.dismiss(progressToast);
+		}
+	}
+
 	async function addRd(hash: string) {
 		await handleAddAsMagnetInRd(
 			rdKey!,
@@ -486,6 +553,57 @@ function HashlistPage() {
 		}
 	}
 
+	async function addTb(hash: string) {
+		try {
+			// Check if instant first
+			const instantResp = await checkCachedStatus(
+				{ hash: [hash], format: 'object', list_files: true },
+				tbKey!
+			);
+			const cachedData = instantResp.data as any;
+			if (!cachedData?.[hash]) {
+				toast.error('Torrent not instant in TorBox; skipped.', genericToastOptions);
+				return;
+			}
+
+			// Add the magnet
+			const magnetUri = hash.startsWith('magnet:?') ? hash : `magnet:?xt=urn:btih:${hash}`;
+			const resp = await createTorrent(tbKey!, { magnet: magnetUri });
+			if (!resp.success || !resp.data?.torrent_id) {
+				toast.error('Failed to add hash to TorBox.', genericToastOptions);
+				return;
+			}
+
+			const torrentInfo = await getTorrentList(tbKey!, { id: resp.data.torrent_id });
+			if (torrentInfo.success && torrentInfo.data) {
+				const info = torrentInfo.data as TorBoxTorrentInfo;
+				const userTorrent = convertToTbUserTorrent(info);
+				await torrentDB.addAll([userTorrent]);
+				addToCache(userTorrent);
+				await fetchHashAndProgress(hash);
+				toast.success('Torrent added to TorBox.', genericToastOptions);
+			}
+		} catch (error) {
+			console.error('Error adding magnet to TorBox:', error);
+			toast.error('Failed to add hash to TorBox.', genericToastOptions);
+		}
+	}
+
+	async function deleteTb(hash: string) {
+		const torrents = await torrentDB.getAllByHash(hash);
+		for (const t of torrents) {
+			if (!t.id.startsWith('tb:')) continue;
+			await handleDeleteTbTorrent(tbKey!, t.id);
+			await torrentDB.deleteByHash('tb', hash);
+			removeFromCache(t.id); // Update global cache
+			setHashAndProgress((prev) => {
+				const newHashAndProgress = { ...prev };
+				delete newHashAndProgress[`tb:${hash}`];
+				return newHashAndProgress;
+			});
+		}
+	}
+
 	const handlePrevPage = useCallback(() => {
 		setCurrentPage((prev) => prev - 1);
 	}, []);
@@ -560,7 +678,7 @@ function HashlistPage() {
 				>
 					{tvCount} TV Shows
 				</Link>
-				{(rdKey || adKey) && (
+				{(rdKey || adKey || tbKey) && (
 					<button
 						className={`mb-2 mr-2 rounded border-2 ${
 							showOnlyAvailable
@@ -605,6 +723,21 @@ function HashlistPage() {
 						</button>
 					</>
 				)}
+				{tbKey && (
+					<>
+						<button
+							className={`mb-2 mr-2 rounded border-2 border-purple-500 bg-purple-900/30 px-2 py-1 text-purple-100 transition-colors hover:bg-purple-800/50 ${
+								filteredList.length === 0 || !tbKey
+									? 'cursor-not-allowed opacity-60'
+									: ''
+							}`}
+							onClick={downloadNonDupeTorrentsInTb}
+							disabled={filteredList.length === 0 || !tbKey}
+						>
+							TB ({filteredList.length})
+						</button>
+					</>
+				)}
 
 				{Object.keys(router.query).length !== 0 && (
 					<Link
@@ -615,15 +748,15 @@ function HashlistPage() {
 					</Link>
 				)}
 
-				{!rdKey && !adKey && (
+				{!rdKey && !adKey && !tbKey && (
 					<>
 						<span className="mb-2 mr-2 rounded px-2 py-1 text-white">
-							Login to RD/AD to download
+							Login to RD/AD/TB to download
 						</span>
 					</>
 				)}
 
-				{(rdKey || adKey) && (
+				{(rdKey || adKey || tbKey) && (
 					<span className="text-s mr-2 bg-green-100 px-2.5 py-1 text-green-800">
 						<strong>{userTorrentsList.length - filteredList.length}</strong> hidden
 					</span>
@@ -663,10 +796,13 @@ function HashlistPage() {
 								<tr
 									key={i}
 									className={`border-b border-gray-800 hover:bg-gray-800/50 ${
-										isDownloaded('rd', t.hash) || isDownloaded('ad', t.hash)
+										isDownloaded('rd', t.hash) ||
+										isDownloaded('ad', t.hash) ||
+										isDownloaded('tb', t.hash)
 											? 'bg-green-900'
 											: isDownloading('rd', t.hash) ||
-												  isDownloading('ad', t.hash)
+												  isDownloading('ad', t.hash) ||
+												  isDownloading('tb', t.hash)
 												? 'bg-red-900'
 												: ''
 									} `}
@@ -770,6 +906,34 @@ function HashlistPage() {
 											>
 												<Download className="mr-1 inline h-3 w-3" />
 												AD
+											</button>
+										)}
+
+										{tbKey && isDownloading('tb', t.hash) && (
+											<button
+												className="ml-2 rounded border-2 border-red-500 bg-red-900/30 px-2 py-1 text-red-100 transition-colors hover:bg-red-800/50"
+												onClick={() => deleteTb(t.hash)}
+											>
+												<X className="mr-1 inline h-3 w-3" />
+												TB ({hashAndProgress[`tb:${t.hash}`] || 0}%)
+											</button>
+										)}
+										{tbKey && !t.tbAvailable && notInLibrary('tb', t.hash) && (
+											<button
+												className="ml-2 rounded border-2 border-purple-500 bg-purple-900/30 px-2 py-1 text-purple-100 transition-colors hover:bg-purple-800/50"
+												onClick={() => addTb(t.hash)}
+											>
+												<Download className="mr-1 inline h-3 w-3" />
+												TB
+											</button>
+										)}
+										{tbKey && t.tbAvailable && notInLibrary('tb', t.hash) && (
+											<button
+												className="ml-2 rounded border-2 border-green-500 bg-green-900/30 px-2 py-1 text-green-100 transition-colors hover:bg-green-800/50"
+												onClick={() => addTb(t.hash)}
+											>
+												<Download className="mr-1 inline h-3 w-3" />
+												TB
 											</button>
 										)}
 									</td>
