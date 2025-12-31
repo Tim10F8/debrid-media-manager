@@ -15,8 +15,8 @@ const axiosInstance = {
 	post: vi.fn(),
 	get: vi.fn(),
 	interceptors: {
-		request: { use: vi.fn() },
-		response: { use: vi.fn() },
+		request: { use: vi.fn(), eject: vi.fn() },
+		response: { use: vi.fn(), eject: vi.fn() },
 	},
 	request: vi.fn(),
 };

@@ -2,7 +2,12 @@ import { useLibraryCache } from '@/contexts/LibraryCacheContext';
 import { useAllDebridApiKey, useRealDebridAccessToken, useTorBoxAccessToken } from '@/hooks/auth';
 import { adInstantCheck, getMagnetStatus, uploadMagnet } from '@/services/allDebrid';
 import { EnrichedHashlistTorrent, Hashlist, HashlistTorrent } from '@/services/mediasearch';
-import { checkCachedStatus, createTorrent, getTorrentList } from '@/services/torbox';
+import {
+	checkCachedStatus,
+	createTorrent,
+	getTorrentList,
+	TorBoxRateLimitError,
+} from '@/services/torbox';
 import { TorBoxTorrentInfo } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
 import { handleAddAsMagnetInRd } from '@/utils/addMagnet';
@@ -29,13 +34,22 @@ import getReleaseTags from '@/utils/score';
 import { genericToastOptions } from '@/utils/toastOptions';
 import { generateTokenAndHash } from '@/utils/token';
 import { filenameParse } from '@ctrl/video-filename-parser';
-import { CheckCircle, ChevronLeft, ChevronRight, Download, Film, Tv, X } from 'lucide-react';
+import {
+	CheckCircle,
+	ChevronLeft,
+	ChevronRight,
+	Download,
+	Film,
+	Shuffle,
+	Tv,
+	X,
+} from 'lucide-react';
 import lzString from 'lz-string';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
-import { Toaster, toast } from 'react-hot-toast';
+import { toast, Toaster } from 'react-hot-toast';
 
 const ONE_GIGABYTE = 1024 * 1024 * 1024;
 const ITEMS_PER_PAGE = 100;
@@ -70,6 +84,78 @@ function HashlistPage() {
 	const [tvGroupingByTitle] = useState<Record<string, number>>({});
 	const [hasDupes] = useState<Array<string>>([]);
 	const [totalBytes, setTotalBytes] = useState<number>(0);
+
+	// Hashlist navigation state (for browsing hashlists from /hashlists page)
+	const [navState, setNavState] = useState<{
+		files: string[];
+		names: string[];
+		currentIndex: number;
+	} | null>(null);
+	const [navLoading, setNavLoading] = useState(false);
+	const [mounted, setMounted] = useState(false);
+
+	// Load navigation state from sessionStorage (client-side only)
+	useEffect(() => {
+		setMounted(true);
+		const stored = sessionStorage.getItem('hashlistNav');
+		if (stored) {
+			try {
+				setNavState(JSON.parse(stored));
+			} catch {
+				// Invalid JSON, ignore
+			}
+		}
+	}, []);
+
+	async function navigateToHashlist(index: number) {
+		if (!navState || index < 0 || index >= navState.files.length) return;
+
+		setNavLoading(true);
+		try {
+			const response = await fetch(navState.files[index]);
+			const html = await response.text();
+			const match = html.match(/src="https:\/\/debridmediamanager\.com\/hashlist#([^"]+)"/);
+			if (match && match[1]) {
+				// Update navigation state
+				const newNavState = { ...navState, currentIndex: index };
+				sessionStorage.setItem('hashlistNav', JSON.stringify(newNavState));
+				setNavState(newNavState);
+				// Navigate to new hashlist
+				window.location.hash = match[1];
+				window.location.reload();
+			}
+		} catch (err) {
+			console.error('Failed to load hashlist:', err);
+		} finally {
+			setNavLoading(false);
+		}
+	}
+
+	function handleNavPrevious() {
+		if (navState && navState.currentIndex > 0) {
+			navigateToHashlist(navState.currentIndex - 1);
+		}
+	}
+
+	function handleNavNext() {
+		if (navState && navState.currentIndex < navState.files.length - 1) {
+			navigateToHashlist(navState.currentIndex + 1);
+		}
+	}
+
+	function handleNavRandom() {
+		if (!navState || navState.files.length <= 1) return;
+		let newIndex;
+		do {
+			newIndex = Math.floor(Math.random() * navState.files.length);
+		} while (newIndex === navState.currentIndex);
+		navigateToHashlist(newIndex);
+	}
+
+	function clearNavState() {
+		sessionStorage.removeItem('hashlistNav');
+		setNavState(null);
+	}
 
 	async function initialize() {
 		await torrentDB.initializeDB();
@@ -585,7 +671,14 @@ function HashlistPage() {
 			}
 		} catch (error) {
 			console.error('Error adding magnet to TorBox:', error);
-			toast.error('Failed to add hash to TorBox.', genericToastOptions);
+			if (error instanceof TorBoxRateLimitError) {
+				toast.error(
+					'TorBox rate limit exceeded. Please wait and try again.',
+					genericToastOptions
+				);
+			} else {
+				toast.error('Failed to add hash to TorBox.', genericToastOptions);
+			}
 		}
 	}
 
@@ -618,6 +711,65 @@ function HashlistPage() {
 				<title>{`Debrid Media Manager - Hash list (${userTorrentsList.length} files)`}</title>
 			</Head>
 			<Toaster position="bottom-right" />
+
+			{/* Hashlist Navigation Bar (when browsing from /hashlists) */}
+			{mounted && navState && (
+				<div className="mb-2 flex items-center justify-between border-b border-gray-700 bg-gray-800 px-2 py-2">
+					<div className="flex items-center gap-2">
+						<button
+							onClick={handleNavPrevious}
+							disabled={navState.currentIndex <= 0 || navLoading}
+							className={`rounded border-2 border-indigo-500 bg-indigo-900/30 p-1.5 text-indigo-100 transition-colors hover:bg-indigo-800/50 ${
+								navState.currentIndex <= 0 || navLoading
+									? 'cursor-not-allowed opacity-50'
+									: ''
+							}`}
+							title="Previous Hashlist"
+						>
+							<ChevronLeft className="h-4 w-4" />
+						</button>
+						<button
+							onClick={handleNavRandom}
+							disabled={navState.files.length <= 1 || navLoading}
+							className={`rounded border-2 border-purple-500 bg-purple-900/30 p-1.5 text-purple-100 transition-colors hover:bg-purple-800/50 ${
+								navState.files.length <= 1 || navLoading
+									? 'cursor-not-allowed opacity-50'
+									: ''
+							}`}
+							title="Random Hashlist"
+						>
+							<Shuffle className="h-4 w-4" />
+						</button>
+						<button
+							onClick={handleNavNext}
+							disabled={
+								navState.currentIndex >= navState.files.length - 1 || navLoading
+							}
+							className={`rounded border-2 border-indigo-500 bg-indigo-900/30 p-1.5 text-indigo-100 transition-colors hover:bg-indigo-800/50 ${
+								navState.currentIndex >= navState.files.length - 1 || navLoading
+									? 'cursor-not-allowed opacity-50'
+									: ''
+							}`}
+							title="Next Hashlist"
+						>
+							<ChevronRight className="h-4 w-4" />
+						</button>
+						<span className="ml-2 text-sm text-gray-300">
+							{navLoading
+								? 'Loading...'
+								: `${navState.names[navState.currentIndex]} (${navState.currentIndex + 1}/${navState.files.length})`}
+						</span>
+					</div>
+					<button
+						onClick={clearNavState}
+						className="rounded border-2 border-red-500 bg-red-900/30 p-1.5 text-red-100 transition-colors hover:bg-red-800/50"
+						title="Exit Browser Mode"
+					>
+						<X className="h-4 w-4" />
+					</button>
+				</div>
+			)}
+
 			<div className="mb-2 flex items-center justify-between">
 				<h1 className="text-xl font-bold text-white">
 					{hashlistTitle} ({userTorrentsList.length} files in total; size:{' '}
@@ -678,7 +830,7 @@ function HashlistPage() {
 				>
 					{tvCount} TV Shows
 				</Link>
-				{(rdKey || adKey || tbKey) && (
+				{mounted && (rdKey || adKey || tbKey) && (
 					<button
 						className={`mb-2 mr-2 rounded border-2 ${
 							showOnlyAvailable
@@ -693,7 +845,7 @@ function HashlistPage() {
 						{showOnlyAvailable ? 'Instant Only' : 'All Torrents'}
 					</button>
 				)}
-				{rdKey && (
+				{mounted && rdKey && (
 					<>
 						<button
 							className={`mb-2 mr-2 rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-blue-100 transition-colors hover:bg-blue-800/50 ${
@@ -708,7 +860,7 @@ function HashlistPage() {
 						</button>
 					</>
 				)}
-				{adKey && (
+				{mounted && adKey && (
 					<>
 						<button
 							className={`mb-2 mr-2 rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-blue-100 transition-colors hover:bg-blue-800/50 ${
@@ -723,7 +875,7 @@ function HashlistPage() {
 						</button>
 					</>
 				)}
-				{tbKey && (
+				{mounted && tbKey && (
 					<>
 						<button
 							className={`mb-2 mr-2 rounded border-2 border-purple-500 bg-purple-900/30 px-2 py-1 text-purple-100 transition-colors hover:bg-purple-800/50 ${
@@ -748,7 +900,7 @@ function HashlistPage() {
 					</Link>
 				)}
 
-				{!rdKey && !adKey && !tbKey && (
+				{mounted && !rdKey && !adKey && !tbKey && (
 					<>
 						<span className="mb-2 mr-2 rounded px-2 py-1 text-white">
 							Login to RD/AD/TB to download
@@ -756,7 +908,7 @@ function HashlistPage() {
 					</>
 				)}
 
-				{(rdKey || adKey || tbKey) && (
+				{mounted && (rdKey || adKey || tbKey) && (
 					<span className="text-s mr-2 bg-green-100 px-2.5 py-1 text-green-800">
 						<strong>{userTorrentsList.length - filteredList.length}</strong> hidden
 					</span>
@@ -853,7 +1005,7 @@ function HashlistPage() {
 										{(t.bytes / ONE_GIGABYTE).toFixed(1)} GB
 									</td>
 									<td className="border-0 px-4 py-2">
-										{rdKey && isDownloading('rd', t.hash) && (
+										{mounted && rdKey && isDownloading('rd', t.hash) && (
 											<button
 												className="rounded border-2 border-red-500 bg-red-900/30 px-2 py-1 text-red-100 transition-colors hover:bg-red-800/50"
 												onClick={() => deleteRd(t.hash)}
@@ -862,26 +1014,32 @@ function HashlistPage() {
 												RD ({hashAndProgress[`rd:${t.hash}`] || 0}%)
 											</button>
 										)}
-										{rdKey && !t.rdAvailable && notInLibrary('rd', t.hash) && (
-											<button
-												className="rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-blue-100 transition-colors hover:bg-blue-800/50"
-												onClick={() => addRd(t.hash)}
-											>
-												<Download className="mr-1 inline h-3 w-3" />
-												RD
-											</button>
-										)}
-										{rdKey && t.rdAvailable && notInLibrary('rd', t.hash) && (
-											<button
-												className="rounded border-2 border-green-500 bg-green-900/30 px-2 py-1 text-green-100 transition-colors hover:bg-green-800/50"
-												onClick={() => addRd(t.hash)}
-											>
-												<Download className="mr-1 inline h-3 w-3" />
-												RD
-											</button>
-										)}
+										{mounted &&
+											rdKey &&
+											!t.rdAvailable &&
+											notInLibrary('rd', t.hash) && (
+												<button
+													className="rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-blue-100 transition-colors hover:bg-blue-800/50"
+													onClick={() => addRd(t.hash)}
+												>
+													<Download className="mr-1 inline h-3 w-3" />
+													RD
+												</button>
+											)}
+										{mounted &&
+											rdKey &&
+											t.rdAvailable &&
+											notInLibrary('rd', t.hash) && (
+												<button
+													className="rounded border-2 border-green-500 bg-green-900/30 px-2 py-1 text-green-100 transition-colors hover:bg-green-800/50"
+													onClick={() => addRd(t.hash)}
+												>
+													<Download className="mr-1 inline h-3 w-3" />
+													RD
+												</button>
+											)}
 
-										{adKey && isDownloading('ad', t.hash) && (
+										{mounted && adKey && isDownloading('ad', t.hash) && (
 											<button
 												className="ml-2 rounded border-2 border-red-500 bg-red-900/30 px-2 py-1 text-red-100 transition-colors hover:bg-red-800/50"
 												onClick={() => deleteAd(t.hash)}
@@ -890,26 +1048,32 @@ function HashlistPage() {
 												AD ({hashAndProgress[`ad:${t.hash}`] + '%'})
 											</button>
 										)}
-										{adKey && !t.adAvailable && notInLibrary('ad', t.hash) && (
-											<button
-												className="ml-2 rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-blue-100 transition-colors hover:bg-blue-800/50"
-												onClick={() => addAd(t.hash)}
-											>
-												<Download className="mr-1 inline h-3 w-3" />
-												AD
-											</button>
-										)}
-										{adKey && t.adAvailable && notInLibrary('ad', t.hash) && (
-											<button
-												className="ml-2 rounded border-2 border-green-500 bg-green-900/30 px-2 py-1 text-green-100 transition-colors hover:bg-green-800/50"
-												onClick={() => addAd(t.hash)}
-											>
-												<Download className="mr-1 inline h-3 w-3" />
-												AD
-											</button>
-										)}
+										{mounted &&
+											adKey &&
+											!t.adAvailable &&
+											notInLibrary('ad', t.hash) && (
+												<button
+													className="ml-2 rounded border-2 border-blue-500 bg-blue-900/30 px-2 py-1 text-blue-100 transition-colors hover:bg-blue-800/50"
+													onClick={() => addAd(t.hash)}
+												>
+													<Download className="mr-1 inline h-3 w-3" />
+													AD
+												</button>
+											)}
+										{mounted &&
+											adKey &&
+											t.adAvailable &&
+											notInLibrary('ad', t.hash) && (
+												<button
+													className="ml-2 rounded border-2 border-green-500 bg-green-900/30 px-2 py-1 text-green-100 transition-colors hover:bg-green-800/50"
+													onClick={() => addAd(t.hash)}
+												>
+													<Download className="mr-1 inline h-3 w-3" />
+													AD
+												</button>
+											)}
 
-										{tbKey && isDownloading('tb', t.hash) && (
+										{mounted && tbKey && isDownloading('tb', t.hash) && (
 											<button
 												className="ml-2 rounded border-2 border-red-500 bg-red-900/30 px-2 py-1 text-red-100 transition-colors hover:bg-red-800/50"
 												onClick={() => deleteTb(t.hash)}
@@ -918,24 +1082,30 @@ function HashlistPage() {
 												TB ({hashAndProgress[`tb:${t.hash}`] || 0}%)
 											</button>
 										)}
-										{tbKey && !t.tbAvailable && notInLibrary('tb', t.hash) && (
-											<button
-												className="ml-2 rounded border-2 border-purple-500 bg-purple-900/30 px-2 py-1 text-purple-100 transition-colors hover:bg-purple-800/50"
-												onClick={() => addTb(t.hash)}
-											>
-												<Download className="mr-1 inline h-3 w-3" />
-												TB
-											</button>
-										)}
-										{tbKey && t.tbAvailable && notInLibrary('tb', t.hash) && (
-											<button
-												className="ml-2 rounded border-2 border-green-500 bg-green-900/30 px-2 py-1 text-green-100 transition-colors hover:bg-green-800/50"
-												onClick={() => addTb(t.hash)}
-											>
-												<Download className="mr-1 inline h-3 w-3" />
-												TB
-											</button>
-										)}
+										{mounted &&
+											tbKey &&
+											!t.tbAvailable &&
+											notInLibrary('tb', t.hash) && (
+												<button
+													className="ml-2 rounded border-2 border-purple-500 bg-purple-900/30 px-2 py-1 text-purple-100 transition-colors hover:bg-purple-800/50"
+													onClick={() => addTb(t.hash)}
+												>
+													<Download className="mr-1 inline h-3 w-3" />
+													TB
+												</button>
+											)}
+										{mounted &&
+											tbKey &&
+											t.tbAvailable &&
+											notInLibrary('tb', t.hash) && (
+												<button
+													className="ml-2 rounded border-2 border-green-500 bg-green-900/30 px-2 py-1 text-green-100 transition-colors hover:bg-green-800/50"
+													onClick={() => addTb(t.hash)}
+												>
+													<Download className="mr-1 inline h-3 w-3" />
+													TB
+												</button>
+											)}
 									</td>
 								</tr>
 							);

@@ -15,7 +15,12 @@ import {
 	getTorrentInfo,
 	selectFiles,
 } from '@/services/realDebrid';
-import { controlTorrent, createTorrent, getTorrentList } from '@/services/torbox';
+import {
+	controlTorrent,
+	createTorrent,
+	getTorrentList,
+	TorBoxRateLimitError,
+} from '@/services/torbox';
 import { TorBoxTorrentInfo, TorrentInfoResponse } from '@/services/types';
 import { UserTorrent } from '@/torrent/userTorrent';
 import { AxiosError } from 'axios';
@@ -422,7 +427,14 @@ export const handleRestartTbTorrent = async (tbKey: string, id: string) => {
 			'Error reannouncing TB torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		toast.error(`Failed to reannounce torrent (${id}).`, magnetToastOptions);
+		if (error instanceof TorBoxRateLimitError) {
+			toast.error(
+				'TorBox rate limit exceeded. Please wait and try again.',
+				magnetToastOptions
+			);
+		} else {
+			toast.error(`Failed to reannounce torrent (${id}).`, magnetToastOptions);
+		}
 		throw error;
 	}
 };
@@ -452,11 +464,18 @@ export const handleAddAsMagnetInTb = async (
 			'Error adding torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		const tbError = getTbError(error);
-		toast.error(
-			tbError ? `TorBox error: ${tbError}` : 'Failed to add torrent.',
-			magnetToastOptions
-		);
+		if (error instanceof TorBoxRateLimitError) {
+			toast.error(
+				'TorBox rate limit exceeded. Please wait and try again.',
+				magnetToastOptions
+			);
+		} else {
+			const tbError = getTbError(error);
+			toast.error(
+				tbError ? `TorBox error: ${tbError}` : 'Failed to add torrent.',
+				magnetToastOptions
+			);
+		}
 		throw error;
 	}
 };
@@ -467,6 +486,7 @@ export const handleAddMultipleHashesInTb = async (
 	callback?: () => Promise<void>
 ) => {
 	let errorCount = 0;
+	let rateLimited = false;
 	for (const hash of hashes) {
 		try {
 			await handleAddAsMagnetInTb(tbKey, hash);
@@ -476,17 +496,31 @@ export const handleAddMultipleHashesInTb = async (
 				'Error adding hash in TB:',
 				error instanceof Error ? error.message : 'Unknown error'
 			);
+			if (error instanceof TorBoxRateLimitError) {
+				rateLimited = true;
+				break; // Stop processing if rate limited
+			}
 			const tbError = getTbError(error);
 			toast.error(tbError ? `TorBox error: ${tbError}` : 'Failed to add hash.');
 		}
 	}
 	if (callback) await callback();
-	toast(
-		`Added ${hashes.length - errorCount} ${
-			hashes.length - errorCount === 1 ? 'hash' : 'hashes'
-		} to TorBox.`,
-		magnetToastOptions
-	);
+	if (rateLimited) {
+		const added = hashes.length - errorCount;
+		if (added > 0) {
+			toast(
+				`Added ${added} hash${added === 1 ? '' : 'es'} before rate limit.`,
+				magnetToastOptions
+			);
+		}
+	} else {
+		toast(
+			`Added ${hashes.length - errorCount} ${
+				hashes.length - errorCount === 1 ? 'hash' : 'hashes'
+			} to TorBox.`,
+			magnetToastOptions
+		);
+	}
 };
 
 export const handleAddMultipleTorrentFilesInTb = async (
@@ -496,6 +530,7 @@ export const handleAddMultipleTorrentFilesInTb = async (
 ) => {
 	let success = 0;
 	let errors = 0;
+	let rateLimited = false;
 	for (const file of files) {
 		try {
 			const resp = await createTorrent(tbKey, { file });
@@ -519,14 +554,22 @@ export const handleAddMultipleTorrentFilesInTb = async (
 				'Error adding torrent file in TB:',
 				error instanceof Error ? error.message : 'Unknown error'
 			);
+			if (error instanceof TorBoxRateLimitError) {
+				rateLimited = true;
+				break; // Stop processing if rate limited
+			}
 			const tbError = getTbError(error);
 			toast.error(tbError ? `TorBox error: ${tbError}` : 'Failed to add torrent file.');
 		}
 	}
 	if (callback) await callback();
-	toast(
-		`Added ${success} torrent file${success === 1 ? '' : 's'} to TorBox` +
-			(errors ? ` (${errors} failed)` : ''),
-		magnetToastOptions
-	);
+	if (rateLimited) {
+		toast.error('TorBox rate limit exceeded. Please wait and try again.', magnetToastOptions);
+	} else {
+		toast(
+			`Added ${success} torrent file${success === 1 ? '' : 's'} to TorBox` +
+				(errors ? ` (${errors} failed)` : ''),
+			magnetToastOptions
+		);
+	}
 };

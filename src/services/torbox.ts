@@ -14,6 +14,7 @@ export type { TorBoxTorrentInfo, TorBoxUser };
 
 // Safely access Next.js runtime config in test/non-Next environments
 const fallbackRuntimeConfig = {
+	proxy: '',
 	torboxHostname: 'https://api.torbox.app',
 };
 
@@ -33,55 +34,107 @@ const API_VERSION = 'v1';
 
 // Rate limiting and retry logic
 let axiosInstance: AxiosInstance | null = null;
+let lastRequestTime = 0;
+let currentInterceptorId: number | null = null;
+
+// Custom error class for rate limiting
+export class TorBoxRateLimitError extends Error {
+	constructor(message: string = 'TorBox API rate limit exceeded. Please wait and try again.') {
+		super(message);
+		this.name = 'TorBoxRateLimitError';
+	}
+}
+
+// Function to get proxy URL with random number for load balancing
+function getProxyUrl(baseUrl: string): string {
+	return baseUrl.replace('#num#', Math.floor(Math.random() * 1000).toString());
+}
+
+// Get the base URL for TorBox API (with or without proxy)
+function getTorBoxBaseUrl(): string {
+	const torboxHost = config.torboxHostname || BASE_URL;
+	if (config.proxy) {
+		return `${getProxyUrl(config.proxy)}${torboxHost}`;
+	}
+	return torboxHost;
+}
+
+async function retryWithBackoff<T>(
+	fn: () => Promise<T>,
+	maxRetries: number = 5,
+	baseDelay: number = 1000
+): Promise<T> {
+	let lastError: any;
+
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			return await fn();
+		} catch (error: any) {
+			lastError = error;
+
+			// Check if it's a rate limit error (429 or network error that might be 429-related)
+			const is429 = error.response?.status === 429;
+			const isNetworkError =
+				error.message === 'Network Error' || error.code === 'ERR_NETWORK';
+
+			if ((is429 || isNetworkError) && attempt < maxRetries) {
+				// Get retry-after header or use exponential backoff
+				const retryAfter = error.response?.headers?.['retry-after'];
+				const delay = retryAfter
+					? parseInt(retryAfter, 10) * 1000
+					: Math.min(baseDelay * Math.pow(2, attempt), 30000);
+
+				console.log(
+					`[TorBox] Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`
+				);
+				await new Promise((resolve) => setTimeout(resolve, delay));
+				continue;
+			}
+
+			// Not a retryable error or max retries exceeded
+			break;
+		}
+	}
+
+	// If we exhausted retries due to rate limiting, throw a specific error
+	if (
+		lastError?.response?.status === 429 ||
+		lastError?.message === 'Network Error' ||
+		lastError?.code === 'ERR_NETWORK'
+	) {
+		throw new TorBoxRateLimitError();
+	}
+
+	throw lastError;
+}
 
 function createAxiosClient(token: string): AxiosInstance {
 	if (!axiosInstance) {
-		axiosInstance = axios.create({
-			baseURL: config.torboxHostname || BASE_URL,
-		});
-
-		// Rate limiting configuration
-		let lastRequestTime = 0;
-
-		// Add request interceptor for rate limiting and token
-		axiosInstance.interceptors.request.use(async (config) => {
-			// Set the current token
-			config.headers.Authorization = `Bearer ${token}`;
-
-			// Rate limiting
-			const now = Date.now();
-			const timeSinceLastRequest = now - lastRequestTime;
-			if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-				await new Promise((resolve) =>
-					setTimeout(resolve, MIN_REQUEST_INTERVAL - timeSinceLastRequest)
-				);
-			}
-			lastRequestTime = Date.now();
-			return config;
-		});
-
-		// Add response interceptor for handling 429 errors
-		axiosInstance.interceptors.response.use(
-			(response) => response,
-			async (error) => {
-				const maxRetries = 10;
-				let retryCount = 0;
-
-				while (error.response?.status === 429 && retryCount < maxRetries) {
-					retryCount++;
-					const delay = Math.min(Math.pow(2, retryCount) * 1000, 30000);
-					await new Promise((resolve) => setTimeout(resolve, delay));
-					try {
-						return await axiosInstance!.request(error.config);
-					} catch (retryError) {
-						error = retryError;
-					}
-				}
-
-				throw error;
-			}
-		);
+		axiosInstance = axios.create();
 	}
+
+	// Update request interceptor to use current token and handle rate limiting
+	// Eject previous interceptor if it exists (compatible with axios mocks)
+	if (currentInterceptorId !== null) {
+		axiosInstance.interceptors.request.eject(currentInterceptorId);
+	}
+	currentInterceptorId = axiosInstance.interceptors.request.use(async (reqConfig) => {
+		// Only set Authorization header if token is provided
+		if (token) {
+			reqConfig.headers.Authorization = `Bearer ${token}`;
+		}
+
+		// Rate limiting - wait if needed
+		const now = Date.now();
+		const timeSinceLastRequest = now - lastRequestTime;
+		if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+			await new Promise((resolve) =>
+				setTimeout(resolve, MIN_REQUEST_INTERVAL - timeSinceLastRequest)
+			);
+		}
+		lastRequestTime = Date.now();
+		return reqConfig;
+	});
 
 	return axiosInstance;
 }
@@ -100,30 +153,25 @@ export const createTorrent = async (
 		add_only_if_cached?: boolean;
 	}
 ): Promise<TorBoxResponse<TorBoxCreateTorrentResponse>> => {
-	try {
-		const client = createAxiosClient(accessToken);
-		const formData = new FormData();
+	const client = createAxiosClient(accessToken);
+	const formData = new FormData();
 
-		if (params.file) formData.append('file', params.file);
-		if (params.magnet) formData.append('magnet', params.magnet);
-		if (params.seed) formData.append('seed', params.seed);
-		if (params.allow_zip !== undefined)
-			formData.append('allow_zip', params.allow_zip.toString());
-		if (params.name) formData.append('name', params.name);
-		if (params.as_queued !== undefined)
-			formData.append('as_queued', params.as_queued.toString());
-		if (params.add_only_if_cached !== undefined)
-			formData.append('add_only_if_cached', params.add_only_if_cached.toString());
+	if (params.file) formData.append('file', params.file);
+	if (params.magnet) formData.append('magnet', params.magnet);
+	if (params.seed) formData.append('seed', params.seed);
+	if (params.allow_zip !== undefined) formData.append('allow_zip', params.allow_zip.toString());
+	if (params.name) formData.append('name', params.name);
+	if (params.as_queued !== undefined) formData.append('as_queued', params.as_queued.toString());
+	if (params.add_only_if_cached !== undefined)
+		formData.append('add_only_if_cached', params.add_only_if_cached.toString());
 
+	return retryWithBackoff(async () => {
 		const response = await client.post<TorBoxResponse<TorBoxCreateTorrentResponse>>(
-			`/${API_VERSION}/api/torrents/createtorrent`,
+			`${getTorBoxBaseUrl()}/${API_VERSION}/api/torrents/createtorrent`,
 			formData
 		);
 		return response.data;
-	} catch (error: any) {
-		console.error('Error creating torrent:', error.message);
-		throw error;
-	}
+	});
 };
 
 export const controlTorrent = async (
@@ -134,17 +182,14 @@ export const controlTorrent = async (
 		all?: boolean;
 	}
 ): Promise<TorBoxResponse<null>> => {
-	try {
-		const client = createAxiosClient(accessToken);
+	const client = createAxiosClient(accessToken);
+	return retryWithBackoff(async () => {
 		const response = await client.post<TorBoxResponse<null>>(
-			`/${API_VERSION}/api/torrents/controltorrent`,
+			`${getTorBoxBaseUrl()}/${API_VERSION}/api/torrents/controltorrent`,
 			params
 		);
 		return response.data;
-	} catch (error: any) {
-		console.error('Error controlling torrent:', error.message);
-		throw error;
-	}
+	});
 };
 
 export const deleteTorrent = async (
@@ -170,16 +215,18 @@ export const getTorrentList = async (
 	};
 	const requestStartedAt = Date.now();
 	console.log('[TorboxAPI] getTorrentList start', requestMeta);
-	try {
-		const client = createAxiosClient(accessToken);
-		// Add fresh query parameter to get uncached results
-		const queryParams = {
-			...params,
-			bypass_cache: true, // Always fetch fresh uncached results
-			_fresh: Date.now(), // Additional cache-busting parameter
-		};
+
+	const client = createAxiosClient(accessToken);
+	// Add fresh query parameter to get uncached results
+	const queryParams = {
+		...params,
+		bypass_cache: true, // Always fetch fresh uncached results
+		_fresh: Date.now(), // Additional cache-busting parameter
+	};
+
+	return retryWithBackoff(async () => {
 		const response = await client.get<TorBoxResponse<TorBoxTorrentInfo[] | TorBoxTorrentInfo>>(
-			`/${API_VERSION}/api/torrents/mylist`,
+			`${getTorBoxBaseUrl()}/${API_VERSION}/api/torrents/mylist`,
 			{ params: queryParams }
 		);
 		const result = response.data;
@@ -192,19 +239,7 @@ export const getTorrentList = async (
 			elapsedMs: durationMs,
 		});
 		return result;
-	} catch (error: any) {
-		console.error(
-			'[TorboxAPI] getTorrentList error after',
-			Date.now() - requestStartedAt,
-			'ms',
-			{
-				...requestMeta,
-				error: error?.message,
-			}
-		);
-		console.error('Error getting torrent list:', error.message);
-		throw error;
-	}
+	});
 };
 
 export const requestDownloadLink = async (
@@ -217,10 +252,10 @@ export const requestDownloadLink = async (
 		redirect?: boolean;
 	}
 ): Promise<TorBoxResponse<string>> => {
-	try {
-		const client = createAxiosClient(accessToken);
+	const client = createAxiosClient(accessToken);
+	return retryWithBackoff(async () => {
 		const response = await client.get<TorBoxResponse<string>>(
-			`/${API_VERSION}/api/torrents/requestdl`,
+			`${getTorBoxBaseUrl()}/${API_VERSION}/api/torrents/requestdl`,
 			{
 				params: {
 					token: accessToken,
@@ -229,10 +264,7 @@ export const requestDownloadLink = async (
 			}
 		);
 		return response.data;
-	} catch (error: any) {
-		console.error('Error requesting download link:', error.message);
-		throw error;
-	}
+	});
 };
 
 export const checkCachedStatus = async (
@@ -243,14 +275,14 @@ export const checkCachedStatus = async (
 	},
 	accessToken?: string
 ): Promise<TorBoxResponse<TorBoxCachedResponse | TorBoxCachedItem[] | null>> => {
-	try {
-		const client = createAxiosClient(accessToken || '');
-		const hashString = Array.isArray(params.hash) ? params.hash.join(',') : params.hash;
+	const client = createAxiosClient(accessToken || '');
+	const hashString = Array.isArray(params.hash) ? params.hash.join(',') : params.hash;
+	const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 
-		const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+	return retryWithBackoff(async () => {
 		const response = await client.get<
 			TorBoxResponse<TorBoxCachedResponse | TorBoxCachedItem[] | null>
-		>(`/${API_VERSION}/api/torrents/checkcached`, {
+		>(`${getTorBoxBaseUrl()}/${API_VERSION}/api/torrents/checkcached`, {
 			params: {
 				hash: hashString,
 				format: params.format || 'object',
@@ -259,10 +291,7 @@ export const checkCachedStatus = async (
 			headers,
 		});
 		return response.data;
-	} catch (error: any) {
-		console.error('Error checking cached status:', error.message);
-		throw error;
-	}
+	});
 };
 
 export const exportTorrentData = async (
@@ -276,14 +305,17 @@ export const exportTorrentData = async (
 		const client = createAxiosClient(accessToken);
 
 		if (params.type === 'file') {
-			const response = await client.get(`/${API_VERSION}/api/torrents/exportdata`, {
-				params,
-				responseType: 'blob',
-			});
+			const response = await client.get(
+				`${getTorBoxBaseUrl()}/${API_VERSION}/api/torrents/exportdata`,
+				{
+					params,
+					responseType: 'blob',
+				}
+			);
 			return response.data;
 		} else {
 			const response = await client.get<TorBoxResponse<string>>(
-				`/${API_VERSION}/api/torrents/exportdata`,
+				`${getTorBoxBaseUrl()}/${API_VERSION}/api/torrents/exportdata`,
 				{ params }
 			);
 			return response.data;
@@ -306,7 +338,7 @@ export const getTorrentInfo = async (params: {
 		if (params.hash && !params.magnet && !params.file) {
 			// Use GET method for hash-only requests
 			const response = await client.get<TorBoxResponse<TorBoxTorrentMetadata>>(
-				`/${API_VERSION}/api/torrents/torrentinfo`,
+				`${getTorBoxBaseUrl()}/${API_VERSION}/api/torrents/torrentinfo`,
 				{ params }
 			);
 			return response.data;
@@ -319,7 +351,7 @@ export const getTorrentInfo = async (params: {
 			if (params.timeout) formData.append('timeout', params.timeout.toString());
 
 			const response = await client.post<TorBoxResponse<TorBoxTorrentMetadata>>(
-				`/${API_VERSION}/api/torrents/torrentinfo`,
+				`${getTorBoxBaseUrl()}/${API_VERSION}/api/torrents/torrentinfo`,
 				formData
 			);
 			return response.data;
@@ -341,7 +373,7 @@ export const getUserData = async (
 	try {
 		const client = createAxiosClient(accessToken);
 		const response = await client.get<TorBoxResponse<TorBoxUser>>(
-			`/${API_VERSION}/api/user/me`,
+			`${getTorBoxBaseUrl()}/${API_VERSION}/api/user/me`,
 			{
 				params: {
 					settings: params?.settings,
@@ -361,7 +393,7 @@ export const refreshApiToken = async (
 	try {
 		const client = createAxiosClient(accessToken);
 		const response = await client.post<TorBoxResponse<{ token: string }>>(
-			`/${API_VERSION}/api/user/refreshtoken`
+			`${getTorBoxBaseUrl()}/${API_VERSION}/api/user/refreshtoken`
 		);
 		return response.data;
 	} catch (error: any) {
@@ -375,7 +407,9 @@ export const refreshApiToken = async (
 export const getStats = async (): Promise<TorBoxResponse<any>> => {
 	try {
 		const client = createAxiosClient('');
-		const response = await client.get<TorBoxResponse>(`/${API_VERSION}/api/stats`);
+		const response = await client.get<TorBoxResponse>(
+			`${getTorBoxBaseUrl()}/${API_VERSION}/api/stats`
+		);
 		return response.data;
 	} catch (error: any) {
 		console.error('Error getting stats:', error.message);

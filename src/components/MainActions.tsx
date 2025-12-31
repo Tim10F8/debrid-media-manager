@@ -7,6 +7,8 @@ interface MainActionsProps {
 	isLoading: boolean;
 }
 
+const isLocalDev = process.env.NODE_ENV === 'development';
+
 export function MainActions({ rdUser, isLoading }: MainActionsProps) {
 	return (
 		<div className="grid w-full grid-cols-3 gap-3">
@@ -18,8 +20,8 @@ export function MainActions({ rdUser, isLoading }: MainActionsProps) {
 				Library
 			</Link>
 			<Link
-				href="https://hashlists.debridmediamanager.com"
-				target="_blank"
+				href={isLocalDev ? '/hashlists' : 'https://hashlists.debridmediamanager.com'}
+				target={isLocalDev ? undefined : '_blank'}
 				className="haptic flex items-center justify-center gap-2 rounded border-2 border-indigo-500 bg-indigo-900/30 p-3 text-indigo-100 transition-colors hover:bg-indigo-800/50"
 			>
 				<Rocket className="mr-1 inline-block h-4 w-4 text-indigo-400" />
