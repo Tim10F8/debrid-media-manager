@@ -82,7 +82,6 @@ export class ImdbSearchService extends DatabaseClient {
 		}
 
 		// Fall back to LIKE search on basics table
-		// Note: N-gram search was removed due to PlanetScale FTS result cache limit errors
 		return this.searchWithLike(cleanKeyword, typeFilter, yearFilter, limit);
 	}
 

@@ -114,4 +114,24 @@ describe('intent helpers', () => {
 		const intent = await getIntent('rd', 'https://link', 'ip', 'android', 'chooser');
 		expect(intent).toBe('');
 	});
+
+	it('builds Windows intent with player URL scheme', async () => {
+		unrestrictLinkMock.mockResolvedValue({
+			id: 'stream',
+			download: 'https://files.domain/video.mp4',
+		});
+
+		const intent = await getIntent('rd', 'https://link', 'ip', 'windows', 'vlc');
+		expect(intent).toBe('vlc://https://files.domain/video.mp4');
+	});
+
+	it('builds Windows intent for PotPlayer', async () => {
+		unrestrictLinkMock.mockResolvedValue({
+			id: 'stream',
+			download: 'https://files.domain/video.mp4',
+		});
+
+		const intent = await getIntent('rd', 'https://link', 'ip', 'windows', 'potplayer');
+		expect(intent).toBe('potplayer://https://files.domain/video.mp4');
+	});
 });

@@ -106,9 +106,9 @@ const handler: NextApiHandler = async (req, res) => {
 		const [title, year, mediaType] = parseQuery(cleanKeyword);
 		const searchQuery = title.toLowerCase();
 
-		// Search local IMDB database
+		// Search local IMDB database (fetch more to allow for filtering/ranking)
 		const imdbResults = await db.searchImdbTitles(searchQuery, {
-			limit: 50,
+			limit: 120,
 			year,
 			mediaType: mediaType as 'movie' | 'show' | undefined,
 		});
@@ -201,7 +201,9 @@ const handler: NextApiHandler = async (req, res) => {
 			...startMatches,
 			...nearMatches,
 			...results,
-		].filter((r) => r.type === 'movie' || r.type === 'show');
+		]
+			.filter((r) => r.type === 'movie' || r.type === 'show')
+			.slice(0, 80); // Limit to 80 results
 
 		res.status(200).json({ results: finalResults });
 	} catch (error: any) {

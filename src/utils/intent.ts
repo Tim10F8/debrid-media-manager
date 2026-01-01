@@ -49,6 +49,8 @@ export const getInstantIntent = async (
 				intent = `${player}://weblink?url=${resp.download}&new_window=1`;
 			} else if (os === 'mac4') {
 				intent = `${player}://x-callback-url/open?url=${resp.download}`;
+			} else if (os === 'windows') {
+				intent = `${player}://${resp.download}`;
 			} else {
 				intent = 'https://real-debrid.com/streaming-' + resp.id;
 			}
@@ -90,6 +92,8 @@ export const getIntent = async (
 			intent = `${player}://weblink?url=${resp.download}&new_window=1`;
 		} else if (os === 'mac4') {
 			intent = `${player}://x-callback-url/open?url=${resp.download}`;
+		} else if (os === 'windows') {
+			intent = `${player}://${resp.download}`;
 		} else {
 			intent = 'https://real-debrid.com/streaming-' + resp.id;
 		}

@@ -63,7 +63,7 @@ describe('/api/search/title', () => {
 
 		expect(res.status).toHaveBeenCalledWith(200);
 		expect(searchImdbTitlesMock).toHaveBeenCalledWith('matrix', {
-			limit: 50,
+			limit: 120,
 			year: undefined,
 			mediaType: undefined,
 		});
@@ -92,7 +92,7 @@ describe('/api/search/title', () => {
 
 		expect(res.status).toHaveBeenCalledWith(200);
 		expect(searchImdbTitlesMock).toHaveBeenCalledWith('matrix', {
-			limit: 50,
+			limit: 120,
 			year: 1999,
 			mediaType: undefined,
 		});
@@ -107,7 +107,7 @@ describe('/api/search/title', () => {
 
 		expect(res.status).toHaveBeenCalledWith(200);
 		expect(searchImdbTitlesMock).toHaveBeenCalledWith('breaking bad', {
-			limit: 50,
+			limit: 120,
 			year: undefined,
 			mediaType: 'show',
 		});

@@ -44,19 +44,19 @@ You can share your whole collection or select specific items you want to share. 
 
 ## Setup
 
-0. Signup for a free tier plan at [PlanetScale](https://planetscale.com/) - this is a serverless MySQL database hosted in the cloud
+0. Have a MySQL database ready
 1. Have Tor running at `127.0.0.1:9050` (needed for DHT search; if you don't need your own search database then refer to the section `External Search API`)
 2. Clone this repository and go to the directory
 3. Create a copy of the `.env` file `cp .env .env.local` and fill in the details
 4. Fill in required settings in `.env.local`:
-   - `PROXY=socks5h://127.0.0.1:9050` (if tor is running on your host machine)
-   - `DATABASE_URL` - Get your Prisma database connection string from PlanetScale console
-   - `ZURGTORRENT_SYNC_SECRET` - Must match the `DMM_SNAPSHOT_TOKEN` secret configured on the zurgtorrent Cloudflare Worker
+    - `PROXY=socks5h://127.0.0.1:9050` (if tor is running on your host machine)
+    - `DATABASE_URL` - Your MySQL connection string
+    - `ZURGTORRENT_SYNC_SECRET` - Must match the `DMM_SNAPSHOT_TOKEN` secret configured on the zurgtorrent Cloudflare Worker
 5. (Optional) Configure additional integrations in `.env.local`:
-   - `TMDB_KEY`, `OMDB_KEY`, `MDBLIST_KEY` - For enhanced movie/show metadata and info pages
-   - `JACKETT` and `JACKETT_KEY` or `PROWLARR` and `PROWLARR_KEY` - For torrent search
-   - `TRAKT_CLIENT_ID` and `TRAKT_CLIENT_SECRET` - For Trakt integration
-   - `PATREON_*`, `GITHUB_*`, `DISCORD_*` - For authentication providers
+    - `TMDB_KEY`, `OMDB_KEY`, `MDBLIST_KEY` - For enhanced movie/show metadata and info pages
+    - `JACKETT` and `JACKETT_KEY` or `PROWLARR` and `PROWLARR_KEY` - For torrent search
+    - `TRAKT_CLIENT_ID` and `TRAKT_CLIENT_SECRET` - For Trakt integration
+    - `PATREON_*`, `GITHUB_*`, `DISCORD_*` - For authentication providers
 6. Install the dependencies `npm i`
 7. This is a Next.js project so either go with `npm run dev` or `npm run build && npm run start`
 8. Head to `localhost:3000` and login
