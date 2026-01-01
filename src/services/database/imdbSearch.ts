@@ -118,7 +118,7 @@ export class ImdbSearchService extends DatabaseClient {
 				1 as isOriginalMatch,
 				MATCH(b.primary_title) AGAINST(${fulltextKeyword} IN BOOLEAN MODE) as relevance
 			FROM imdb_title_basics b
-			LEFT JOIN imdb_title_ratings r ON b.tconst = r.tconst
+			INNER JOIN imdb_title_ratings r ON b.tconst = r.tconst
 			WHERE MATCH(b.primary_title) AGAINST(${fulltextKeyword} IN BOOLEAN MODE)
 				${Prisma.raw(typeFilter)}
 				${Prisma.raw(yearFilter)}
@@ -176,7 +176,7 @@ export class ImdbSearchService extends DatabaseClient {
 				MAX(MATCH(a.title) AGAINST(${fulltextKeyword} IN BOOLEAN MODE)) as relevance
 			FROM imdb_title_akas a
 			JOIN imdb_title_basics b ON a.title_id = b.tconst
-			LEFT JOIN imdb_title_ratings r ON b.tconst = r.tconst
+			INNER JOIN imdb_title_ratings r ON b.tconst = r.tconst
 			WHERE MATCH(a.title) AGAINST(${fulltextKeyword} IN BOOLEAN MODE)
 				${Prisma.raw(typeFilter)}
 				${Prisma.raw(yearFilter)}
@@ -229,7 +229,7 @@ export class ImdbSearchService extends DatabaseClient {
 					ELSE 1
 				END as matchQuality
 			FROM imdb_title_basics b
-			LEFT JOIN imdb_title_ratings r ON b.tconst = r.tconst
+			INNER JOIN imdb_title_ratings r ON b.tconst = r.tconst
 			WHERE (LOWER(b.primary_title) LIKE LOWER(${likePattern})
 				OR LOWER(b.original_title) LIKE LOWER(${likePattern}))
 				${Prisma.raw(typeFilter)}
