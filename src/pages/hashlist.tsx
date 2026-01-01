@@ -190,25 +190,28 @@ function HashlistPage() {
 
 	async function fetchUserTorrentsList() {
 		try {
-			const torrents = (await readHashlist()).map((torrent) => {
-				const mediaType = getTypeByName(torrent.filename);
-				const info =
-					mediaType === 'movie'
-						? filenameParse(torrent.filename)
-						: filenameParse(torrent.filename, true);
-				return {
-					score: getReleaseTags(torrent.filename, torrent.bytes / ONE_GIGABYTE).score,
-					info,
-					mediaType,
-					title: getMediaId(info, mediaType, false) || torrent.filename,
-					rdAvailable: false,
-					adAvailable: false,
-					tbAvailable: false,
-					noVideos: false,
-					files: [],
-					...torrent,
-				};
-			}) as EnrichedHashlistTorrent[];
+			const torrents = (await readHashlist())
+				.map((torrent) => {
+					const mediaType = getTypeByName(torrent.filename);
+					const info =
+						mediaType === 'movie'
+							? filenameParse(torrent.filename)
+							: filenameParse(torrent.filename, true);
+					return {
+						score: getReleaseTags(torrent.filename, torrent.bytes / ONE_GIGABYTE).score,
+						info,
+						mediaType,
+						title: getMediaId(info, mediaType, false) || torrent.filename,
+						rdAvailable: false,
+						adAvailable: false,
+						tbAvailable: false,
+						noVideos: false,
+						files: [],
+						...torrent,
+					};
+				})
+				// Filter out results without a valid year
+				.filter((t) => t.info.year && Number(t.info.year) > 0) as EnrichedHashlistTorrent[];
 			if (!torrents.length) return;
 			setUserTorrentsList(torrents);
 
