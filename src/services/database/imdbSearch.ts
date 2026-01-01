@@ -77,11 +77,12 @@ export class ImdbSearchService extends DatabaseClient {
 				return results;
 			}
 		} catch (error) {
-			// Fulltext index might not exist yet, fall back to LIKE
-			console.warn('Akas fulltext search failed, falling back to LIKE search:', error);
+			// Fulltext index might not exist yet
+			console.warn('Akas fulltext search failed:', error);
 		}
 
 		// Fall back to LIKE search on basics table
+		// Note: N-gram search was removed due to PlanetScale FTS result cache limit errors
 		return this.searchWithLike(cleanKeyword, typeFilter, yearFilter, limit);
 	}
 
