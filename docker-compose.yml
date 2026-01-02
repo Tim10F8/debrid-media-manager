@@ -6,7 +6,7 @@ services:
       replicas: 1
 
   web:
-    image: debridmediamanager/debrid-media-manager:latest
+    image: dmm-prod:latest
     ports:
       - 3000:3000
     env_file:
@@ -15,6 +15,6 @@ services:
     depends_on:
       - tor
     deploy:
-      replicas: 1
+      replicas: 4
       restart_policy:
         condition: on-failure
