@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { repository } from '@/services/repository';
 
 export type HistoryRange = '24h' | '7d' | '30d' | '90d';
-export type HistoryType = 'stream' | 'servers' | 'rd';
+export type HistoryType = 'stream' | 'servers' | 'rd' | 'torrentio';
 
 interface HistoryQuery {
 	type?: HistoryType;
@@ -91,6 +91,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 					const dailyData = await repository.getRdDailyHistory(daysBack ?? 30);
 					return res.status(200).json({
 						type: 'rd',
+						granularity: 'daily',
+						range,
+						data: dailyData,
+					});
+				}
+			}
+
+			case 'torrentio': {
+				// For short ranges, use hourly data; for longer ranges, use daily
+				if (hoursBack && hoursBack <= 168) {
+					const hourlyData = await repository.getTorrentioHourlyHistory(hoursBack);
+					return res.status(200).json({
+						type: 'torrentio',
+						granularity: 'hourly',
+						range,
+						data: hourlyData,
+					});
+				} else {
+					const dailyData = await repository.getTorrentioDailyHistory(daysBack ?? 30);
+					return res.status(200).json({
+						type: 'torrentio',
 						granularity: 'daily',
 						range,
 						data: dailyData,

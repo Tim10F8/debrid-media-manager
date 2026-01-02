@@ -351,6 +351,35 @@ model TorrentioCheckResult {
   @@index([checkedAt])
 }
 
+// Torrentio Health - Hourly snapshots (kept for 7 days)
+model TorrentioHealthHourly {
+  id           Int      @id @default(autoincrement())
+  hour         DateTime // Start of hour (UTC)
+  successCount Int      @default(0) // Number of successful checks in hour
+  totalCount   Int      @default(0) // Total checks in hour
+  successRate  Float    @default(0) // successCount / totalCount
+  avgLatencyMs Float?   // Average latency of checks
+  createdAt    DateTime @default(now())
+
+  @@unique([hour])
+  @@index([hour])
+}
+
+// Torrentio Health - Daily aggregates (kept for 90 days)
+model TorrentioHealthDaily {
+  id             Int      @id @default(autoincrement())
+  date           DateTime // Start of day (UTC)
+  avgSuccessRate Float    // Average success rate across all checks
+  minSuccessRate Float    // Worst hour of the day
+  maxSuccessRate Float    // Best hour of the day
+  avgLatencyMs   Float?   // Average latency across all checks
+  checksCount    Int      // Total health checks that day
+  createdAt      DateTime @default(now())
+
+  @@unique([date])
+  @@index([date])
+}
+
 // Stream Health - Hourly snapshots (kept for 7 days)
 model StreamHealthHourly {
   id             Int      @id @default(autoincrement())

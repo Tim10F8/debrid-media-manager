@@ -47,6 +47,23 @@ interface RdDailyData {
 	maxSuccessRate: number;
 }
 
+interface TorrentioHourlyData {
+	hour: string;
+	successCount: number;
+	totalCount: number;
+	successRate: number;
+	avgLatencyMs: number | null;
+}
+
+interface TorrentioDailyData {
+	date: string;
+	avgSuccessRate: number;
+	minSuccessRate: number;
+	maxSuccessRate: number;
+	avgLatencyMs: number | null;
+	checksCount: number;
+}
+
 interface HistoryResponse<T> {
 	type: string;
 	granularity?: string;
@@ -90,6 +107,9 @@ export function HistoryCharts() {
 	const [range, setRange] = useState<HistoryRange>('24h');
 	const [streamData, setStreamData] = useState<(StreamHourlyData | StreamDailyData)[]>([]);
 	const [rdData, setRdData] = useState<(RdHourlyData | RdDailyData)[]>([]);
+	const [torrentioData, setTorrentioData] = useState<
+		(TorrentioHourlyData | TorrentioDailyData)[]
+	>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [granularity, setGranularity] = useState<'hourly' | 'daily'>('hourly');
@@ -104,9 +124,10 @@ export function HistoryCharts() {
 					? window.location.origin
 					: 'http://localhost:3000';
 
-			const [streamResponse, rdResponse] = await Promise.all([
+			const [streamResponse, rdResponse, torrentioResponse] = await Promise.all([
 				fetch(`${origin}/api/observability/history?type=stream&range=${range}`),
 				fetch(`${origin}/api/observability/history?type=rd&range=${range}`),
+				fetch(`${origin}/api/observability/history?type=torrentio&range=${range}`),
 			]);
 
 			if (!streamResponse.ok) {
@@ -125,6 +146,13 @@ export function HistoryCharts() {
 					RdHourlyData | RdDailyData
 				>;
 				setRdData(rdJson.data ?? []);
+			}
+
+			if (torrentioResponse.ok) {
+				const torrentioJson = (await torrentioResponse.json()) as HistoryResponse<
+					TorrentioHourlyData | TorrentioDailyData
+				>;
+				setTorrentioData(torrentioJson.data ?? []);
 			}
 		} catch (err) {
 			console.error('Failed to fetch history:', err);
@@ -165,6 +193,22 @@ export function HistoryCharts() {
 				time,
 				successRate: 'avgSuccessRate' in item ? item.avgSuccessRate : item.successRate,
 				totalCount: item.totalCount,
+				label,
+			};
+		})
+		.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+
+	// Format Torrentio data for chart
+	const torrentioChartData = (torrentioData ?? [])
+		.map((item) => {
+			const isHourly = 'hour' in item;
+			const time = isHourly ? item.hour : item.date;
+			const label = isHourly ? formatShortTime(time) : formatShortDate(time);
+
+			return {
+				time,
+				successRate: 'avgSuccessRate' in item ? item.avgSuccessRate : item.successRate,
+				avgLatencyMs: item.avgLatencyMs,
 				label,
 			};
 		})
@@ -221,7 +265,8 @@ export function HistoryCharts() {
 
 	const hasStreamData = streamChartData.length > 0;
 	const hasRdData = rdChartData.length > 0;
-	const hasData = hasStreamData || hasRdData;
+	const hasTorrentioData = torrentioChartData.length > 0;
+	const hasData = hasStreamData || hasRdData || hasTorrentioData;
 
 	return (
 		<section className="space-y-6 rounded-xl border border-white/10 bg-black/25 p-5">
@@ -385,6 +430,73 @@ export function HistoryCharts() {
 										dataKey="successRate"
 										stroke="#0ea5e9"
 										fill="url(#rdGradient)"
+										strokeWidth={2}
+									/>
+								</AreaChart>
+							</ResponsiveContainer>
+						</div>
+					)}
+
+					{hasTorrentioData && (
+						<div className="rounded-xl border border-white/10 bg-black/20 p-4">
+							<h3 className="mb-4 text-sm font-medium text-slate-200">
+								Torrentio Resolver Health
+							</h3>
+							<ResponsiveContainer width="100%" height={200}>
+								<AreaChart data={torrentioChartData}>
+									<defs>
+										<linearGradient
+											id="torrentioGradient"
+											x1="0"
+											y1="0"
+											x2="0"
+											y2="1"
+										>
+											<stop
+												offset="5%"
+												stopColor="#f59e0b"
+												stopOpacity={0.3}
+											/>
+											<stop
+												offset="95%"
+												stopColor="#f59e0b"
+												stopOpacity={0}
+											/>
+										</linearGradient>
+									</defs>
+									<CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+									<XAxis
+										dataKey="label"
+										tick={{ fill: '#94a3b8', fontSize: 10 }}
+										tickLine={false}
+										axisLine={{ stroke: '#475569' }}
+										interval="preserveStartEnd"
+										minTickGap={20}
+									/>
+									<YAxis
+										tick={{ fill: '#94a3b8', fontSize: 10 }}
+										tickLine={false}
+										axisLine={{ stroke: '#475569' }}
+										tickFormatter={(v) => formatPercent(v)}
+										domain={[0, 1]}
+									/>
+									<Tooltip
+										contentStyle={{
+											backgroundColor: '#1e293b',
+											border: '1px solid #334155',
+											borderRadius: '8px',
+										}}
+										labelStyle={{ color: '#f1f5f9' }}
+										formatter={(value) => [
+											formatPercent(value as number),
+											'Success Rate',
+										]}
+									/>
+									<Area
+										type="monotone"
+										dataKey="successRate"
+										stroke="#f59e0b"
+										fill="url(#torrentioGradient)"
 										strokeWidth={2}
 									/>
 								</AreaChart>

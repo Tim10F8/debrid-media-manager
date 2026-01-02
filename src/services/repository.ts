@@ -531,6 +531,22 @@ export class Repository {
 		return this.historyAggregationService.getServerReliability(daysBack, sortBy, limit);
 	}
 
+	public recordTorrentioHealthSnapshot(data: { ok: boolean; latencyMs: number | null }) {
+		return this.historyAggregationService.recordTorrentioHealthSnapshot(data);
+	}
+
+	public getTorrentioHourlyHistory(hoursBack?: number) {
+		return this.historyAggregationService.getTorrentioHourlyHistory(hoursBack);
+	}
+
+	public getTorrentioDailyHistory(daysBack?: number) {
+		return this.historyAggregationService.getTorrentioDailyHistory(daysBack);
+	}
+
+	public rollupTorrentioDaily(targetDate?: Date) {
+		return this.historyAggregationService.rollupTorrentioDaily(targetDate);
+	}
+
 	public runHistoryAggregation() {
 		return this.historyAggregationService.runAggregation();
 	}

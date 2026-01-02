@@ -157,12 +157,18 @@ async function executeCheck(): Promise<void> {
 	try {
 		const result = await runTorrentioCheck(rdKey);
 
-		// Record to database
+		// Record individual check result
 		await repository.recordTorrentioCheckResult({
 			ok: result.ok,
 			latencyMs: result.latencyMs,
 			error: result.error,
 			urls: result.urls,
+		});
+
+		// Record to hourly aggregates for historical charts
+		await repository.recordTorrentioHealthSnapshot({
+			ok: result.ok,
+			latencyMs: result.latencyMs,
 		});
 
 		console.log(

@@ -39,6 +39,23 @@ export interface ServerReliabilityData {
 	reliability: number;
 }
 
+export interface TorrentioHourlyData {
+	hour: Date;
+	successCount: number;
+	totalCount: number;
+	successRate: number;
+	avgLatencyMs: number | null;
+}
+
+export interface TorrentioDailyData {
+	date: Date;
+	avgSuccessRate: number;
+	minSuccessRate: number;
+	maxSuccessRate: number;
+	avgLatencyMs: number | null;
+	checksCount: number;
+}
+
 export class HistoryAggregationService extends DatabaseClient {
 	private rdOperationalService: RdOperationalService;
 
@@ -293,6 +310,8 @@ export class HistoryAggregationService extends DatabaseClient {
 		serverReliabilityDeleted: number;
 		rdHourlyDeleted: number;
 		rdDailyDeleted: number;
+		torrentioHourlyDeleted: number;
+		torrentioDailyDeleted: number;
 	}> {
 		const now = new Date();
 		const hourlyRetentionDate = new Date(
@@ -308,6 +327,8 @@ export class HistoryAggregationService extends DatabaseClient {
 			serverReliabilityDeleted: 0,
 			rdHourlyDeleted: 0,
 			rdDailyDeleted: 0,
+			torrentioHourlyDeleted: 0,
+			torrentioDailyDeleted: 0,
 		};
 
 		try {
@@ -333,6 +354,26 @@ export class HistoryAggregationService extends DatabaseClient {
 			const rdCleanup = await this.rdOperationalService.cleanupOldData();
 			results.rdHourlyDeleted = rdCleanup.hourlyDeleted;
 			results.rdDailyDeleted = rdCleanup.dailyDeleted;
+
+			// Clean Torrentio hourly (7 days)
+			try {
+				const torrentioHourly = await this.prisma.torrentioHealthHourly.deleteMany({
+					where: { hour: { lt: hourlyRetentionDate } },
+				});
+				results.torrentioHourlyDeleted = torrentioHourly.count;
+			} catch {
+				// Table may not exist yet
+			}
+
+			// Clean Torrentio daily (90 days)
+			try {
+				const torrentioDaily = await this.prisma.torrentioHealthDaily.deleteMany({
+					where: { date: { lt: dailyRetentionDate } },
+				});
+				results.torrentioDailyDeleted = torrentioDaily.count;
+			} catch {
+				// Table may not exist yet
+			}
 		} catch (error: any) {
 			if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
 				return results;
@@ -492,6 +533,220 @@ export class HistoryAggregationService extends DatabaseClient {
 	}
 
 	/**
+	 * Records a Torrentio health snapshot for aggregation.
+	 * Called after each Torrentio health check run.
+	 */
+	public async recordTorrentioHealthSnapshot(data: {
+		ok: boolean;
+		latencyMs: number | null;
+	}): Promise<void> {
+		const hour = this.startOfHour(new Date());
+
+		try {
+			const existing = await this.prisma.torrentioHealthHourly.findUnique({
+				where: { hour },
+			});
+
+			if (existing) {
+				// Merge with existing data
+				const newTotalCount = existing.totalCount + 1;
+				const newSuccessCount = existing.successCount + (data.ok ? 1 : 0);
+				const newSuccessRate = newSuccessCount / newTotalCount;
+
+				// Calculate new average latency
+				let newAvgLatency = existing.avgLatencyMs;
+				if (data.latencyMs !== null) {
+					if (existing.avgLatencyMs !== null) {
+						// Weighted average
+						newAvgLatency =
+							(existing.avgLatencyMs * existing.totalCount + data.latencyMs) /
+							newTotalCount;
+					} else {
+						newAvgLatency = data.latencyMs;
+					}
+				}
+
+				await this.prisma.torrentioHealthHourly.update({
+					where: { hour },
+					data: {
+						successCount: newSuccessCount,
+						totalCount: newTotalCount,
+						successRate: newSuccessRate,
+						avgLatencyMs: newAvgLatency,
+					},
+				});
+			} else {
+				// Create new record
+				await this.prisma.torrentioHealthHourly.create({
+					data: {
+						hour,
+						successCount: data.ok ? 1 : 0,
+						totalCount: 1,
+						successRate: data.ok ? 1 : 0,
+						avgLatencyMs: data.latencyMs,
+					},
+				});
+			}
+		} catch (error: any) {
+			if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
+				console.warn('TorrentioHealthHourly table does not exist');
+				return;
+			}
+			console.error('Failed to record Torrentio health snapshot:', error);
+		}
+	}
+
+	/**
+	 * Gets Torrentio hourly history for a time range.
+	 */
+	public async getTorrentioHourlyHistory(hoursBack: number = 24): Promise<TorrentioHourlyData[]> {
+		const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+
+		try {
+			const data = await this.prisma.torrentioHealthHourly.findMany({
+				where: { hour: { gte: since } },
+				orderBy: { hour: 'asc' },
+			});
+
+			return data.map((d) => ({
+				hour: d.hour,
+				successCount: d.successCount,
+				totalCount: d.totalCount,
+				successRate: d.successRate,
+				avgLatencyMs: d.avgLatencyMs,
+			}));
+		} catch (error: any) {
+			if (
+				error?.code?.startsWith?.('P') ||
+				error?.name?.includes?.('Prisma') ||
+				error?.message?.includes('does not exist') ||
+				error?.message?.includes('Authentication failed')
+			) {
+				console.warn(
+					'getTorrentioHourlyHistory: Database error, returning empty array:',
+					error?.code || error?.name
+				);
+				return [];
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Gets Torrentio daily history for a time range.
+	 */
+	public async getTorrentioDailyHistory(daysBack: number = 90): Promise<TorrentioDailyData[]> {
+		const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+
+		try {
+			const data = await this.prisma.torrentioHealthDaily.findMany({
+				where: { date: { gte: since } },
+				orderBy: { date: 'asc' },
+			});
+
+			return data.map((d) => ({
+				date: d.date,
+				avgSuccessRate: d.avgSuccessRate,
+				minSuccessRate: d.minSuccessRate,
+				maxSuccessRate: d.maxSuccessRate,
+				avgLatencyMs: d.avgLatencyMs,
+				checksCount: d.checksCount,
+			}));
+		} catch (error: any) {
+			if (
+				error?.code?.startsWith?.('P') ||
+				error?.name?.includes?.('Prisma') ||
+				error?.message?.includes('does not exist') ||
+				error?.message?.includes('Authentication failed')
+			) {
+				console.warn(
+					'getTorrentioDailyHistory: Database error, returning empty array:',
+					error?.code || error?.name
+				);
+				return [];
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Rolls up hourly Torrentio health data into daily aggregates.
+	 */
+	public async rollupTorrentioDaily(targetDate?: Date): Promise<boolean> {
+		const date = targetDate ? this.startOfDay(targetDate) : this.startOfDay(new Date());
+		const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+
+		try {
+			// Get hourly data for this day
+			const hourlyData = await this.prisma.torrentioHealthHourly.findMany({
+				where: {
+					hour: {
+						gte: date,
+						lt: nextDate,
+					},
+				},
+			});
+
+			if (hourlyData.length === 0) {
+				return false;
+			}
+
+			// Calculate weighted aggregates (weighted by checks per hour)
+			const totalChecks = hourlyData.reduce((sum, h) => sum + h.totalCount, 0);
+
+			// Weighted average of success rates
+			const weightedSuccessRateSum = hourlyData.reduce(
+				(sum, h) => sum + h.successRate * h.totalCount,
+				0
+			);
+			const avgSuccessRate = totalChecks > 0 ? weightedSuccessRateSum / totalChecks : 0;
+
+			// Weighted average of latencies (only for hours with latency data)
+			const hourlyWithLatency = hourlyData.filter((h) => h.avgLatencyMs !== null);
+			const totalChecksWithLatency = hourlyWithLatency.reduce(
+				(sum, h) => sum + h.totalCount,
+				0
+			);
+			const weightedLatencySum = hourlyWithLatency.reduce(
+				(sum, h) => sum + (h.avgLatencyMs as number) * h.totalCount,
+				0
+			);
+			const avgLatencyMs =
+				totalChecksWithLatency > 0 ? weightedLatencySum / totalChecksWithLatency : null;
+
+			// Min/max are the extremes across all hourly records
+			const successRates = hourlyData.map((h) => h.successRate);
+
+			await this.prisma.torrentioHealthDaily.upsert({
+				where: { date },
+				update: {
+					avgSuccessRate,
+					minSuccessRate: Math.min(...successRates),
+					maxSuccessRate: Math.max(...successRates),
+					avgLatencyMs,
+					checksCount: totalChecks,
+				},
+				create: {
+					date,
+					avgSuccessRate,
+					minSuccessRate: Math.min(...successRates),
+					maxSuccessRate: Math.max(...successRates),
+					avgLatencyMs,
+					checksCount: totalChecks,
+				},
+			});
+
+			return true;
+		} catch (error: any) {
+			if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
+				return false;
+			}
+			console.error('Failed to rollup Torrentio daily data:', error);
+			return false;
+		}
+	}
+
+	/**
 	 * Runs all aggregation tasks. Call this periodically (e.g., every hour).
 	 * Stream health snapshots are recorded directly from the health check module.
 	 */
@@ -510,18 +765,21 @@ export class HistoryAggregationService extends DatabaseClient {
 	public async runDailyRollup(targetDate?: Date): Promise<{
 		streamDailyRolled: boolean;
 		rdDailyRolled: boolean;
+		torrentioDailyRolled: boolean;
 	}> {
 		// Roll up yesterday's data by default
 		const date = targetDate ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-		const [streamDailyRolled] = await Promise.all([
+		const [streamDailyRolled, , torrentioDailyRolled] = await Promise.all([
 			this.rollupStreamDaily(date),
 			this.rdOperationalService.rollupDaily(date),
+			this.rollupTorrentioDaily(date),
 		]);
 
 		return {
 			streamDailyRolled,
 			rdDailyRolled: true,
+			torrentioDailyRolled,
 		};
 	}
 
