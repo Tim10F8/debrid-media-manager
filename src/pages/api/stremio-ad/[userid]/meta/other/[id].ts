@@ -17,9 +17,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	// Parse the id - format is "dmm-ad:magnetId" or "dmm-ad:magnetId.json"
 	const cleanId = id.replace(/\.json$/, '');
-	const parts = cleanId.split(':');
 
-	if (parts.length < 2 || parts[0] !== 'dmm-ad') {
+	// Skip if this is not an AllDebrid ID - let other addons handle it
+	if (!cleanId.startsWith('dmm-ad:')) {
+		res.status(200).json({ meta: null });
+		return;
+	}
+
+	const parts = cleanId.split(':');
+	if (parts.length < 2) {
 		res.status(400).json({
 			status: 'error',
 			errorMessage: 'Invalid meta id format',

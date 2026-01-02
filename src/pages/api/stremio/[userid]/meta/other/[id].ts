@@ -48,7 +48,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			return;
 		}
 
-		const torrentID = id.replaceAll(/^dmm:/g, '').replaceAll(/\.json$/g, '');
+		// Clean up the ID - remove prefix and .json suffix
+		const cleanId = id.replaceAll(/\.json$/g, '');
+
+		// Skip if this is an AllDebrid or TorBox ID - let those addons handle it
+		if (cleanId.startsWith('dmm-ad:') || cleanId.startsWith('dmm-tb:')) {
+			console.log('[meta/other/id] Skipping non-RD ID:', cleanId);
+			res.status(200).json({ meta: null });
+			return;
+		}
+
+		const torrentID = cleanId.replaceAll(/^dmm:/g, '');
 		console.log('[meta/other/id] Torrent ID:', torrentID);
 
 		const profile = await db.getCastProfile(userid);

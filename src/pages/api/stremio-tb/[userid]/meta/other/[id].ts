@@ -19,8 +19,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	// Parse id: dmm-tb:123.json -> 123
 	const idStr = id.replace('.json', '');
+
+	// Skip if this is not a TorBox ID - let other addons handle it
+	if (!idStr.startsWith('dmm-tb:')) {
+		res.status(200).json({ meta: null });
+		return;
+	}
+
 	const parts = idStr.split(':');
-	if (parts.length < 2 || parts[0] !== 'dmm-tb') {
+	if (parts.length < 2) {
 		res.status(400).json({
 			status: 'error',
 			errorMessage: 'Invalid id format. Expected dmm-tb:{torrentId}',
