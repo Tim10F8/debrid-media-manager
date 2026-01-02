@@ -19,7 +19,7 @@ const baseTvResult: SearchResult = {
 	title: 'Sample Show',
 	fileSize: 1024 * 20,
 	hash: 'tv-hash',
-	rdAvailable: false,
+	rdAvailable: true,
 	adAvailable: false,
 	tbAvailable: false,
 	files: [{ fileId: 1, filename: 'Sample.S01E01.1080p.mkv', filesize: 1024 * 10 }],
@@ -73,13 +73,15 @@ describe('TvSearchResults', () => {
 
 	it('casts episodes with matching filenames', async () => {
 		const { props } = renderTv();
-		const castButton = await screen.findByRole('button', { name: /Cast/i });
+		const castButton = await screen.findByRole('button', { name: /Cast \(RD\)/i });
 		await userEvent.click(castButton);
 		await waitFor(() => expect(props.handleCast).toHaveBeenCalledWith('tv-hash', ['1']));
 	});
 
 	it('checks availability for uncached torrents', async () => {
+		const uncachedResult = { ...baseTvResult, rdAvailable: false };
 		const { props } = renderTv({
+			filteredResults: [uncachedResult],
 			hashAndProgress: { 'rd:tv-hash': 50 },
 		});
 

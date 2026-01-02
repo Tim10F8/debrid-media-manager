@@ -742,12 +742,12 @@ const MovieSearch: FunctionComponent = () => {
 								</b>
 							</button>
 							<button
-								className="mb-1 mr-2 mt-0 rounded border-2 border-gray-500 bg-gray-900/30 p-1 text-xs text-gray-100 transition-colors hover:bg-gray-800/50"
+								className="mb-1 mr-2 mt-0 rounded border-2 border-green-500 bg-green-900/30 p-1 text-xs text-green-100 transition-colors hover:bg-green-800/50"
 								onClick={() => handleCast(getFirstAvailableRdTorrent()!.hash)}
 							>
 								<b className="flex items-center justify-center">
-									<Cast className="mr-1 h-3 w-3 text-gray-500" />
-									Cast
+									<Cast className="mr-1 h-3 w-3 text-green-400" />
+									Cast (RD)
 								</b>
 							</button>
 						</>

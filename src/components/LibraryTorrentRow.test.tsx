@@ -347,13 +347,13 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 		});
 	});
 
-	describe('Cast All Quick Action', () => {
+	describe('Cast Quick Action', () => {
 		it('calls cast API endpoint for RD torrents when rdKey is present', async () => {
 			const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
 				json: () => Promise.resolve({ status: 'success', redirectUrl: 'stremio://test' }),
 			} as Response);
 			render(<LibraryTorrentRow {...defaultProps} />);
-			const castButton = screen.getByTitle('Cast All');
+			const castButton = screen.getByTitle('Cast (RD)');
 			fireEvent.click(castButton);
 			const expectedUrl = `/api/stremio/cast/library/${mockTorrent.id.substring(3)}:${mockTorrent.hash}?rdToken=${defaultProps.rdKey}`;
 			await waitFor(() => {
@@ -364,7 +364,7 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 
 		it('hides cast button when rdKey is missing', () => {
 			const { queryByTitle } = render(<LibraryTorrentRow {...defaultProps} rdKey={null} />);
-			expect(queryByTitle('Cast All')).not.toBeInTheDocument();
+			expect(queryByTitle('Cast (RD)')).not.toBeInTheDocument();
 		});
 
 		it('hides cast button for non-RD torrents', () => {
@@ -374,7 +374,7 @@ describe('LibraryTorrentRow Reinsert Functionality', () => {
 					torrent={{ ...defaultProps.torrent, id: 'ad:456' }}
 				/>
 			);
-			expect(queryByTitle('Cast All')).not.toBeInTheDocument();
+			expect(queryByTitle('Cast (RD)')).not.toBeInTheDocument();
 		});
 	});
 

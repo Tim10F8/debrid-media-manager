@@ -113,7 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			streams.push({
 				name,
 				title,
-				url: item.link,
+				url: `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.hash}`,
 				behaviorHints: {
 					bingeGroup: `dmm-ad:${imdbidStr}:yours`,
 				},
@@ -136,7 +136,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			streams.push({
 				name,
 				title,
-				url: item.link,
+				url: `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.hash}`,
 				behaviorHints: {
 					bingeGroup: `dmm-ad:${imdbidStr}:other:${i + 1}`,
 				},

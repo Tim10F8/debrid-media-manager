@@ -173,7 +173,10 @@ describe('StartPage', () => {
 		const tbLink = screen.getByText('Create an account with Torbox');
 		expect(tbLink).toHaveAttribute('target', '_blank');
 		expect(tbLink).toHaveAttribute('rel', 'noopener noreferrer');
-		expect(tbLink).toHaveAttribute('href', 'https://torbox.app');
+		expect(tbLink).toHaveAttribute(
+			'href',
+			'https://torbox.app/subscription?referral=74ffa560-7381-4a18-adb1-cef97378c670'
+		);
 	});
 
 	it('should have correct page title and meta tags', () => {

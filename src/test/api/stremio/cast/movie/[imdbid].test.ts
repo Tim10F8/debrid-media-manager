@@ -92,7 +92,7 @@ describe('/api/stremio/cast/movie/[imdbid]', () => {
 		expect(res.status).toHaveBeenCalledWith(500);
 		expect(res.json).toHaveBeenCalledWith({
 			status: 'error',
-			errorMessage: expect.stringContaining('Failed to get stream URL for tt7654321'),
+			errorMessage: 'rd offline',
 		});
 	});
 });

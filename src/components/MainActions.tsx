@@ -16,7 +16,7 @@ export function MainActions({ rdUser, tbUser, adUser, isLoading }: MainActionsPr
 	const castButtons = [
 		rdUser && {
 			href: '/stremio',
-			label: 'Cast for Real-Debrid',
+			label: 'Cast for RD',
 			borderColor: 'border-green-500',
 			bgColor: 'bg-green-900/30',
 			hoverColor: 'hover:bg-green-800/50',
@@ -25,7 +25,7 @@ export function MainActions({ rdUser, tbUser, adUser, isLoading }: MainActionsPr
 		},
 		tbUser && {
 			href: '/stremio-torbox',
-			label: 'Cast for TorBox',
+			label: 'Cast for TB',
 			borderColor: 'border-purple-500',
 			bgColor: 'bg-purple-900/30',
 			hoverColor: 'hover:bg-purple-800/50',
@@ -34,7 +34,7 @@ export function MainActions({ rdUser, tbUser, adUser, isLoading }: MainActionsPr
 		},
 		adUser && {
 			href: '/stremio-alldebrid',
-			label: 'Cast for AllDebrid',
+			label: 'Cast for AD',
 			borderColor: 'border-yellow-500',
 			bgColor: 'bg-yellow-900/30',
 			hoverColor: 'hover:bg-yellow-800/50',

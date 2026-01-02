@@ -274,15 +274,15 @@ function TorrentRow({
 				>
 					{rdKey && torrent.id.startsWith('rd:') && (
 						<button
-							title="Cast All"
-							className="mb-2 mr-2 cursor-pointer text-gray-400 disabled:opacity-50"
+							title="Cast (RD)"
+							className="mb-2 mr-2 cursor-pointer text-green-400 disabled:opacity-50"
 							onClick={(e) => {
 								e.stopPropagation();
 								handleCastClick();
 							}}
 							disabled={isCasting}
 						>
-							<Cast className="h-4 w-4 text-gray-400" />
+							<Cast className="h-4 w-4 text-green-400" />
 						</button>
 					)}
 					<button

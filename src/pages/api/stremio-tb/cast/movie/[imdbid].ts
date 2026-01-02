@@ -24,24 +24,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 
 	try {
-		const [streamUrl, fileSize, torrentId, fileId] = await getBiggestFileTorBoxStreamUrl(
-			apiKey,
-			hash
-		);
+		const [streamUrl, fileSize, torrentId, fileId, filename] =
+			await getBiggestFileTorBoxStreamUrl(apiKey, hash);
 
 		if (streamUrl) {
 			const message = 'You can now stream the movie in Stremio';
 
 			const userid = await generateTorBoxUserId(apiKey);
 
-			// For TorBox, we store the filename/URL as the display name
-			const filename = streamUrl.split('/').pop() ?? 'Unknown';
+			// Extract just the filename from the path (remove directory path)
+			const displayFilename = filename.split('/').pop() ?? 'Unknown';
 
 			await db.saveTorBoxCast(
 				imdbid,
 				userid,
 				hash,
-				filename, // url field stores the filename for display
+				displayFilename, // url field stores the filename for display
 				streamUrl, // link field stores the actual stream URL
 				fileSize,
 				torrentId,
@@ -51,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			res.status(200).json({
 				status: 'success',
 				message,
-				filename,
+				filename: displayFilename,
 			});
 			return;
 		} else {
@@ -62,9 +60,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		}
 	} catch (e) {
 		console.error(e);
+		const message = e instanceof Error ? e.message : String(e);
 		res.status(500).json({
 			status: 'error',
-			errorMessage: `Failed to get stream URL for ${imdbid}: ${e instanceof Error ? e.message : e}`,
+			errorMessage: message,
 		});
 		return;
 	}

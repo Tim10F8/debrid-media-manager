@@ -51,21 +51,21 @@ describe('MainActions', () => {
 	it('shows RD cast action when only RD user is authenticated', () => {
 		render(<MainActions rdUser={baseRdUser} tbUser={null} adUser={false} isLoading={false} />);
 
-		const castLink = screen.getByRole('link', { name: /cast for real-debrid/i });
+		const castLink = screen.getByRole('link', { name: /cast for rd/i });
 		expect(castLink.getAttribute('href')).toBe('/stremio');
 	});
 
 	it('shows TB cast action when only TB user is authenticated', () => {
 		render(<MainActions rdUser={null} tbUser={baseTbUser} adUser={false} isLoading={false} />);
 
-		const castLink = screen.getByRole('link', { name: /cast for torbox/i });
+		const castLink = screen.getByRole('link', { name: /cast for tb/i });
 		expect(castLink.getAttribute('href')).toBe('/stremio-torbox');
 	});
 
 	it('shows AD cast action when only AD user is authenticated', () => {
 		render(<MainActions rdUser={null} tbUser={null} adUser={true} isLoading={false} />);
 
-		const castLink = screen.getByRole('link', { name: /cast for alldebrid/i });
+		const castLink = screen.getByRole('link', { name: /cast for ad/i });
 		expect(castLink.getAttribute('href')).toBe('/stremio-alldebrid');
 	});
 
@@ -74,8 +74,8 @@ describe('MainActions', () => {
 			<MainActions rdUser={baseRdUser} tbUser={baseTbUser} adUser={false} isLoading={false} />
 		);
 
-		const rdLink = screen.getByRole('link', { name: /cast for real-debrid/i });
-		const tbLink = screen.getByRole('link', { name: /cast for torbox/i });
+		const rdLink = screen.getByRole('link', { name: /cast for rd/i });
+		const tbLink = screen.getByRole('link', { name: /cast for tb/i });
 		expect(rdLink.getAttribute('href')).toBe('/stremio');
 		expect(tbLink.getAttribute('href')).toBe('/stremio-torbox');
 	});
@@ -85,9 +85,9 @@ describe('MainActions', () => {
 			<MainActions rdUser={baseRdUser} tbUser={baseTbUser} adUser={true} isLoading={false} />
 		);
 
-		const rdLink = screen.getByRole('link', { name: /cast for real-debrid/i });
-		const tbLink = screen.getByRole('link', { name: /cast for torbox/i });
-		const adLink = screen.getByRole('link', { name: /cast for alldebrid/i });
+		const rdLink = screen.getByRole('link', { name: /cast for rd/i });
+		const tbLink = screen.getByRole('link', { name: /cast for tb/i });
+		const adLink = screen.getByRole('link', { name: /cast for ad/i });
 		expect(rdLink.getAttribute('href')).toBe('/stremio');
 		expect(tbLink.getAttribute('href')).toBe('/stremio-torbox');
 		expect(adLink.getAttribute('href')).toBe('/stremio-alldebrid');

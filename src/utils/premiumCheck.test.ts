@@ -28,7 +28,10 @@ describe('checkPremiumStatus', () => {
 		expect(modalFireMock).toHaveBeenCalledWith(
 			expect.objectContaining({ title: 'Premium Required' })
 		);
-		expect(openMock).toHaveBeenCalledWith('https://real-debrid.com/premium', '_blank');
+		expect(openMock).toHaveBeenCalledWith(
+			'https://real-debrid.com/premium?id=440161',
+			'_blank'
+		);
 		expect(result).toEqual({ shouldLogout: true });
 	});
 

@@ -676,6 +676,52 @@ export function isValidSHA40Hash(hash: string): boolean {
 }
 
 // ====================================================================
+// Link Unlocking
+// ====================================================================
+
+interface UnlockLinkData {
+	link: string;
+	host: string;
+	filename: string;
+	streaming: string[];
+	paws: boolean;
+	filesize: number;
+	id: string;
+	hostDomain: string;
+}
+
+/**
+ * Unlock an AllDebrid link to get a direct download URL
+ * @param apiKey AllDebrid API key
+ * @param link The AllDebrid link to unlock (e.g., https://alldebrid.com/f/...)
+ * @returns The unlocked link data including the direct download URL
+ */
+export const unlockLink = async (apiKey: string, link: string): Promise<UnlockLinkData> => {
+	const endpoint = `${config.allDebridHostname}/v4/link/unlock`;
+
+	try {
+		const params = new URLSearchParams();
+		params.append('link', link);
+
+		const response = await axios.post<ApiResponse<UnlockLinkData>>(endpoint, params, {
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Authorization: `Bearer ${apiKey}`,
+			},
+		});
+
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Failed to unlock link');
+		}
+
+		return response.data.data!;
+	} catch (error: any) {
+		console.error('Error unlocking AllDebrid link:', error.message);
+		throw error;
+	}
+};
+
+// ====================================================================
 // Rate Limiting
 // ====================================================================
 

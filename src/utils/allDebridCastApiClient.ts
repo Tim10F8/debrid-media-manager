@@ -10,12 +10,12 @@ export const handleCastMovieAllDebrid = async (imdbId: string, apiKey: string, h
 			`/api/stremio-ad/cast/movie/${imdbId}?apiKey=${apiKey}&hash=${hash}`
 		);
 		toast(`Casted ${resp.data.filename} to Stremio (AllDebrid).`, castToastOptions);
-	} catch (error) {
-		console.error(
-			'Error casting movie (AllDebrid):',
-			error instanceof Error ? error.message : 'Unknown error'
-		);
-		toast.error('Failed to cast movie to Stremio (AllDebrid).');
+	} catch (error: any) {
+		const errorMessage =
+			error?.response?.data?.errorMessage ||
+			(error instanceof Error ? error.message : 'Unknown error');
+		console.error('Error casting movie (AllDebrid):', errorMessage);
+		toast.error(errorMessage, castToastOptions);
 	}
 };
 
@@ -71,9 +71,9 @@ export const saveAllDebridCastProfile = async (apiKey: string) => {
 
 export const updateAllDebridSizeLimits = async (
 	apiKey: string,
-	movieMaxSize: number,
-	episodeMaxSize: number,
-	otherStreamsLimit: number
+	movieMaxSize?: number,
+	episodeMaxSize?: number,
+	otherStreamsLimit?: number
 ) => {
 	try {
 		await axios.post(`/api/stremio-ad/cast/updateSizeLimits`, {

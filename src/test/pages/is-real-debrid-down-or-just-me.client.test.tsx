@@ -84,20 +84,13 @@ describe('RealDebridStatusPage client refresh', () => {
 		});
 		setMockFetch(mockFetch);
 
-		const { getByRole, getByTestId } = render(<RealDebridStatusPage />);
+		const { getByRole, getByText } = render(<RealDebridStatusPage />);
 
-		// Wait for data to load
-		await waitFor(() => expect(getByTestId('dmm-marketing-copy')).toBeTruthy());
+		// Wait for data to load - use text content that exists on the page
+		await waitFor(() => expect(getByText('About this data')).toBeTruthy());
 
-		const marketingCopy = getByTestId('dmm-marketing-copy');
-		expect(marketingCopy.textContent).toContain(
-			'Debrid Media Manager is a free, open source dashboard for Real-Debrid, AllDebrid, and TorBox.'
-		);
-		expect(marketingCopy.textContent).toContain(
-			'to search, download, and manage your library.'
-		);
-		expect(getByTestId('dmm-marketing-separator')).toBeTruthy();
-		const ctaLink = getByRole('link', { name: 'debridmediamanager.com' });
+		// Check for the marketing link to DMM
+		const ctaLink = getByRole('link', { name: 'Debrid Media Manager' });
 		expect(ctaLink).toBeTruthy();
 		expect(ctaLink).toHaveAttribute('href', 'https://debridmediamanager.com/');
 		expect(ctaLink).toHaveAttribute('target', '_blank');

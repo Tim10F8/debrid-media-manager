@@ -109,7 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			streams.push({
 				name,
 				title,
-				url: item.link,
+				url: `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.hash}`,
 				behaviorHints: {
 					bingeGroup: `dmm-tb:${imdbidStr}:yours`,
 				},
@@ -132,7 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			streams.push({
 				name,
 				title,
-				url: item.link,
+				url: `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.hash}`,
 				behaviorHints: {
 					bingeGroup: `dmm-tb:${imdbidStr}:other:${i + 1}`,
 				},

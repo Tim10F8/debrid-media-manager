@@ -72,9 +72,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		});
 	} catch (e) {
 		console.error(e);
+		const message = e instanceof Error ? e.message : String(e);
 		res.status(500).json({
 			status: 'error',
-			errorMessage: `Failed to cast series for ${imdbid}: ${e instanceof Error ? e.message : e}`,
+			errorMessage: message,
 		});
 	}
 }

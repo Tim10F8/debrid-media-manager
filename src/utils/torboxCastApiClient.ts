@@ -10,12 +10,12 @@ export const handleCastMovieTorBox = async (imdbId: string, apiKey: string, hash
 			`/api/stremio-tb/cast/movie/${imdbId}?apiKey=${apiKey}&hash=${hash}`
 		);
 		toast(`Casted ${resp.data.filename} to Stremio (TorBox).`, castToastOptions);
-	} catch (error) {
-		console.error(
-			'Error casting movie (TorBox):',
-			error instanceof Error ? error.message : 'Unknown error'
-		);
-		toast.error('Failed to cast movie to Stremio (TorBox).');
+	} catch (error: any) {
+		const errorMessage =
+			error?.response?.data?.errorMessage ||
+			(error instanceof Error ? error.message : 'Unknown error');
+		console.error('Error casting movie (TorBox):', errorMessage);
+		toast.error(errorMessage, castToastOptions);
 	}
 };
 
@@ -71,9 +71,9 @@ export const saveTorBoxCastProfile = async (apiKey: string) => {
 
 export const updateTorBoxSizeLimits = async (
 	apiKey: string,
-	movieMaxSize: number,
-	episodeMaxSize: number,
-	otherStreamsLimit: number
+	movieMaxSize?: number,
+	episodeMaxSize?: number,
+	otherStreamsLimit?: number
 ) => {
 	try {
 		await axios.post(`/api/stremio-tb/cast/updateSizeLimits`, {

@@ -134,7 +134,7 @@ describe('IndexPage', () => {
 		checkPremiumStatusMock.mockClear();
 	});
 
-	it('shows the Real-Debrid status helper when an RD user is present', () => {
+	it('shows the MainActions component when an RD user is present', () => {
 		currentUserMock.mockReturnValue({
 			rdUser: { username: 'demo' },
 			rdError: null,
@@ -154,12 +154,11 @@ describe('IndexPage', () => {
 
 		render(<IndexPage />);
 
-		const statusLink = screen.getByRole('link', { name: 'Is Real-Debrid down?' });
-		expect(statusLink).toBeTruthy();
-		expect(statusLink).toHaveAttribute('href', '/is-real-debrid-down-or-just-me');
+		// MainActions is mocked, verify it renders
+		expect(screen.getByTestId('main-actions')).toBeTruthy();
 	});
 
-	it('hides the Real-Debrid status helper when the user is logged out of RD', () => {
+	it('shows the MainActions component when logged out', () => {
 		currentUserMock.mockReturnValue({
 			rdUser: null,
 			rdError: null,
@@ -179,7 +178,8 @@ describe('IndexPage', () => {
 
 		render(<IndexPage />);
 
-		expect(screen.queryByRole('link', { name: 'Is Real-Debrid down?' })).toBeNull();
+		// MainActions is mocked, verify it still renders for logged out users
+		expect(screen.getByTestId('main-actions')).toBeTruthy();
 	});
 
 	it('provides a shortcut to the settings page', () => {

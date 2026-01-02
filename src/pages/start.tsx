@@ -106,7 +106,7 @@ export default function StartPage() {
 					</button>
 					<a
 						className="m-2 rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600"
-						href="https://torbox.app"
+						href="https://torbox.app/subscription?referral=74ffa560-7381-4a18-adb1-cef97378c670"
 						target="_blank"
 						rel="noopener noreferrer"
 					>

@@ -10,12 +10,12 @@ export const handleCastMovie = async (imdbId: string, rdKey: string, hash: strin
 			`/api/stremio/cast/movie/${imdbId}?token=${rdKey}&hash=${hash}`
 		);
 		toast(`Casted ${resp.data.filename} to Stremio.`, castToastOptions);
-	} catch (error) {
-		console.error(
-			'Error casting movie:',
-			error instanceof Error ? error.message : 'Unknown error'
-		);
-		toast.error('Failed to cast movie to Stremio.');
+	} catch (error: any) {
+		const errorMessage =
+			error?.response?.data?.errorMessage ||
+			(error instanceof Error ? error.message : 'Unknown error');
+		console.error('Error casting movie:', errorMessage);
+		toast.error(errorMessage, castToastOptions);
 	}
 };
 

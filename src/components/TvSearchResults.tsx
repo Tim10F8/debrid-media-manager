@@ -468,10 +468,10 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 											</button>
 										)}
 
-										{/* Cast button */}
-										{rdKey && castableFileIds.length > 0 && (
+										{/* Cast (RD) button - only show if cached on RD */}
+										{rdKey && r.rdAvailable && castableFileIds.length > 0 && (
 											<button
-												className={`haptic-sm inline rounded border-2 border-gray-500 bg-gray-900/30 px-1 text-xs text-gray-100 transition-colors hover:bg-gray-800/50 ${isCasting ? 'cursor-not-allowed opacity-50' : ''}`}
+												className={`haptic-sm inline rounded border-2 border-green-500 bg-green-900/30 px-1 text-xs text-green-100 transition-colors hover:bg-green-800/50 ${isCasting ? 'cursor-not-allowed opacity-50' : ''}`}
 												onClick={() =>
 													handleCastWithLoading(r.hash, castableFileIds)
 												}
@@ -484,16 +484,17 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 													</>
 												) : (
 													<>
-														<Cast className="mr-1 inline-block h-3 w-3 text-gray-400" />
-														Cast
+														<Cast className="mr-1 inline-block h-3 w-3 text-green-400" />
+														Cast (RD)
 													</>
 												)}
 											</button>
 										)}
 
-										{/* Cast (TB) button */}
+										{/* Cast (TB) button - only show if cached on TB */}
 										{torboxKey &&
 											handleCastTorBox &&
+											r.tbAvailable &&
 											castableFileIds.length > 0 && (
 												<button
 													className={`haptic-sm inline rounded border-2 border-purple-500 bg-purple-900/30 px-1 text-xs text-purple-100 transition-colors hover:bg-purple-800/50 ${isCastingTb ? 'cursor-not-allowed opacity-50' : ''}`}
@@ -519,9 +520,10 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 												</button>
 											)}
 
-										{/* Cast (AD) button */}
+										{/* Cast (AD) button - only show if cached on AD */}
 										{adKey &&
 											handleCastAllDebrid &&
+											r.adAvailable &&
 											castableFileIds.length > 0 && (
 												<button
 													className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${isCastingAd ? 'cursor-not-allowed opacity-50' : ''}`}

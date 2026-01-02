@@ -134,11 +134,12 @@ export const getTorBoxStreamUrl = async (
 export const getBiggestFileTorBoxStreamUrl = async (
 	apiKey: string,
 	hash: string
-): Promise<[string, number, number, number]> => {
+): Promise<[string, number, number, number, string]> => {
 	let streamUrl = '';
 	let fileSize = 0;
 	let torrentId = 0;
 	let fileId = 0;
+	let filename = '';
 
 	try {
 		// First check if the torrent is cached
@@ -184,6 +185,7 @@ export const getBiggestFileTorBoxStreamUrl = async (
 			});
 
 			fileId = biggestFile.id;
+			filename = biggestFile.name || biggestFile.short_name || '';
 
 			// Get download link
 			const downloadResult = await requestDownloadLink(apiKey, {
@@ -209,7 +211,7 @@ export const getBiggestFileTorBoxStreamUrl = async (
 		throw e;
 	}
 
-	return [streamUrl, fileSize, torrentId, fileId];
+	return [streamUrl, fileSize, torrentId, fileId, filename];
 };
 
 // Get stream URL for a specific file without deleting the torrent

@@ -483,10 +483,10 @@ const MovieSearchResults = ({
 									</button>
 								)}
 
-								{/* Cast btn */}
-								{rdKey && (
+								{/* Cast (RD) btn - only show if cached on RD */}
+								{rdKey && r.rdAvailable && (
 									<button
-										className={`haptic-sm inline rounded border-2 border-gray-500 bg-gray-900/30 px-1 text-xs text-gray-100 transition-colors hover:bg-gray-800/50 ${isCasting ? 'cursor-not-allowed opacity-50' : ''}`}
+										className={`haptic-sm inline rounded border-2 border-green-500 bg-green-900/30 px-1 text-xs text-green-100 transition-colors hover:bg-green-800/50 ${isCasting ? 'cursor-not-allowed opacity-50' : ''}`}
 										onClick={() => handleCastWithLoading(r.hash)}
 										disabled={isCasting}
 									>
@@ -497,15 +497,15 @@ const MovieSearchResults = ({
 											</>
 										) : (
 											<span className="inline-flex items-center">
-												<Cast className="mr-1 h-3 w-3 text-gray-500" />
-												Cast
+												<Cast className="mr-1 h-3 w-3 text-green-400" />
+												Cast (RD)
 											</span>
 										)}
 									</button>
 								)}
 
-								{/* Cast (TB) btn */}
-								{torboxKey && handleCastTorBox && (
+								{/* Cast (TB) btn - only show if cached on TB */}
+								{torboxKey && handleCastTorBox && r.tbAvailable && (
 									<button
 										className={`haptic-sm inline rounded border-2 border-purple-500 bg-purple-900/30 px-1 text-xs text-purple-100 transition-colors hover:bg-purple-800/50 ${isCastingTb ? 'cursor-not-allowed opacity-50' : ''}`}
 										onClick={() => handleCastTorBoxWithLoading(r.hash)}
@@ -525,8 +525,8 @@ const MovieSearchResults = ({
 									</button>
 								)}
 
-								{/* Cast (AD) btn */}
-								{adKey && handleCastAllDebrid && (
+								{/* Cast (AD) btn - only show if cached on AD */}
+								{adKey && handleCastAllDebrid && r.adAvailable && (
 									<button
 										className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${isCastingAd ? 'cursor-not-allowed opacity-50' : ''}`}
 										onClick={() => handleCastAllDebridWithLoading(r.hash)}

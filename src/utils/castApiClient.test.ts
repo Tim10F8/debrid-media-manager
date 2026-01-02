@@ -34,7 +34,7 @@ describe('castApiClient', () => {
 
 			await handleCastMovie('tt1234567', 'test-rd-key', 'test-hash');
 
-			expect(toast.error).toHaveBeenCalledWith('Failed to cast movie to Stremio.');
+			expect(toast.error).toHaveBeenCalledWith('Network error', expect.any(Object));
 		});
 
 		it('logs error message when error is an Error instance', async () => {
