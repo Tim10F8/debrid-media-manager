@@ -1,4 +1,9 @@
-import { getMagnetFiles, getMagnetStatus, MagnetFile } from '@/services/allDebrid';
+import {
+	getMagnetFiles,
+	getMagnetStatus,
+	getMagnetStatusAd,
+	MagnetFile,
+} from '@/services/allDebrid';
 
 export const PAGE_SIZE = 12;
 
@@ -64,15 +69,18 @@ export async function getAllDebridDMMTorrent(apiKey: string, magnetID: string) {
 	try {
 		// Get magnet files with download links
 		const filesResult = await getMagnetFiles(apiKey, [magnetIdNum]);
-		const magnetFiles = filesResult.magnets[0];
+		const magnetFiles = filesResult.magnets?.[0];
+
+		if (!magnetFiles) {
+			return { error: 'Magnet files not found', status: 404 };
+		}
 
 		if (magnetFiles.error) {
 			return { error: magnetFiles.error.message, status: 500 };
 		}
 
-		// Also get magnet info for the name
-		const statusResult = await getMagnetStatus(apiKey, magnetID);
-		const magnet = statusResult.data.magnets[0];
+		// Also get magnet info for the name (use getMagnetStatusAd for single ID - returns object not array)
+		const magnet = await getMagnetStatusAd(apiKey, magnetIdNum);
 
 		if (!magnet) {
 			return { error: 'Magnet not found', status: 404 };
