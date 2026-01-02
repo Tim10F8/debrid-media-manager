@@ -17,5 +17,6 @@ npx --no-install lint-staged
 # TypeScript type-check
 npm run -s typecheck
 
-# Run tests (fail commit on failing tests)
-npm run -s test
+# Run unit tests only (fail commit on failing tests)
+# Integration tests require Docker and are run separately in CI
+npm run -s test:unit

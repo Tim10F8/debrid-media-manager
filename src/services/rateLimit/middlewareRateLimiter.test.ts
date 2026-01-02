@@ -1,0 +1,389 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+	extractIdentifier,
+	getRateLimitConfig,
+	InMemoryRateLimiter,
+	RATE_LIMIT_CONFIGS,
+	shouldRateLimit,
+} from './middlewareRateLimiter';
+
+describe('middlewareRateLimiter', () => {
+	describe('shouldRateLimit', () => {
+		it('should return true for /api/stremio paths', () => {
+			expect(shouldRateLimit('/api/stremio/abc123456789/catalog/movie')).toBe(true);
+			expect(shouldRateLimit('/api/stremio-tb/xyz789012345/catalog/series')).toBe(true);
+			expect(shouldRateLimit('/api/stremio-ad/def456789012/meta/movie')).toBe(true);
+			expect(shouldRateLimit('/api/stremio/id')).toBe(true);
+		});
+
+		it('should return false for non-stremio paths', () => {
+			expect(shouldRateLimit('/api/healthz')).toBe(false);
+			expect(shouldRateLimit('/api/search')).toBe(false);
+			expect(shouldRateLimit('/')).toBe(false);
+			expect(shouldRateLimit('/browse')).toBe(false);
+		});
+	});
+
+	describe('getRateLimitConfig', () => {
+		it('should return stream config for stream endpoints', () => {
+			const config = getRateLimitConfig('/api/stremio/6xPzgFqT0tKI/stream/movie/tt1234567');
+			expect(config).toEqual(RATE_LIMIT_CONFIGS.stream);
+			expect(config.rateLimit).toBe(1);
+			expect(config.windowSeconds).toBe(5);
+		});
+
+		it('should return stream config for stremio-tb stream endpoints', () => {
+			const config = getRateLimitConfig(
+				'/api/stremio-tb/ZNxmirFYKwK0/stream/series/tt1234567'
+			);
+			expect(config).toEqual(RATE_LIMIT_CONFIGS.stream);
+		});
+
+		it('should return stream config for stremio-ad stream endpoints', () => {
+			const config = getRateLimitConfig(
+				'/api/stremio-ad/OYDJaDP0l5yM/stream/movie/tt1234567'
+			);
+			expect(config).toEqual(RATE_LIMIT_CONFIGS.stream);
+		});
+
+		it('should return default config for catalog endpoints', () => {
+			const config = getRateLimitConfig(
+				'/api/stremio/6xPzgFqT0tKI/catalog/movie/casted-movies.json'
+			);
+			expect(config).toEqual(RATE_LIMIT_CONFIGS.default);
+			expect(config.rateLimit).toBe(5);
+			expect(config.windowSeconds).toBe(1);
+		});
+
+		it('should return default config for meta endpoints', () => {
+			const config = getRateLimitConfig('/api/stremio/6xPzgFqT0tKI/meta/movie/tt1234567');
+			expect(config).toEqual(RATE_LIMIT_CONFIGS.default);
+		});
+
+		it('should return default config for other endpoints', () => {
+			expect(getRateLimitConfig('/api/stremio/id')).toEqual(RATE_LIMIT_CONFIGS.default);
+			expect(getRateLimitConfig('/api/stremio/cast/movie/tt123')).toEqual(
+				RATE_LIMIT_CONFIGS.default
+			);
+			expect(getRateLimitConfig('/api/stremio/links')).toEqual(RATE_LIMIT_CONFIGS.default);
+		});
+	});
+
+	describe('extractIdentifier', () => {
+		it('should extract user ID from stremio path', () => {
+			// User IDs are 12 characters
+			expect(extractIdentifier('/api/stremio/6xPzgFqT0tKI/catalog/movie', null)).toBe(
+				'6xPzgFqT0tKI'
+			);
+			expect(extractIdentifier('/api/stremio/abcdef123456/meta/movie/tt123', null)).toBe(
+				'abcdef123456'
+			);
+		});
+
+		it('should extract user ID from stremio-tb path', () => {
+			expect(extractIdentifier('/api/stremio-tb/ZNxmirFYKwK0/catalog/series', null)).toBe(
+				'ZNxmirFYKwK0'
+			);
+		});
+
+		it('should extract user ID from stremio-ad path', () => {
+			expect(extractIdentifier('/api/stremio-ad/OYDJaDP0l5yM/catalog/movie', null)).toBe(
+				'OYDJaDP0l5yM'
+			);
+		});
+
+		it('should fall back to IP when no user ID in path', () => {
+			expect(extractIdentifier('/api/stremio/id', '192.168.1.1')).toBe('192.168.1.1');
+			expect(extractIdentifier('/api/stremio/cast/movie', '10.0.0.1, 192.168.1.1')).toBe(
+				'10.0.0.1'
+			);
+		});
+
+		it('should return "unknown" when no user ID and no IP', () => {
+			expect(extractIdentifier('/api/stremio/id', null)).toBe('unknown');
+			expect(extractIdentifier('/api/stremio/cast/movie', null)).toBe('unknown');
+		});
+	});
+
+	describe('InMemoryRateLimiter', () => {
+		let limiter: InMemoryRateLimiter;
+		const testConfig = { rateLimit: 5, windowSeconds: 60 };
+
+		beforeEach(() => {
+			limiter = new InMemoryRateLimiter();
+		});
+
+		afterEach(() => {
+			limiter.clear();
+		});
+
+		it('should allow requests under the limit', () => {
+			const result1 = limiter.check('user1', testConfig);
+			expect(result1.success).toBe(true);
+			expect(result1.remaining).toBe(4);
+			expect(result1.limit).toBe(5);
+
+			const result2 = limiter.check('user1', testConfig);
+			expect(result2.success).toBe(true);
+			expect(result2.remaining).toBe(3);
+		});
+
+		it('should block requests over the limit', () => {
+			// Use up all requests
+			for (let i = 0; i < 5; i++) {
+				limiter.check('user1', testConfig);
+			}
+
+			const result = limiter.check('user1', testConfig);
+			expect(result.success).toBe(false);
+			expect(result.remaining).toBe(0);
+		});
+
+		it('should track different users independently', () => {
+			// Use up all requests for user1
+			for (let i = 0; i < 5; i++) {
+				limiter.check('user1', testConfig);
+			}
+
+			// user2 should still be allowed
+			const result = limiter.check('user2', testConfig);
+			expect(result.success).toBe(true);
+			expect(result.remaining).toBe(4);
+		});
+
+		it('should track different rate limit configs independently', () => {
+			const streamConfig = RATE_LIMIT_CONFIGS.stream; // 1 req per 5s
+			const defaultConfig = RATE_LIMIT_CONFIGS.default; // 5 req per 1s
+
+			// Use up stream limit
+			limiter.check('user1', streamConfig);
+			expect(limiter.check('user1', streamConfig).success).toBe(false);
+
+			// Default should still work
+			const result = limiter.check('user1', defaultConfig);
+			expect(result.success).toBe(true);
+			expect(result.remaining).toBe(4);
+		});
+
+		it('should reset after window expires', () => {
+			vi.useFakeTimers();
+
+			// Use up all requests
+			for (let i = 0; i < 5; i++) {
+				limiter.check('user1', testConfig);
+			}
+
+			expect(limiter.check('user1', testConfig).success).toBe(false);
+
+			// Advance time past the window
+			vi.advanceTimersByTime(61000);
+
+			const result = limiter.check('user1', testConfig);
+			expect(result.success).toBe(true);
+			expect(result.remaining).toBe(4);
+
+			vi.useRealTimers();
+		});
+
+		it('should include reset timestamp in response', () => {
+			const before = Date.now();
+			const result = limiter.check('user1', testConfig);
+			const after = Date.now();
+
+			expect(result.reset).toBeGreaterThanOrEqual(before + 60000);
+			expect(result.reset).toBeLessThanOrEqual(after + 60000);
+		});
+
+		it('should cleanup old entries', () => {
+			vi.useFakeTimers();
+
+			limiter.check('user1', testConfig);
+			limiter.check('user2', testConfig);
+			expect(limiter.size()).toBe(2);
+
+			// Advance time past the window
+			vi.advanceTimersByTime(61000);
+
+			limiter.cleanup();
+			expect(limiter.size()).toBe(0);
+
+			vi.useRealTimers();
+		});
+	});
+
+	describe('Rate Limit Constants', () => {
+		it('should have correct stream config', () => {
+			expect(RATE_LIMIT_CONFIGS.stream.rateLimit).toBe(1);
+			expect(RATE_LIMIT_CONFIGS.stream.windowSeconds).toBe(5);
+		});
+
+		it('should have correct default config', () => {
+			expect(RATE_LIMIT_CONFIGS.default.rateLimit).toBe(5);
+			expect(RATE_LIMIT_CONFIGS.default.windowSeconds).toBe(1);
+		});
+	});
+
+	describe('Edge Cases', () => {
+		describe('extractIdentifier edge cases', () => {
+			it('should handle paths with special characters after user ID', () => {
+				expect(
+					extractIdentifier(
+						'/api/stremio/abcdef123456/stream/movie/tt:1234567.json',
+						null
+					)
+				).toBe('abcdef123456');
+			});
+
+			it('should handle very long user IDs', () => {
+				const longId = 'a'.repeat(50);
+				expect(extractIdentifier(`/api/stremio/${longId}/catalog/movie`, null)).toBe(
+					longId
+				);
+			});
+
+			it('should handle user IDs with only numbers', () => {
+				expect(extractIdentifier('/api/stremio/123456789012/catalog/movie', null)).toBe(
+					'123456789012'
+				);
+			});
+
+			it('should handle user IDs with only letters', () => {
+				expect(extractIdentifier('/api/stremio/abcdefghijkl/catalog/movie', null)).toBe(
+					'abcdefghijkl'
+				);
+			});
+
+			it('should handle IPv6 addresses as fallback', () => {
+				expect(
+					extractIdentifier('/api/stremio/id', '2001:0db8:85a3:0000:0000:8a2e:0370:7334')
+				).toBe('2001:0db8:85a3:0000:0000:8a2e:0370:7334');
+			});
+
+			it('should handle empty string IP', () => {
+				expect(extractIdentifier('/api/stremio/id', '')).toBe('unknown');
+			});
+
+			it('should handle whitespace-only IP', () => {
+				expect(extractIdentifier('/api/stremio/id', '   ')).toBe('unknown');
+			});
+		});
+
+		describe('getRateLimitConfig edge cases', () => {
+			it('should handle stream path with query parameters', () => {
+				const config = getRateLimitConfig(
+					'/api/stremio/6xPzgFqT0tKI/stream/movie/tt1234567?quality=1080p'
+				);
+				expect(config).toEqual(RATE_LIMIT_CONFIGS.stream);
+			});
+
+			it('should handle nested stream paths', () => {
+				const config = getRateLimitConfig(
+					'/api/stremio/6xPzgFqT0tKI/stream/series/tt1234567/1/1'
+				);
+				expect(config).toEqual(RATE_LIMIT_CONFIGS.stream);
+			});
+
+			it('should not match partial stream in path', () => {
+				// "streaming" should not match "stream/"
+				const config = getRateLimitConfig('/api/stremio/6xPzgFqT0tKI/streaming/movie');
+				expect(config).toEqual(RATE_LIMIT_CONFIGS.default);
+			});
+
+			it('should handle manifest.json paths', () => {
+				const config = getRateLimitConfig('/api/stremio/6xPzgFqT0tKI/manifest.json');
+				expect(config).toEqual(RATE_LIMIT_CONFIGS.default);
+			});
+		});
+
+		describe('shouldRateLimit edge cases', () => {
+			it('should match stremio with trailing content', () => {
+				expect(shouldRateLimit('/api/stremio-something-else')).toBe(true);
+			});
+
+			it('should not match partial stremio prefix', () => {
+				expect(shouldRateLimit('/api/stremi')).toBe(false);
+			});
+
+			it('should match exact /api/stremio', () => {
+				expect(shouldRateLimit('/api/stremio')).toBe(true);
+			});
+		});
+
+		describe('InMemoryRateLimiter edge cases', () => {
+			let limiter: InMemoryRateLimiter;
+
+			beforeEach(() => {
+				limiter = new InMemoryRateLimiter();
+			});
+
+			afterEach(() => {
+				limiter.clear();
+			});
+
+			it('should handle rapid successive requests', () => {
+				const config = { rateLimit: 100, windowSeconds: 1 };
+				const results = [];
+
+				for (let i = 0; i < 150; i++) {
+					results.push(limiter.check('rapid-user', config));
+				}
+
+				const successCount = results.filter((r) => r.success).length;
+				expect(successCount).toBe(100);
+			});
+
+			it('should handle multiple users with different configs simultaneously', () => {
+				const streamConfig = RATE_LIMIT_CONFIGS.stream;
+				const defaultConfig = RATE_LIMIT_CONFIGS.default;
+
+				// User 1 uses stream config
+				limiter.check('user1', streamConfig);
+				expect(limiter.check('user1', streamConfig).success).toBe(false);
+
+				// User 2 uses default config
+				for (let i = 0; i < 5; i++) {
+					expect(limiter.check('user2', defaultConfig).success).toBe(true);
+				}
+				expect(limiter.check('user2', defaultConfig).success).toBe(false);
+
+				// User 1 with default config should still work
+				expect(limiter.check('user1', defaultConfig).success).toBe(true);
+			});
+
+			it('should correctly report remaining count', () => {
+				const config = { rateLimit: 3, windowSeconds: 60 };
+
+				expect(limiter.check('user', config).remaining).toBe(2);
+				expect(limiter.check('user', config).remaining).toBe(1);
+				expect(limiter.check('user', config).remaining).toBe(0);
+				expect(limiter.check('user', config).remaining).toBe(0); // Still 0 after limit
+			});
+
+			it('should handle rate limit of 1', () => {
+				const config = { rateLimit: 1, windowSeconds: 60 };
+				const result1 = limiter.check('user', config);
+				expect(result1.success).toBe(true);
+				expect(result1.remaining).toBe(0);
+
+				const result2 = limiter.check('user', config);
+				expect(result2.success).toBe(false);
+				expect(result2.remaining).toBe(0);
+			});
+
+			it('should handle very short window', () => {
+				vi.useFakeTimers();
+				const config = { rateLimit: 1, windowSeconds: 1 };
+
+				expect(limiter.check('user', config).success).toBe(true);
+				expect(limiter.check('user', config).success).toBe(false);
+
+				vi.advanceTimersByTime(1001);
+
+				expect(limiter.check('user', config).success).toBe(true);
+
+				vi.useRealTimers();
+			});
+		});
+	});
+});
