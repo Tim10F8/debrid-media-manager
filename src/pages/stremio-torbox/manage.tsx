@@ -1,6 +1,6 @@
 import Poster from '@/components/poster';
-import { useRealDebridAccessToken } from '@/hooks/auth';
-import { useCastToken } from '@/hooks/castToken';
+import useLocalStorage from '@/hooks/localStorage';
+import { useTorBoxCastToken } from '@/hooks/torboxCastToken';
 import { withAuth } from '@/utils/withAuth';
 import { Eye, Trash2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -33,9 +33,9 @@ interface MediaMetadata {
 	type: 'movie' | 'show';
 }
 
-export function ManagePage() {
-	const [rdKey] = useRealDebridAccessToken();
-	useCastToken();
+export function TorBoxManagePage() {
+	const [apiKey] = useLocalStorage<string>('tb:apiKey');
+	useTorBoxCastToken();
 	const [groupedLinks, setGroupedLinks] = useState<GroupedLinks>({});
 	const [loading, setLoading] = useState(true);
 	const [selectedLinks, setSelectedLinks] = useState<Set<string>>(new Set());
@@ -54,15 +54,16 @@ export function ManagePage() {
 
 	useEffect(() => {
 		const fetchLinks = async () => {
-			if (!rdKey) {
+			if (!apiKey) {
 				setLoading(false);
 				return;
 			}
 
 			try {
-				const response = await fetch(`/api/stremio/links?token=${rdKey}`);
+				const response = await fetch(`/api/stremio-tb/links?apiKey=${apiKey}`);
 				if (!response.ok) throw new Error('Failed to fetch links');
-				const links = await response.json();
+				const data = await response.json();
+				const links = data.links || [];
 
 				// Group links by imdbId
 				const grouped = links.reduce((acc: GroupedLinks, link: CastedLink) => {
@@ -100,7 +101,7 @@ export function ManagePage() {
 		};
 
 		fetchLinks();
-	}, [rdKey]);
+	}, [apiKey]);
 
 	useEffect(() => {
 		const imdbIdsToFetch = Object.keys(groupedLinks).filter((imdbId) => !mediaInfo[imdbId]);
@@ -117,7 +118,7 @@ export function ManagePage() {
 					const mediaType: MediaMetadata['type'] = isShow ? 'show' : 'movie';
 					try {
 						console.info(
-							`[StremioManage] Fetching metadata for ${imdbId} using ${endpoint}`
+							`[TorBoxStremioManage] Fetching metadata for ${imdbId} using ${endpoint}`
 						);
 						const response = await fetch(`${endpoint}?imdbid=${imdbId}`);
 						if (!response.ok) {
@@ -139,7 +140,7 @@ export function ManagePage() {
 						};
 					} catch (error) {
 						console.error(
-							`[StremioManage] Metadata lookup failed for ${imdbId}:`,
+							`[TorBoxStremioManage] Metadata lookup failed for ${imdbId}:`,
 							error
 						);
 						return {
@@ -186,15 +187,15 @@ export function ManagePage() {
 
 	const handleDelete = async (link: CastedLink) => {
 		try {
-			if (!rdKey) return;
+			if (!apiKey) return;
 
-			const response = await fetch('/api/stremio/deletelink', {
-				method: 'POST',
+			const response = await fetch('/api/stremio-tb/deletelink', {
+				method: 'DELETE',
 				headers: {
 					'Content-Type': 'application/json',
 				},
 				body: JSON.stringify({
-					token: rdKey,
+					apiKey,
 					imdbId: link.imdbId,
 					hash: link.hash,
 				}),
@@ -245,13 +246,13 @@ export function ManagePage() {
 				}
 				if (!link) return;
 
-				const response = await fetch('/api/stremio/deletelink', {
-					method: 'POST',
+				const response = await fetch('/api/stremio-tb/deletelink', {
+					method: 'DELETE',
 					headers: {
 						'Content-Type': 'application/json',
 					},
 					body: JSON.stringify({
-						token: rdKey,
+						apiKey,
 						imdbId: link.imdbId,
 						hash: link.hash,
 					}),
@@ -364,7 +365,7 @@ export function ManagePage() {
 		return null;
 	};
 
-	if (!rdKey) {
+	if (!apiKey) {
 		return (
 			<div className="flex min-h-screen flex-col items-center justify-center bg-gray-900">
 				<h1 className="text-center text-xl text-white">
@@ -377,12 +378,12 @@ export function ManagePage() {
 	return (
 		<div className="flex min-h-screen flex-col items-center bg-gray-900 p-4">
 			<Head>
-				<title>DMM Cast - Manage Casted Links</title>
+				<title>DMM Cast TorBox - Manage Casted Links</title>
 			</Head>
 			<Image
 				width={100}
 				height={100}
-				src="https://static.debridmediamanager.com/greenlogo.jpeg"
+				src="https://static.debridmediamanager.com/dmmcast.png"
 				alt="logo"
 				className="mb-4"
 			/>
@@ -400,7 +401,9 @@ export function ManagePage() {
 			)}
 
 			<div className="mb-6 flex flex-col items-center gap-4">
-				<h1 className="text-xl font-bold text-white">DMM Cast - Manage Casted Links</h1>
+				<h1 className="text-xl font-bold text-white">
+					DMM Cast TorBox - Manage Casted Links
+				</h1>
 			</div>
 
 			{loading ? (
@@ -432,7 +435,7 @@ export function ManagePage() {
 												}
 											}}
 											onChange={() => toggleGroupSelection(imdbId)}
-											className="h-4 w-4 rounded border-gray-300 bg-gray-700 text-green-600 focus:ring-green-500"
+											className="h-4 w-4 rounded border-gray-300 bg-gray-700 text-purple-600 focus:ring-purple-500"
 										/>
 										<span className="text-sm font-medium text-white">
 											Select All
@@ -440,7 +443,7 @@ export function ManagePage() {
 									</label>
 									<Link
 										href={`/x/${imdbId}`}
-										className="haptic-sm rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700"
+										className="haptic-sm rounded bg-purple-600 px-3 py-1 text-sm text-white hover:bg-purple-700"
 										title={`Cast other torrents for ${displayTitle}`}
 										aria-label={`Cast other torrents for ${displayTitle}`}
 									>
@@ -476,11 +479,11 @@ export function ManagePage() {
 														onChange={() =>
 															toggleLinkSelection(link.url)
 														}
-														className="h-4 w-4 rounded border-gray-300 bg-gray-600 text-green-600 focus:ring-green-500"
+														className="h-4 w-4 rounded border-gray-300 bg-gray-600 text-purple-600 focus:ring-purple-500"
 													/>
 													<div className="flex min-w-0 flex-1 flex-col">
 														{episodeLabel && (
-															<span className="text-sm font-medium text-green-300">
+															<span className="text-sm font-medium text-purple-300">
 																{episodeLabel}
 															</span>
 														)}
@@ -517,13 +520,13 @@ export function ManagePage() {
 			)}
 
 			<Link
-				href="/stremio"
+				href="/stremio-torbox"
 				className="haptic-sm mt-6 rounded border-2 border-cyan-500 bg-cyan-900/30 px-4 py-2 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-800/50"
 			>
-				Back to Stremio
+				Back to Stremio TorBox
 			</Link>
 		</div>
 	);
 }
 
-export default dynamic(() => Promise.resolve(withAuth(ManagePage)), { ssr: false });
+export default dynamic(() => Promise.resolve(withAuth(TorBoxManagePage)), { ssr: false });

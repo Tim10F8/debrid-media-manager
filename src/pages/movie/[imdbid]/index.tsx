@@ -29,6 +29,7 @@ import {
 } from '@/utils/settings';
 import { castToastOptions, searchToastOptions } from '@/utils/toastOptions';
 import { generateTokenAndHash } from '@/utils/token';
+import { handleCastMovieTorBox } from '@/utils/torboxCastApiClient';
 import { getMultipleTrackerStats } from '@/utils/trackerStats';
 import { withAuth } from '@/utils/withAuth';
 import axios from 'axios';
@@ -603,6 +604,19 @@ const MovieSearch: FunctionComponent = () => {
 		window.open(`stremio://detail/movie/${imdbid}/${imdbid}`);
 	}
 
+	async function handleCastTorBox(hash: string) {
+		await toast.promise(
+			handleCastMovieTorBox(imdbid as string, torboxKey!, hash),
+			{
+				loading: 'Starting TorBox cast in Stremio...',
+				success: 'Cast started in Stremio',
+				error: 'TorBox cast failed in Stremio',
+			},
+			castToastOptions
+		);
+		window.open(`stremio://detail/movie/${imdbid}/${imdbid}`);
+	}
+
 	const getFirstAvailableRdTorrent = () => {
 		return filteredResults.find((r) => r.rdAvailable && !r.noVideos);
 	};
@@ -834,6 +848,7 @@ const MovieSearch: FunctionComponent = () => {
 						hashAndProgress={hashAndProgress}
 						handleShowInfo={handleShowInfo}
 						handleCast={handleCast}
+						handleCastTorBox={torboxKey ? handleCastTorBox : undefined}
 						handleCopyMagnet={(hash) =>
 							handleCopyOrDownloadMagnet(hash, shouldDownloadMagnets)
 						}

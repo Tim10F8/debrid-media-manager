@@ -86,6 +86,37 @@ model CastProfile {
   otherStreamsLimit Int      @default(5)
 }
 
+// ═══════════════════════════════════════════════════════════════
+// TORBOX CAST TABLES (DMM Cast for TorBox)
+// ═══════════════════════════════════════════════════════════════
+
+// TorBox Cast - stores individual casted content
+model TorBoxCast {
+  id        String   @id @default(uuid())
+  imdbId    String           // IMDB ID (format: tt1234567 or tt1234567:S:E)
+  userId    String           // 12-character hashed user ID (from TorBox email)
+  hash      String           // Torrent hash
+  url       String   @db.Text // Torrent name/filename for display
+  updatedAt DateTime @updatedAt
+  size      BigInt   @default(0)  // File size in MB
+  link      String?  @db.Text     // TorBox permalink URL
+  torrentId Int?             // TorBox torrent ID (for reference)
+  fileId    Int?             // TorBox file ID within torrent
+
+  @@unique([imdbId, userId, hash])
+  @@index([imdbId, userId, updatedAt])
+}
+
+// TorBox Cast Profile - stores user API key and preferences
+model TorBoxCastProfile {
+  userId            String   @id    // 12-character hashed user ID
+  apiKey            String   @db.Text // TorBox API key (stored securely)
+  updatedAt         DateTime @updatedAt
+  movieMaxSize      Float    @default(0)   // Max movie size filter (GB)
+  episodeMaxSize    Float    @default(0)   // Max episode size filter (GB)
+  otherStreamsLimit Int      @default(5)   // Max community streams (0-5)
+}
+
 model Titles {
   imdbid            String  @id
   title             String

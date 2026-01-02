@@ -200,7 +200,7 @@ function IndexPage() {
 					)}
 
 					<div className="flex w-full max-w-md flex-col items-center gap-6">
-						<MainActions rdUser={rdUser} isLoading={isLoading} />
+						<MainActions rdUser={rdUser} tbUser={tbUser} isLoading={isLoading} />
 						{rdUser ? (
 							<Link
 								href="/is-real-debrid-down-or-just-me"

@@ -34,6 +34,7 @@ import {
 } from '@/utils/settings';
 import { castToastOptions, searchToastOptions } from '@/utils/toastOptions';
 import { generateTokenAndHash } from '@/utils/token';
+import { handleCastTvShowTorBox } from '@/utils/torboxCastApiClient';
 import { getMultipleTrackerStats } from '@/utils/trackerStats';
 import { withAuth } from '@/utils/withAuth';
 import axios, { AxiosError } from 'axios';
@@ -682,6 +683,20 @@ const TvSearch: FunctionComponent = () => {
 		window.open(`stremio://detail/series/${imdbid}/${imdbid}:${seasonNum}:1`);
 	}
 
+	async function handleCastTorBox(hash: string, fileIds: string[]) {
+		await toast.promise(
+			handleCastTvShowTorBox(imdbid as string, torboxKey!, hash, fileIds),
+			{
+				loading: `Casting ${fileIds.length} episodes (TorBox)...`,
+				success: 'Casting succeeded.',
+				error: 'Casting failed.',
+			},
+			castToastOptions
+		);
+		// open stremio after casting
+		window.open(`stremio://detail/series/${imdbid}/${imdbid}:${seasonNum}:1`);
+	}
+
 	// Helper function to find the first complete season torrent
 	const getFirstCompleteSeasonTorrent = () => {
 		// Find torrents that have all or most episodes for the season
@@ -1161,6 +1176,7 @@ const TvSearch: FunctionComponent = () => {
 				hashAndProgress={hashAndProgress}
 				handleShowInfo={handleShowInfo}
 				handleCast={handleCast}
+				handleCastTorBox={torboxKey ? handleCastTorBox : undefined}
 				handleCopyMagnet={(hash) => handleCopyOrDownloadMagnet(hash, shouldDownloadMagnets)}
 				checkServiceAvailability={checkServiceAvailability}
 				addRd={addRd}

@@ -122,7 +122,8 @@ AllDebrid uses a nested tree structure for files:
 - Manifest ID: `com.debridmediamanager.cast`
 - Addon Name: "DMM Cast for Real-Debrid"
 - localStorage keys: `rd:*`
-- Color: Purple
+- Color: Green
+- Logo: `https://static.debridmediamanager.com/greenlogo.jpeg`
 
 ### DMM Cast for TorBox
 
@@ -134,7 +135,8 @@ AllDebrid uses a nested tree structure for files:
 - Stream Name: "DMM Cast TB✨"
 - Credit Line: "🎬 DMM Cast TB"
 - localStorage keys: `tb:*`
-- Color: Green
+- Color: Purple
+- Logo: `https://static.debridmediamanager.com/dmmcast.png`
 
 ### DMM Cast for AllDebrid (NEW)
 
@@ -146,7 +148,8 @@ AllDebrid uses a nested tree structure for files:
 - Stream Name: "DMM Cast AD✨"
 - Credit Line: "🎬 DMM Cast AD"
 - localStorage keys: `ad:*`
-- Color: Orange/Amber (AllDebrid brand color)
+- Color: Yellow/Amber
+- Logo: `https://static.debridmediamanager.com/yellowlogo.jpeg`
 
 ---
 
@@ -621,7 +624,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		name: 'DMM Cast for AllDebrid',
 		version: '0.0.1',
 		description: 'Cast torrents from Debrid Media Manager to Stremio using AllDebrid',
-		logo: 'https://static.debridmediamanager.com/dmmcast-alldebrid.png',
+		logo: 'https://static.debridmediamanager.com/yellowlogo.jpeg',
 		resources: [
 			{ name: 'stream', types: ['movie', 'series'], idPrefixes: ['tt'] },
 			{ name: 'meta', types: ['other'], idPrefixes: ['dmm-ad'] },
@@ -833,15 +836,15 @@ export function StremioAllDebridPage() {
 				<Head>
 					<title>Debrid Media Manager - Stremio AllDebrid</title>
 				</Head>
-				<div className="max-w-md rounded-lg border-2 border-orange-500 bg-orange-900/20 p-6 text-center">
-					<AlertTriangle className="mx-auto mb-4 h-12 w-12 text-orange-400" />
-					<h1 className="mb-3 text-2xl font-bold text-orange-400">AllDebrid Required</h1>
+				<div className="max-w-md rounded-lg border-2 border-yellow-500 bg-yellow-900/20 p-6 text-center">
+					<AlertTriangle className="mx-auto mb-4 h-12 w-12 text-yellow-400" />
+					<h1 className="mb-3 text-2xl font-bold text-yellow-400">AllDebrid Required</h1>
 					<p className="mb-4 text-gray-300">
 						You must be logged in with AllDebrid to use this Stremio Cast feature.
 					</p>
 					<Link
 						href="/alldebrid/login"
-						className="haptic-sm inline-block rounded border-2 border-orange-500 bg-orange-800/30 px-6 py-2 font-medium text-orange-100 transition-colors hover:bg-orange-700/50"
+						className="haptic-sm inline-block rounded border-2 border-yellow-500 bg-yellow-800/30 px-6 py-2 font-medium text-yellow-100 transition-colors hover:bg-yellow-700/50"
 					>
 						Login with AllDebrid
 					</Link>
@@ -869,11 +872,11 @@ export function StremioAllDebridPage() {
 			<Image
 				width={200}
 				height={200}
-				src="https://static.debridmediamanager.com/dmmcast-alldebrid.png"
+				src="https://static.debridmediamanager.com/yellowlogo.jpeg"
 				alt="DMM Cast AllDebrid logo"
 				className="mb-4"
 			/>
-			<h1 className="text-2xl font-bold text-orange-400">DMM Cast for AllDebrid</h1>
+			<h1 className="text-2xl font-bold text-yellow-400">DMM Cast for AllDebrid</h1>
 
 			<div className="flex flex-col items-center text-white">
 				<strong>Cast from any device to Stremio</strong>
@@ -885,16 +888,16 @@ export function StremioAllDebridPage() {
 								/^https?:\/\//,
 								''
 							)}/api/stremio-ad/${dmmCastToken}/manifest.json`}
-							className="text-md haptic-sm m-1 rounded border-2 border-orange-500 bg-orange-800/30 px-4 py-2 font-medium text-gray-100 transition-colors hover:bg-orange-700/50"
+							className="text-md haptic-sm m-1 rounded border-2 border-yellow-500 bg-yellow-800/30 px-4 py-2 font-medium text-gray-100 transition-colors hover:bg-yellow-700/50"
 						>
-							<Wand2 className="mr-1 inline-block h-4 w-4 text-orange-400" />
+							<Wand2 className="mr-1 inline-block h-4 w-4 text-yellow-400" />
 							Install
 						</Link>
 						<Link
 							href={`https://web.stremio.com/#/addons?addon=${encodeURIComponent(
 								`${window.location.origin}/api/stremio-ad/${dmmCastToken}/manifest.json`
 							)}`}
-							className="text-md haptic-sm m-1 rounded border-2 border-orange-500 bg-orange-800/30 px-4 py-2 font-medium text-gray-100 transition-colors hover:bg-orange-700/50"
+							className="text-md haptic-sm m-1 rounded border-2 border-yellow-500 bg-yellow-800/30 px-4 py-2 font-medium text-gray-100 transition-colors hover:bg-yellow-700/50"
 							target="_blank"
 							rel="noopener noreferrer"
 						>
@@ -919,7 +922,7 @@ export function StremioAllDebridPage() {
 					<div>1. Choose a Movie or TV Show to watch in DMM</div>
 					<div>
 						2. Select a Torrent &gt; click "
-						<Eye className="inline-block h-3 w-3 text-orange-400" /> Look Inside" &gt;
+						<Eye className="inline-block h-3 w-3 text-yellow-400" /> Look Inside" &gt;
 						click "Cast (AD)"
 					</div>
 					<div>3. Open the *same* Movie or TV Show in Stremio</div>
@@ -932,11 +935,11 @@ export function StremioAllDebridPage() {
 					</div>
 				</div>
 
-				<div className="mt-6 rounded-lg border border-orange-500/30 bg-orange-900/20 p-4 text-sm text-gray-300">
-					<p className="mb-2 font-semibold text-orange-400">💡 Tip:</p>
+				<div className="mt-6 rounded-lg border border-yellow-500/30 bg-yellow-900/20 p-4 text-sm text-gray-300">
+					<p className="mb-2 font-semibold text-yellow-400">💡 Tip:</p>
 					<p>
 						You can control the maximum file size for streams in the{' '}
-						<Link href="/settings" className="text-orange-400 hover:underline">
+						<Link href="/settings" className="text-yellow-400 hover:underline">
 							Settings page
 						</Link>
 						.
@@ -948,7 +951,7 @@ export function StremioAllDebridPage() {
 				{dmmCastToken !== 'default' && (
 					<Link
 						href="/stremio-alldebrid/manage"
-						className="haptic-sm rounded border-2 border-orange-500 bg-orange-800/30 px-4 py-2 text-sm font-medium text-orange-100 transition-colors hover:bg-orange-700/50"
+						className="haptic-sm rounded border-2 border-yellow-500 bg-yellow-800/30 px-4 py-2 text-sm font-medium text-yellow-100 transition-colors hover:bg-yellow-700/50"
 					>
 						<span className="inline-flex items-center">
 							<ClipboardList className="mr-1 h-4 w-4" />
@@ -1020,12 +1023,12 @@ export default function AllDebridLoginPage() {
 
 	return (
 		<div className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
-			<h1 className="mb-8 text-3xl font-bold text-orange-400">Login with AllDebrid</h1>
+			<h1 className="mb-8 text-3xl font-bold text-yellow-400">Login with AllDebrid</h1>
 
 			{!pinState && !isPolling && (
 				<button
 					onClick={handleStartAuth}
-					className="rounded bg-orange-600 px-6 py-3 text-lg font-semibold text-white hover:bg-orange-700"
+					className="rounded bg-yellow-600 px-6 py-3 text-lg font-semibold text-white hover:bg-yellow-700"
 				>
 					Start Authentication
 				</button>
@@ -1035,7 +1038,7 @@ export default function AllDebridLoginPage() {
 				<div className="text-center">
 					<p className="mb-4 text-gray-300">Visit the link below and enter this PIN:</p>
 					<div className="mb-4 rounded bg-gray-800 p-4">
-						<span className="font-mono text-4xl font-bold text-orange-400">
+						<span className="font-mono text-4xl font-bold text-yellow-400">
 							{pinState.pin}
 						</span>
 					</div>
@@ -1043,7 +1046,7 @@ export default function AllDebridLoginPage() {
 						href={pinState.userUrl}
 						target="_blank"
 						rel="noopener noreferrer"
-						className="mb-4 block text-orange-400 hover:underline"
+						className="mb-4 block text-yellow-400 hover:underline"
 					>
 						{pinState.userUrl}
 					</a>
@@ -1182,7 +1185,7 @@ Add a third "Cast (AD)" button:
 	hasAllDebridCredentials && (
 		<button
 			onClick={() => handleCastMovieAllDebrid(imdbId, apiKey, hash)}
-			className="rounded bg-orange-600 px-3 py-1 text-sm text-white hover:bg-orange-700"
+			className="rounded bg-yellow-600 px-3 py-1 text-sm text-white hover:bg-yellow-700"
 		>
 			<Cast className="mr-1 inline h-4 w-4" />
 			Cast (AD) {/* Button label - short form */}
@@ -1313,15 +1316,140 @@ AllDebrid allows 12 req/sec and 600 req/min - more generous than TorBox (5 req/s
 
 ### Color Scheme
 
-- **Real-Debrid**: Purple (`purple-500`, `purple-800`)
-- **TorBox**: Green (`green-500`, `green-800`)
-- **AllDebrid**: Orange/Amber (`orange-500`, `orange-800`, `amber-400`)
+- **Real-Debrid**: Green (`green-500`, `green-800`)
+- **TorBox**: Purple (`purple-500`, `purple-800`)
+- **AllDebrid**: Yellow/Amber (`yellow-500`, `yellow-800`, `amber-400`)
 
 ### Icons & Logos
 
-- Create new logo: `dmmcast-alldebrid.png`
-- Use orange cast icon for AllDebrid buttons
+- Logo: `https://static.debridmediamanager.com/yellowlogo.jpeg` (already uploaded to R2)
+- Use yellow cast icon for AllDebrid buttons
 - AllDebrid branding in addon manifest
+
+### MainActions Component Update
+
+**Modify:** `src/components/MainActions.tsx`
+
+Add AllDebrid user prop and Stremio button:
+
+```tsx
+import { RealDebridUser } from '@/hooks/auth';
+import { TorBoxUser, AllDebridUser } from '@/services/types';
+import { BookOpen, Rocket, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+
+interface MainActionsProps {
+	rdUser: RealDebridUser | null;
+	tbUser: TorBoxUser | null;
+	adUser: AllDebridUser | null; // NEW
+	isLoading: boolean;
+}
+
+export function MainActions({ rdUser, tbUser, adUser, isLoading }: MainActionsProps) {
+	// Count how many debrid services are logged in
+	const loggedInServices = [rdUser, tbUser, adUser].filter(Boolean).length;
+
+	return (
+		<div className="grid w-full grid-cols-3 gap-3">
+			{/* Library and Hash lists buttons... */}
+
+			{/* Single service logged in - full button */}
+			{loggedInServices === 1 && rdUser && (
+				<Link href="/stremio" className="...border-green-500 bg-green-900/30...">
+					<Sparkles className="...text-green-400" /> Stremio
+				</Link>
+			)}
+			{loggedInServices === 1 && tbUser && (
+				<Link href="/stremio-torbox" className="...border-purple-500 bg-purple-900/30...">
+					<Sparkles className="...text-purple-400" /> Stremio
+				</Link>
+			)}
+			{loggedInServices === 1 && adUser && (
+				<Link
+					href="/stremio-alldebrid"
+					className="...border-yellow-500 bg-yellow-900/30..."
+				>
+					<Sparkles className="...text-yellow-400" /> Stremio
+				</Link>
+			)}
+
+			{/* Two services - show both as compact buttons */}
+			{loggedInServices === 2 && (
+				<div className="flex gap-1">
+					{rdUser && (
+						<Link
+							href="/stremio"
+							className="...border-green-500..."
+							title="DMM Cast for Real-Debrid"
+						>
+							<Sparkles className="...text-green-400" />
+							<span className="text-xs">RD</span>
+						</Link>
+					)}
+					{tbUser && (
+						<Link
+							href="/stremio-torbox"
+							className="...border-purple-500..."
+							title="DMM Cast for TorBox"
+						>
+							<Sparkles className="...text-purple-400" />
+							<span className="text-xs">TB</span>
+						</Link>
+					)}
+					{adUser && (
+						<Link
+							href="/stremio-alldebrid"
+							className="...border-yellow-500..."
+							title="DMM Cast for AllDebrid"
+						>
+							<Sparkles className="...text-yellow-400" />
+							<span className="text-xs">AD</span>
+						</Link>
+					)}
+				</div>
+			)}
+
+			{/* Three services - show all as compact buttons */}
+			{loggedInServices === 3 && (
+				<div className="flex gap-1">
+					<Link
+						href="/stremio"
+						className="...border-green-500..."
+						title="DMM Cast for Real-Debrid"
+					>
+						<Sparkles className="...text-green-400" />
+						<span className="text-xs">RD</span>
+					</Link>
+					<Link
+						href="/stremio-torbox"
+						className="...border-purple-500..."
+						title="DMM Cast for TorBox"
+					>
+						<Sparkles className="...text-purple-400" />
+						<span className="text-xs">TB</span>
+					</Link>
+					<Link
+						href="/stremio-alldebrid"
+						className="...border-yellow-500..."
+						title="DMM Cast for AllDebrid"
+					>
+						<Sparkles className="...text-yellow-400" />
+						<span className="text-xs">AD</span>
+					</Link>
+				</div>
+			)}
+		</div>
+	);
+}
+```
+
+**Modify:** `src/pages/index.tsx`
+
+Pass `adUser` prop to MainActions:
+
+```tsx
+<MainActions rdUser={rdUser} tbUser={tbUser} adUser={adUser} isLoading={isLoading} />
+```
 
 ---
 
@@ -1369,7 +1497,7 @@ This plan creates a complete "DMM Cast for AllDebrid" feature that:
     - PIN authentication flow
     - Link expiration considerations
 
-5. **Provides Clear Branding**: Distinct orange theme to differentiate from RD (purple) and TorBox (green)
+5. **Provides Clear Branding**: Distinct yellow theme to differentiate from RD (green) and TorBox (purple)
 
 6. **Enables Multi-Provider Use**: Users can install all three addons (RD, TorBox, AllDebrid) simultaneously in Stremio
 

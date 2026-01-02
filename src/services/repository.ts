@@ -11,6 +11,7 @@ import {
 	ScrapedService,
 	SearchService,
 	StreamHealthService,
+	TorBoxCastService,
 	TorrentSnapshotService,
 	ZurgKeysService,
 } from './database';
@@ -26,6 +27,7 @@ export type RepositoryDependencies = Partial<{
 	searchService: SearchService;
 	animeService: AnimeService;
 	castService: CastService;
+	torboxCastService: TorBoxCastService;
 	reportService: ReportService;
 	torrentSnapshotService: TorrentSnapshotService;
 	hashSearchService: HashSearchService;
@@ -42,6 +44,7 @@ export class Repository {
 	private searchService: SearchService;
 	private animeService: AnimeService;
 	private castService: CastService;
+	private torboxCastService: TorBoxCastService;
 	private reportService: ReportService;
 	private torrentSnapshotService: TorrentSnapshotService;
 	private hashSearchService: HashSearchService;
@@ -57,6 +60,7 @@ export class Repository {
 		searchService,
 		animeService,
 		castService,
+		torboxCastService,
 		reportService,
 		torrentSnapshotService,
 		hashSearchService,
@@ -71,6 +75,7 @@ export class Repository {
 		this.searchService = searchService ?? new SearchService();
 		this.animeService = animeService ?? new AnimeService();
 		this.castService = castService ?? new CastService();
+		this.torboxCastService = torboxCastService ?? new TorBoxCastService();
 		this.reportService = reportService ?? new ReportService();
 		this.torrentSnapshotService = torrentSnapshotService ?? new TorrentSnapshotService();
 		this.hashSearchService = hashSearchService ?? new HashSearchService();
@@ -90,6 +95,7 @@ export class Repository {
 			this.searchService.disconnect(),
 			this.animeService.disconnect(),
 			this.castService.disconnect(),
+			this.torboxCastService.disconnect(),
 			this.reportService.disconnect(),
 			this.torrentSnapshotService.disconnect(),
 			this.hashSearchService.disconnect(),
@@ -342,6 +348,89 @@ export class Repository {
 
 	public getOtherStreams(imdbId: string, userId: string, limit?: number, maxSize?: number) {
 		return this.castService.getOtherStreams(imdbId, userId, limit, maxSize);
+	}
+
+	// TorBox Cast Service Methods
+	public saveTorBoxCastProfile(
+		userId: string,
+		apiKey: string,
+		movieMaxSize?: number,
+		episodeMaxSize?: number,
+		otherStreamsLimit?: number
+	) {
+		return this.torboxCastService.saveCastProfile(
+			userId,
+			apiKey,
+			movieMaxSize,
+			episodeMaxSize,
+			otherStreamsLimit
+		);
+	}
+
+	public getTorBoxLatestCast(imdbId: string, userId: string) {
+		return this.torboxCastService.getLatestCast(imdbId, userId);
+	}
+
+	public getTorBoxCastURLs(imdbId: string, userId: string) {
+		return this.torboxCastService.getCastURLs(imdbId, userId);
+	}
+
+	public getTorBoxOtherCastURLs(imdbId: string, userId: string) {
+		return this.torboxCastService.getOtherCastURLs(imdbId, userId);
+	}
+
+	public getTorBoxCastProfile(userId: string) {
+		return this.torboxCastService.getCastProfile(userId);
+	}
+
+	public saveTorBoxCast(
+		imdbId: string,
+		userId: string,
+		hash: string,
+		url: string,
+		tbLink: string,
+		fileSize: number,
+		torrentId?: number,
+		fileId?: number
+	) {
+		return this.torboxCastService.saveCast(
+			imdbId,
+			userId,
+			hash,
+			url,
+			tbLink,
+			fileSize,
+			torrentId,
+			fileId
+		);
+	}
+
+	public fetchTorBoxCastedMovies(userId: string) {
+		return this.torboxCastService.fetchCastedMovies(userId);
+	}
+
+	public fetchTorBoxCastedShows(userId: string) {
+		return this.torboxCastService.fetchCastedShows(userId);
+	}
+
+	public fetchAllTorBoxCastedLinks(userId: string) {
+		return this.torboxCastService.fetchAllCastedLinks(userId);
+	}
+
+	public deleteTorBoxCastedLink(imdbId: string, userId: string, hash: string) {
+		return this.torboxCastService.deleteCastedLink(imdbId, userId, hash);
+	}
+
+	public getAllTorBoxUserCasts(userId: string) {
+		return this.torboxCastService.getAllUserCasts(userId);
+	}
+
+	public getTorBoxUserCastStreams(imdbId: string, userId: string, limit?: number) {
+		return this.torboxCastService.getUserCastStreams(imdbId, userId, limit);
+	}
+
+	public getTorBoxOtherStreams(imdbId: string, userId: string, limit?: number, maxSize?: number) {
+		return this.torboxCastService.getOtherStreams(imdbId, userId, limit, maxSize);
 	}
 
 	// Torrent Snapshot Methods

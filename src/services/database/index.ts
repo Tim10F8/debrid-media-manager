@@ -9,6 +9,7 @@ import { ReportService } from './report';
 import { ScrapedService } from './scraped';
 import { SearchService } from './search';
 import { StreamHealthService } from './streamHealth';
+import { TorBoxCastService } from './torboxCast';
 import { TorrentSnapshotService } from './torrentSnapshot';
 import { ZurgKeysService } from './zurgKeys';
 
@@ -24,6 +25,7 @@ export {
 	ScrapedService,
 	SearchService,
 	StreamHealthService,
+	TorBoxCastService,
 	TorrentSnapshotService,
 	ZurgKeysService,
 };

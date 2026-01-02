@@ -237,7 +237,8 @@ export function formatStremioStreamTitle(
 	filename: string,
 	size: number,
 	metadata: StreamMetadata | null,
-	isUserCast: boolean
+	isUserCast: boolean,
+	provider: 'RD' | 'TB' = 'RD'
 ): string {
 	let displayFilename = decodeURIComponent(filename);
 	if (displayFilename.length > 60) {
@@ -264,7 +265,7 @@ export function formatStremioStreamTitle(
 		audioParts.push(languageFlags);
 	}
 
-	const creditLine = isUserCast ? '🎬 DMM Cast RD (Yours)' : '🎬 DMM Cast RD';
+	const creditLine = isUserCast ? `🎬 DMM Cast ${provider} (Yours)` : `🎬 DMM Cast ${provider}`;
 
 	const line2 = audioParts.length > 0 ? audioParts.join(' • ') : '';
 

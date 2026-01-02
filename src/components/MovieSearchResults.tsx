@@ -26,6 +26,7 @@ type MovieSearchResultsProps = {
 	hashAndProgress: Record<string, number>;
 	handleShowInfo: (result: SearchResult) => void;
 	handleCast: (hash: string) => Promise<void>;
+	handleCastTorBox?: (hash: string) => Promise<void>;
 	handleCopyMagnet: (hash: string) => void;
 	checkServiceAvailability: (
 		result: SearchResult,
@@ -52,6 +53,7 @@ const MovieSearchResults = ({
 	hashAndProgress,
 	handleShowInfo,
 	handleCast,
+	handleCastTorBox,
 	handleCopyMagnet,
 	checkServiceAvailability,
 	addRd,
@@ -65,6 +67,7 @@ const MovieSearchResults = ({
 }: MovieSearchResultsProps) => {
 	const [loadingHashes, setLoadingHashes] = useState<Set<string>>(new Set());
 	const [castingHashes, setCastingHashes] = useState<Set<string>>(new Set());
+	const [castingTbHashes, setCastingTbHashes] = useState<Set<string>>(new Set());
 	const [checkingHashes, setCheckingHashes] = useState<Map<string, string>>(new Map());
 	const [downloadMagnets, setDownloadMagnets] = useState(false);
 
@@ -194,6 +197,20 @@ const MovieSearchResults = ({
 		}
 	};
 
+	const handleCastTorBoxWithLoading = async (hash: string) => {
+		if (!handleCastTorBox || castingTbHashes.has(hash)) return;
+		setCastingTbHashes((prev) => new Set(prev).add(hash));
+		try {
+			await handleCastTorBox(hash);
+		} finally {
+			setCastingTbHashes((prev) => {
+				const newSet = new Set(prev);
+				newSet.delete(hash);
+				return newSet;
+			});
+		}
+	};
+
 	const handleCheckWithLoading = async (result: SearchResult, services?: DebridService[]) => {
 		if (checkingHashes.has(result.hash)) return;
 		const label = resolveServiceLabel(services);
@@ -273,6 +290,7 @@ const MovieSearchResults = ({
 				const tbColor = btnColor(r.tbAvailable, r.noVideos);
 				const isLoading = loadingHashes.has(r.hash);
 				const isCasting = castingHashes.has(r.hash);
+				const isCastingTb = castingTbHashes.has(r.hash);
 				const checkingLabel = checkingHashes.get(r.hash);
 
 				return (
@@ -463,6 +481,27 @@ const MovieSearchResults = ({
 											<span className="inline-flex items-center">
 												<Cast className="mr-1 h-3 w-3 text-gray-500" />
 												Cast
+											</span>
+										)}
+									</button>
+								)}
+
+								{/* Cast (TB) btn */}
+								{torboxKey && handleCastTorBox && (
+									<button
+										className={`haptic-sm inline rounded border-2 border-purple-500 bg-purple-900/30 px-1 text-xs text-purple-100 transition-colors hover:bg-purple-800/50 ${isCastingTb ? 'cursor-not-allowed opacity-50' : ''}`}
+										onClick={() => handleCastTorBoxWithLoading(r.hash)}
+										disabled={isCastingTb}
+									>
+										{isCastingTb ? (
+											<>
+												<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
+												Casting...
+											</>
+										) : (
+											<span className="inline-flex items-center">
+												<Cast className="mr-1 h-3 w-3 text-purple-400" />
+												Cast (TB)
 											</span>
 										)}
 									</button>
