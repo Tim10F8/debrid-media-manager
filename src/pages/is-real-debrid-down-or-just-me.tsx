@@ -270,11 +270,42 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 								</a>{' '}
 								to search, download, and manage your library.
 							</p>
+
+							<div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-6">
+								<div className="flex flex-col gap-4">
+									<div>
+										<h3 className="text-lg font-medium text-white">
+											About this data
+										</h3>
+										<p className="mt-2 text-sm text-slate-400">
+											This dashboard monitors Real-Debrid stream server and
+											Torrentio availability via automated health checks that
+											run every 5 minutes.
+										</p>
+									</div>
+
+									<div className="flex flex-col gap-2 rounded-lg bg-black/20 p-4 text-sm">
+										<div className="flex items-center gap-2 text-slate-300">
+											<span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+											<span>
+												<strong>Is it just you?</strong> Check your internet
+												connection first.
+											</span>
+										</div>
+										<p className="pl-4 text-xs text-slate-500">
+											If Real-Debrid is down for everyone, you will see
+											failure here. If this page says &quot;Operational&quot;
+											but you can&apos;t connect, the issue might be your ISP
+											or local network.
+										</p>
+									</div>
+								</div>
+							</div>
 						</div>
 					</header>
 
 					{/* Stream Health & Info */}
-					<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+					<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 						<div
 							data-testid="working-stream-card"
 							className="rounded-xl border border-white/10 bg-white/5 p-6"
@@ -510,37 +541,6 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 											DMM Cast
 										</Link>{' '}
 										- our Stremio addon for Real-Debrid
-									</p>
-								</div>
-							</div>
-						</div>
-
-						<div className="rounded-xl border border-white/10 bg-white/5 p-6 md:col-span-2 lg:col-span-1">
-							<div className="flex h-full flex-col justify-center gap-4">
-								<div>
-									<h3 className="text-lg font-medium text-white">
-										About this data
-									</h3>
-									<p className="mt-2 text-sm text-slate-400">
-										This dashboard monitors Real-Debrid stream server and
-										Torrentio availability via automated health checks that run
-										every 5 minutes.
-									</p>
-								</div>
-
-								<div className="flex flex-col gap-2 rounded-lg bg-black/20 p-4 text-sm">
-									<div className="flex items-center gap-2 text-slate-300">
-										<span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>
-										<span>
-											<strong>Is it just you?</strong> Check your internet
-											connection first.
-										</span>
-									</div>
-									<p className="pl-4 text-xs text-slate-500">
-										If Real-Debrid is down for everyone, you will see failure
-										here. If this page says &quot;Operational&quot; but you
-										can&apos;t connect, the issue might be your ISP or local
-										network.
 									</p>
 								</div>
 							</div>
