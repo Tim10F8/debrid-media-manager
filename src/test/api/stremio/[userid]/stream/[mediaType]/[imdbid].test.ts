@@ -183,7 +183,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 			streams: Array<{ name: string; title: string; url?: string; externalUrl?: string }>;
 		};
 		expect(payload.streams).toHaveLength(3);
-		const userStream = payload.streams.find((s) => s.title.includes('🎬 DMM Cast (Yours)'));
+		const userStream = payload.streams.find((s) => s.title.includes('🎬 DMM Cast RD (Yours)'));
 		expect(userStream).toBeDefined();
 		expect(mockRepository.getOtherStreams).toHaveBeenCalledWith(
 			'tt7654321:2:3',
@@ -356,7 +356,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 		expect(stream?.title).toContain('DD+');
 		expect(stream?.title).toContain(languageEmojis.eng);
 		expect(stream?.title).toContain(languageEmojis.jpn);
-		expect(stream?.title).toContain('🎬 DMM Cast (Yours)');
+		expect(stream?.title).toContain('🎬 DMM Cast RD (Yours)');
 	});
 
 	it('handles missing snapshots gracefully', async () => {
@@ -398,7 +398,7 @@ describe('/api/stremio/[userid]/stream/[mediaType]/[imdbid]', () => {
 
 		const stream = payload.streams.find((s) => s.title.includes('Movie.mkv'));
 		expect(stream).toBeDefined();
-		expect(stream?.title).toContain('🎬 DMM Cast (Yours)');
+		expect(stream?.title).toContain('🎬 DMM Cast RD (Yours)');
 	});
 
 	it('fetches snapshots for unique hashes only', async () => {

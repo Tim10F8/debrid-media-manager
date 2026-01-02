@@ -313,7 +313,7 @@ describe('formatStremioStreamTitle', () => {
 		expect(lines[1]).toContain('DD+ 5.1');
 		expect(lines[1]).toContain(languageEmojis.eng);
 		expect(lines[1]).toContain(languageEmojis.jpn);
-		expect(lines[2]).toBe('🎬 DMM Cast (Yours)');
+		expect(lines[2]).toBe('🎬 DMM Cast RD (Yours)');
 	});
 
 	it('formats title for other user cast with metadata', () => {
@@ -331,7 +331,7 @@ describe('formatStremioStreamTitle', () => {
 		expect(lines[0]).toBe('movie.mkv');
 		expect(lines[1]).toContain('AAC 2.0');
 		expect(lines[1]).toContain(languageEmojis.eng);
-		expect(lines[2]).toBe('🎬 DMM Cast');
+		expect(lines[2]).toBe('🎬 DMM Cast RD');
 	});
 
 	it('formats title without metadata for user cast', () => {
@@ -339,7 +339,7 @@ describe('formatStremioStreamTitle', () => {
 		const lines = result.split('\n');
 		expect(lines.length).toBe(2);
 		expect(lines[0]).toBe('movie.mkv');
-		expect(lines[1]).toBe('🎬 DMM Cast (Yours)');
+		expect(lines[1]).toBe('🎬 DMM Cast RD (Yours)');
 	});
 
 	it('formats title without metadata for other user', () => {
@@ -347,7 +347,7 @@ describe('formatStremioStreamTitle', () => {
 		const lines = result.split('\n');
 		expect(lines.length).toBe(2);
 		expect(lines[0]).toBe('movie.mkv');
-		expect(lines[1]).toBe('🎬 DMM Cast');
+		expect(lines[1]).toBe('🎬 DMM Cast RD');
 	});
 
 	it('splits long filenames', () => {

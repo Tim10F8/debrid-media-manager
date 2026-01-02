@@ -13,7 +13,7 @@ describe('/api/stremio/[userid]/manifest.json', () => {
 		expect(res.json).toHaveBeenCalledWith(
 			expect.objectContaining({
 				id: 'com.debridmediamanager.cast',
-				name: 'DMM Cast',
+				name: 'DMM Cast for Real-Debrid',
 				catalogs: expect.arrayContaining([
 					expect.objectContaining({ id: 'casted-movies' }),
 				]),
