@@ -86,7 +86,7 @@ export async function getDMMTorrent(userid: string, torrentID: string, token: st
 			meta: {
 				id: `dmm:${torrentID}`,
 				type: 'other',
-				name: `DMM: ${info.original_filename} - ${(info.original_bytes / 1024 / 1024 / 1024).toFixed(2)} GB`,
+				name: `DMM RD: ${info.original_filename} - ${(info.original_bytes / 1024 / 1024 / 1024).toFixed(2)} GB`,
 				videos,
 			},
 			cacheMaxAge: 0,

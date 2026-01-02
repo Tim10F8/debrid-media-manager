@@ -34,7 +34,7 @@ export function StremioPage() {
 		return (
 			<div className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
 				<Head>
-					<title>Debrid Media Manager - Stremio</title>
+					<title>DMM Cast for Real-Debrid - Stremio</title>
 				</Head>
 				<div className="max-w-md rounded-lg border-2 border-red-500 bg-red-900/20 p-6 text-center">
 					<AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-400" />
@@ -66,7 +66,7 @@ export function StremioPage() {
 	return (
 		<div className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
 			<Head>
-				<title>Debrid Media Manager - Stremio</title>
+				<title>DMM Cast for Real-Debrid - Stremio</title>
 			</Head>
 
 			<Image
@@ -76,7 +76,7 @@ export function StremioPage() {
 				alt="logo"
 				className="mb-4"
 			/>
-			<h1 className="mb-4 text-2xl font-bold text-purple-400">DMM Cast</h1>
+			<h1 className="mb-4 text-2xl font-bold text-purple-400">DMM Cast for Real-Debrid</h1>
 			<div className="flex flex-col items-center text-white">
 				<strong>Cast from any device to Stremio</strong>
 

@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				{
 					id: 'dmm-update-required',
 					type: 'movie',
-					name: '⚠️ DMM Cast Update Required',
+					name: '⚠️ DMM Cast RD Update Required',
 					description:
 						'Please reinstall the addon from https://debridmediamanager.com/stremio',
 					poster: 'https://static.debridmediamanager.com/dmmcast.png',

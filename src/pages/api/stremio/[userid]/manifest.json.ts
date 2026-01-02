@@ -4,9 +4,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	res.setHeader('access-control-allow-origin', '*');
 	res.status(200).json({
 		id: 'com.debridmediamanager.cast',
-		name: 'DMM Cast',
+		name: 'DMM Cast for Real-Debrid',
 		description:
-			'Cast your preferred Debrid Media Manager streams to your Stremio device; supports Anime, TV shows and Movies!',
+			'Cast your preferred Debrid Media Manager streams to your Stremio device using Real-Debrid; supports Anime, TV shows and Movies!',
 		logo: 'https://static.debridmediamanager.com/dmmcast.png',
 		background: 'https://static.debridmediamanager.com/background.png',
 		version: '0.0.5',
@@ -26,17 +26,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		catalogs: [
 			{
 				id: 'casted-movies',
-				name: 'DMM Casted Movies',
+				name: 'DMM RD Movies',
 				type: 'movie',
 			},
 			{
 				id: 'casted-shows',
-				name: 'DMM Casted TV Shows',
+				name: 'DMM RD TV Shows',
 				type: 'series',
 			},
 			{
 				id: 'casted-other',
-				name: 'DMM Library',
+				name: 'DMM RD Library',
 				type: 'other',
 				extra: [{ name: 'skip' }],
 			},

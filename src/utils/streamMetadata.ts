@@ -264,7 +264,7 @@ export function formatStremioStreamTitle(
 		audioParts.push(languageFlags);
 	}
 
-	const creditLine = isUserCast ? '🎬 DMM Cast (Yours)' : '🎬 DMM Cast';
+	const creditLine = isUserCast ? '🎬 DMM Cast RD (Yours)' : '🎬 DMM Cast RD';
 
 	const line2 = audioParts.length > 0 ? audioParts.join(' • ') : '';
 

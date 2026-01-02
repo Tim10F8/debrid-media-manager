@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			streams: [
 				{
 					name: '⚠️ Update Required',
-					title: 'DMM Cast security update required\n\n1. Visit https://debridmediamanager.com/stremio\n2. Reinstall the addon\n3. Your casted content will be preserved',
+					title: 'DMM Cast RD security update required\n\n1. Visit https://debridmediamanager.com/stremio\n2. Reinstall the addon\n3. Your casted content will be preserved',
 					externalUrl: 'https://debridmediamanager.com/stremio',
 				},
 			],
@@ -67,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 	const streams = [
 		{
-			name: 'DMM Cast✨',
+			name: 'DMM Cast RD✨',
 			title: 'Cast a file inside a torrent',
 			externalUrl,
 			behaviorHints: {

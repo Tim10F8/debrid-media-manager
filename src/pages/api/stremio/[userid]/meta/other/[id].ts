@@ -38,9 +38,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				meta: {
 					id: id,
 					type: 'other',
-					name: '⚠️ DMM Cast Update Required',
+					name: '⚠️ DMM Cast RD Update Required',
 					description:
-						'Your DMM Cast addon needs to be reinstalled for improved security.\n\nPlease visit https://debridmediamanager.com/stremio to get your new install link.\n\nThis update provides better security with longer tokens.',
+						'Your DMM Cast for Real-Debrid addon needs to be reinstalled for improved security.\n\nPlease visit https://debridmediamanager.com/stremio to get your new install link.\n\nThis update provides better security with longer tokens.',
 					poster: 'https://static.debridmediamanager.com/dmmcast.png',
 					background: 'https://static.debridmediamanager.com/background.png',
 				},
