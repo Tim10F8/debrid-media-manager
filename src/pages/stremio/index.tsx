@@ -4,11 +4,9 @@ import {
 	AlertTriangle,
 	Cast,
 	ClipboardList,
-	Eye,
-	FileText,
+	EyeOff,
 	Globe,
 	Popcorn,
-	Sparkles,
 	Wand2,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -114,28 +112,46 @@ export function StremioPage() {
 						<code className="mt-2 block w-full break-all rounded bg-gray-800 p-2 text-sm text-gray-300">
 							{window.location.origin}/api/stremio/{dmmCastToken}/manifest.json
 						</code>
+
+						{/* No Catalog Version */}
+						<div className="mt-4 border-t border-gray-700 pt-4">
+							<div className="mb-2 flex items-center justify-center text-sm text-gray-400">
+								<EyeOff className="mr-1 h-3 w-3" />
+								No Catalog Version (hides library from Stremio home)
+							</div>
+							<Link
+								href={`stremio://${window.location.origin.replace(
+									/^https?:\/\//,
+									''
+								)}/api/stremio/${dmmCastToken}/manifest-no-catalog.json`}
+								className="haptic-sm m-1 rounded border border-gray-600 bg-gray-800/50 px-3 py-1 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700/50"
+							>
+								<Wand2 className="mr-1 inline-block h-3 w-3 text-gray-400" />
+								Install
+							</Link>
+							<Link
+								href={`https://web.stremio.com/#/addons?addon=${encodeURIComponent(
+									`${window.location.origin}/api/stremio/${dmmCastToken}/manifest-no-catalog.json`
+								)}`}
+								className="haptic-sm m-1 rounded border border-gray-600 bg-gray-800/50 px-3 py-1 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700/50"
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<Globe className="mr-1 inline-block h-3 w-3 text-gray-400" />
+								Install (web)
+							</Link>
+						</div>
 					</div>
 				)}
 
 				<div className="space-y-2 text-gray-300">
-					<div>1. Choose a Movie or TV Show to watch in DMM</div>
+					<div>1. Choose a Movie or TV Show in DMM</div>
 					<div>
-						2. Select a Torrent &gt; click &quot;
-						<Eye className="inline-block h-3 w-3 text-green-400" /> Look Inside&quot;
-						&gt; click &quot;Cast{' '}
-						<Cast className="inline-block h-3 w-3 text-gray-400" />
-						&quot; button
+						2. Click the &quot;
+						<Cast className="inline-block h-3 w-3 text-green-400" /> Cast&quot; button
 					</div>
-					<div>
-						<FileText className="mr-1 inline-block h-4 w-4 text-gray-400" /> it will
-						also open Stremio if you want to watch on the same device
-					</div>
-					<div>3. Open the *same* Movie or TV Show in Stremio</div>
-					<div>
-						4. Choose &quot;Stream{' '}
-						<Sparkles className="inline-block h-3 w-3 text-green-400" />
-						&quot;
-					</div>
+					<div>3. Stremio opens automatically to the movie/show</div>
+					<div>4. Your casted stream appears in the stream list</div>
 					<div>
 						5.{' '}
 						<span className="inline-flex items-center">
