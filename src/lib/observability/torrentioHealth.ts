@@ -28,27 +28,58 @@ export interface TorrentioCheckResultData {
 	checkedAt: Date;
 }
 
+export interface TorrentioTestUrl {
+	url: string;
+	expectedStatus: number;
+}
+
 /**
  * Builds the Torrentio test URLs with the RD key.
+ * Includes both resolve URLs (expect 302) and stream manifest URLs (expect 200).
  */
-function getTorrentioTestUrls(rdKey: string): string[] {
+function getTorrentioTestUrls(rdKey: string): TorrentioTestUrl[] {
 	return [
-		`https://torrentio.strem.fun/resolve/realdebrid/${rdKey}/163d2082453d037f3bec8bb77ddce782797a7fc3/null/0/Interstellar.2014.IMAX.2160p.10bit.HDR.BluRay.6CH.x265.HEVC-PSA.mkv`,
-		`https://torrentio.strem.fun/resolve/realdebrid/${rdKey}/4dafd19cb07dd72000c254f8377d881bbb168836/null/0/The%20Lord%20of%20the%20Rings%20-%20The%20Fellowship%20of%20the%20Ring%20(2001)%20Extended%20(2160p%20BluRay%20x265%2010bit%20HDR%20Tigole).mkv`,
-		`https://torrentio.strem.fun/resolve/realdebrid/${rdKey}/8a48b47dc85313b110ad164255817c3d6f93cf73/null/1/01.%20Harry%20Potter%20and%20the%20Sorcerer's%20Stone%20(2001)%202160p%2010Bit%20UHD%20BDRIP%20x265%20AC3.mkv`,
+		// Resolve URLs - expect HTTP 302 with real-debrid location
+		{
+			url: `https://torrentio.strem.fun/resolve/realdebrid/${rdKey}/163d2082453d037f3bec8bb77ddce782797a7fc3/null/0/Interstellar.2014.IMAX.2160p.10bit.HDR.BluRay.6CH.x265.HEVC-PSA.mkv`,
+			expectedStatus: 302,
+		},
+		{
+			url: `https://torrentio.strem.fun/resolve/realdebrid/${rdKey}/4dafd19cb07dd72000c254f8377d881bbb168836/null/0/The%20Lord%20of%20the%20Rings%20-%20The%20Fellowship%20of%20the%20Ring%20(2001)%20Extended%20(2160p%20BluRay%20x265%2010bit%20HDR%20Tigole).mkv`,
+			expectedStatus: 302,
+		},
+		{
+			url: `https://torrentio.strem.fun/resolve/realdebrid/${rdKey}/8a48b47dc85313b110ad164255817c3d6f93cf73/null/1/01.%20Harry%20Potter%20and%20the%20Sorcerer's%20Stone%20(2001)%202160p%2010Bit%20UHD%20BDRIP%20x265%20AC3.mkv`,
+			expectedStatus: 302,
+		},
+		// Stream manifest URLs - expect HTTP 200
+		{
+			url: `https://torrentio.strem.fun/realdebrid=${rdKey}/stream/movie/tt0816692.json`,
+			expectedStatus: 200,
+		},
+		{
+			url: `https://torrentio.strem.fun/realdebrid=${rdKey}/stream/movie/tt0241527.json`,
+			expectedStatus: 200,
+		},
+		{
+			url: `https://torrentio.strem.fun/realdebrid=${rdKey}/stream/movie/tt0120737.json`,
+			expectedStatus: 200,
+		},
 	];
 }
 
 /**
  * Tests a single Torrentio URL with a HEAD request.
  * Success conditions:
- * - HTTP 302 with location containing "real-debrid" (ideal)
+ * - Expected status matches (200 for stream manifests, 302 for resolve URLs)
+ * - For 302: location header must contain "real-debrid"
  * - Any 4xx response (service is up, just blocking our IP - not a failure)
  * Failure conditions:
  * - 5xx server errors
  * - Network/timeout errors
  */
-async function testTorrentioUrl(url: string): Promise<TorrentioUrlCheckResult> {
+async function testTorrentioUrl(testUrl: TorrentioTestUrl): Promise<TorrentioUrlCheckResult> {
+	const { url, expectedStatus } = testUrl;
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -68,11 +99,13 @@ async function testTorrentioUrl(url: string): Promise<TorrentioUrlCheckResult> {
 		const locationValid = hasLocation && location.toLowerCase().includes('real-debrid');
 
 		// Success cases:
-		// 1. HTTP 302 with valid real-debrid location (ideal)
-		// 2. Any 4xx response means Torrentio is responding (just blocking us)
-		const isIdealResponse = status === 302 && locationValid;
+		// 1. HTTP 200 for stream manifest URLs
+		// 2. HTTP 302 with valid real-debrid location for resolve URLs
+		// 3. Any 4xx response means Torrentio is responding (just blocking us)
+		const isExpectedResponse =
+			expectedStatus === 200 ? status === 200 : status === 302 && locationValid;
 		const is4xxResponse = status >= 400 && status < 500;
-		const ok = isIdealResponse || is4xxResponse;
+		const ok = isExpectedResponse || is4xxResponse;
 
 		return {
 			url,
@@ -109,7 +142,7 @@ async function testTorrentioUrl(url: string): Promise<TorrentioUrlCheckResult> {
 
 /**
  * Runs the Torrentio health check.
- * Tests all 3 URLs and returns true only if all pass.
+ * Tests all 6 URLs and returns true only if all pass.
  */
 async function runTorrentioCheck(rdKey: string): Promise<{
 	ok: boolean;
@@ -117,8 +150,8 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 	error: string | null;
 	urls: TorrentioUrlCheckResult[];
 }> {
-	const urls = getTorrentioTestUrls(rdKey);
-	const results = await Promise.all(urls.map(testTorrentioUrl));
+	const testUrls = getTorrentioTestUrls(rdKey);
+	const results = await Promise.all(testUrls.map(testTorrentioUrl));
 
 	const allOk = results.every((r) => r.ok);
 	const resultsWithLatency = results.filter((r) => r.latencyMs !== null);

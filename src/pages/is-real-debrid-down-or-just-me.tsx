@@ -15,6 +15,7 @@ import {
 import type { NextPage } from 'next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 // Dynamic imports with ssr: false to avoid Recharts SSR compatibility issues
@@ -499,6 +500,18 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 										))}
 									</div>
 								)}
+								<div className="mt-3 rounded-lg bg-sky-500/10 p-2.5">
+									<p className="text-xs text-slate-300">
+										Try{' '}
+										<Link
+											href="/stremio"
+											className="font-semibold text-sky-400 hover:text-sky-300"
+										>
+											DMM Cast
+										</Link>{' '}
+										- our Stremio addon for Real-Debrid
+									</p>
+								</div>
 							</div>
 						</div>
 
