@@ -96,6 +96,9 @@ export const SettingsSection = () => {
 	const [enableTorrentsDBTor, setEnableTorrentsDBTor] = useState(() =>
 		getLocalStorageBoolean('settings:enableTorrentsDBTor', false)
 	);
+	const [hideCastOption, setHideCastOption] = useState(() =>
+		getLocalStorageBoolean('settings:hideCastOption', false)
+	);
 
 	const handlePlayerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
 		const value = e.target.value;
@@ -106,7 +109,8 @@ export const SettingsSection = () => {
 	const updateCastSizeLimits = async (
 		movieSize?: string,
 		episodeSize?: string,
-		streamsLimit?: string
+		streamsLimit?: string,
+		hideCast?: boolean
 	) => {
 		if (typeof localStorage === 'undefined') return;
 
@@ -135,6 +139,7 @@ export const SettingsSection = () => {
 						episodeMaxSize: episodeSize !== undefined ? Number(episodeSize) : undefined,
 						otherStreamsLimit:
 							streamsLimit !== undefined ? Number(streamsLimit) : undefined,
+						hideCastOption: hideCast,
 					}),
 				}).then(() => {})
 			);
@@ -148,7 +153,8 @@ export const SettingsSection = () => {
 					tbApiKey,
 					movieSize !== undefined ? Number(movieSize) : undefined,
 					episodeSize !== undefined ? Number(episodeSize) : undefined,
-					streamsLimit !== undefined ? Number(streamsLimit) : undefined
+					streamsLimit !== undefined ? Number(streamsLimit) : undefined,
+					hideCast
 				)
 			);
 		}
@@ -161,7 +167,8 @@ export const SettingsSection = () => {
 					adApiKey,
 					movieSize !== undefined ? Number(movieSize) : undefined,
 					episodeSize !== undefined ? Number(episodeSize) : undefined,
-					streamsLimit !== undefined ? Number(streamsLimit) : undefined
+					streamsLimit !== undefined ? Number(streamsLimit) : undefined,
+					hideCast
 				)
 			);
 		}
@@ -329,6 +336,15 @@ export const SettingsSection = () => {
 			localStorage.setItem('settings:enableTorrentioTor', String(checked));
 	};
 
+	const handleHideCastOptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const checked = e.target.checked;
+		setHideCastOption(checked);
+		if (typeof localStorage !== 'undefined') {
+			localStorage.setItem('settings:hideCastOption', String(checked));
+			updateCastSizeLimits(undefined, undefined, undefined, checked);
+		}
+	};
+
 	const getBrowserSettingsInfo = () => {
 		if (typeof navigator === 'undefined') {
 			return { text: 'Browser protocol handler settings:', url: '' };
@@ -449,24 +465,42 @@ export const SettingsSection = () => {
 								Stremio Cast Settings
 							</div>
 
-							<div className="flex flex-col gap-1">
-								<label className="font-semibold">Other streams limit</label>
-								<select
-									id="dmm-other-streams-limit"
-									className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
-									value={otherStreamsLimit}
-									onChange={handleOtherStreamsLimitChange}
-								>
-									<option value="0">Don&apos;t show other streams</option>
-									<option value="1">1 stream</option>
-									<option value="2">2 streams</option>
-									<option value="3">3 streams</option>
-									<option value="4">4 streams</option>
-									<option value="5">5 streams</option>
-								</select>
-								<p className="mt-1 text-xs text-gray-400">
-									Limits streams from available files, torrents, and other
-									users&apos; casts shown in the Stremio Cast addon
+							<div className="flex flex-col gap-4">
+								<div className="flex flex-col gap-1">
+									<label className="font-semibold">Other streams limit</label>
+									<select
+										id="dmm-other-streams-limit"
+										className="w-full rounded bg-gray-800 px-2 py-2.5 text-gray-200"
+										value={otherStreamsLimit}
+										onChange={handleOtherStreamsLimitChange}
+									>
+										<option value="0">Don&apos;t show other streams</option>
+										<option value="1">1 stream</option>
+										<option value="2">2 streams</option>
+										<option value="3">3 streams</option>
+										<option value="4">4 streams</option>
+										<option value="5">5 streams</option>
+									</select>
+									<p className="mt-1 text-xs text-gray-400">
+										Limits streams from available files, torrents, and other
+										users&apos; casts shown in the Stremio Cast addon
+									</p>
+								</div>
+
+								<div className="flex items-center gap-2">
+									<input
+										id="dmm-hide-cast-option"
+										type="checkbox"
+										className="h-5 w-5 rounded border-gray-600 bg-gray-800"
+										checked={hideCastOption}
+										onChange={handleHideCastOptionChange}
+									/>
+									<label htmlFor="dmm-hide-cast-option" className="font-semibold">
+										Hide &quot;Cast a file inside a torrent&quot; option
+									</label>
+								</div>
+								<p className="-mt-2 text-xs text-gray-400">
+									When enabled, the cast option will not appear in Stremio streams
 								</p>
 							</div>
 						</div>

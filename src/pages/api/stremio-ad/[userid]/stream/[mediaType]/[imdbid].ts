@@ -33,16 +33,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		const [imdbid2, season] = imdbidStr.split(':');
 		externalUrl = `${process.env.DMM_ORIGIN}/${typeSlug}/${imdbid2}/${season}`;
 	}
-	const streams = [
-		{
-			name: 'DMM Cast AD✨',
-			title: 'Cast a file inside a torrent',
-			externalUrl,
-			behaviorHints: {
-				bingeGroup: `dmm-ad:${imdbidStr}:cast`,
-			},
-		},
-	];
 
 	let profile;
 	try {
@@ -54,7 +44,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		);
 	}
 
-	// If no profile, just return the base cast stream
+	const streams: any[] = [];
+
+	// Add cast option unless hidden in profile settings
+	if (!profile?.hideCastOption) {
+		streams.push({
+			name: 'DMM Cast AD✨',
+			title: 'Cast a file inside a torrent',
+			externalUrl,
+			behaviorHints: {
+				bingeGroup: `dmm-ad:${imdbidStr}:cast`,
+			},
+		});
+	}
+
+	// If no profile, just return the base cast stream (if not hidden)
 	if (!profile) {
 		res.status(200).json({
 			streams,

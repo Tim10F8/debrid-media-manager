@@ -84,6 +84,7 @@ model CastProfile {
   movieMaxSize      Float    @default(0)
   episodeMaxSize    Float    @default(0)
   otherStreamsLimit Int      @default(5)
+  hideCastOption    Boolean  @default(false)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -115,6 +116,7 @@ model TorBoxCastProfile {
   movieMaxSize      Float    @default(0)   // Max movie size filter (GB)
   episodeMaxSize    Float    @default(0)   // Max episode size filter (GB)
   otherStreamsLimit Int      @default(5)   // Max community streams (0-5)
+  hideCastOption    Boolean  @default(false) // Hide "Cast a file" option in Stremio
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -146,6 +148,7 @@ model AllDebridCastProfile {
   movieMaxSize      Float    @default(0)   // Max movie size filter (GB)
   episodeMaxSize    Float    @default(0)   // Max episode size filter (GB)
   otherStreamsLimit Int      @default(5)   // Max community streams (0-5)
+  hideCastOption    Boolean  @default(false) // Hide "Cast a file" option in Stremio
 }
 
 model Titles {

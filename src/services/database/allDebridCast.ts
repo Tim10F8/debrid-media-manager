@@ -27,7 +27,8 @@ export class AllDebridCastService extends DatabaseClient {
 		apiKey: string,
 		movieMaxSize?: number,
 		episodeMaxSize?: number,
-		otherStreamsLimit?: number
+		otherStreamsLimit?: number,
+		hideCastOption?: boolean
 	) {
 		return this.prisma.allDebridCastProfile.upsert({
 			where: {
@@ -38,6 +39,7 @@ export class AllDebridCastService extends DatabaseClient {
 				...(movieMaxSize !== undefined && { movieMaxSize }),
 				...(episodeMaxSize !== undefined && { episodeMaxSize }),
 				...(otherStreamsLimit !== undefined && { otherStreamsLimit }),
+				...(hideCastOption !== undefined && { hideCastOption }),
 				updatedAt: new Date(),
 			},
 			create: {
@@ -46,6 +48,7 @@ export class AllDebridCastService extends DatabaseClient {
 				movieMaxSize: movieMaxSize ?? 0,
 				episodeMaxSize: episodeMaxSize ?? 0,
 				otherStreamsLimit: otherStreamsLimit ?? 5,
+				hideCastOption: hideCastOption ?? false,
 				updatedAt: new Date(),
 			},
 		});
@@ -145,6 +148,7 @@ export class AllDebridCastService extends DatabaseClient {
 		movieMaxSize: number;
 		episodeMaxSize: number;
 		otherStreamsLimit?: number;
+		hideCastOption?: boolean;
 	} | null> {
 		const profile = await this.prisma.allDebridCastProfile.findUnique({
 			where: { userId },
@@ -153,6 +157,7 @@ export class AllDebridCastService extends DatabaseClient {
 				movieMaxSize: true,
 				episodeMaxSize: true,
 				otherStreamsLimit: true,
+				hideCastOption: true,
 			},
 		});
 		return profile;

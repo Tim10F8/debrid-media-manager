@@ -48,16 +48,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		const [imdbid2, season] = imdbidStr.split(':');
 		externalUrl = `${process.env.DMM_ORIGIN}/${typeSlug}/${imdbid2}/${season}`;
 	}
-	const streams = [
-		{
+
+	const streams: any[] = [];
+
+	// Add cast option unless hidden in profile settings
+	if (!profile.hideCastOption) {
+		streams.push({
 			name: 'DMM Cast TB✨',
 			title: 'Cast a file inside a torrent',
 			externalUrl,
 			behaviorHints: {
 				bingeGroup: `dmm-tb:${imdbidStr}:cast`,
 			},
-		},
-	];
+		});
+	}
 
 	try {
 		const maxSize = typeSlug === 'movie' ? profile.movieMaxSize : profile.episodeMaxSize;

@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return;
 	}
 
-	const { apiKey, movieMaxSize, episodeMaxSize, otherStreamsLimit } = req.body;
+	const { apiKey, movieMaxSize, episodeMaxSize, otherStreamsLimit, hideCastOption } = req.body;
 
 	if (!apiKey || typeof apiKey !== 'string') {
 		res.status(400).json({
@@ -41,7 +41,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			apiKey,
 			movieMaxSize,
 			episodeMaxSize,
-			otherStreamsLimit
+			otherStreamsLimit,
+			hideCastOption !== undefined ? Boolean(hideCastOption) : undefined
 		);
 
 		res.status(200).json({
@@ -51,6 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				movieMaxSize: profile.movieMaxSize,
 				episodeMaxSize: profile.episodeMaxSize,
 				otherStreamsLimit: profile.otherStreamsLimit,
+				hideCastOption: profile.hideCastOption,
 			},
 		});
 	} catch (error) {

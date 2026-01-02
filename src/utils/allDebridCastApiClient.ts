@@ -73,7 +73,8 @@ export const updateAllDebridSizeLimits = async (
 	apiKey: string,
 	movieMaxSize?: number,
 	episodeMaxSize?: number,
-	otherStreamsLimit?: number
+	otherStreamsLimit?: number,
+	hideCastOption?: boolean
 ) => {
 	try {
 		await axios.post(`/api/stremio-ad/cast/updateSizeLimits`, {
@@ -81,6 +82,7 @@ export const updateAllDebridSizeLimits = async (
 			movieMaxSize,
 			episodeMaxSize,
 			otherStreamsLimit,
+			hideCastOption,
 		});
 	} catch (error) {
 		console.error('Error updating AllDebrid size limits:', error);

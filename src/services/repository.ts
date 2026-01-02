@@ -288,7 +288,8 @@ export class Repository {
 		refreshToken?: string | null,
 		movieMaxSize?: number,
 		episodeMaxSize?: number,
-		otherStreamsLimit?: number
+		otherStreamsLimit?: number,
+		hideCastOption?: boolean
 	) {
 		return this.castService.saveCastProfile(
 			userId,
@@ -297,7 +298,8 @@ export class Repository {
 			refreshToken,
 			movieMaxSize,
 			episodeMaxSize,
-			otherStreamsLimit
+			otherStreamsLimit,
+			hideCastOption
 		);
 	}
 
@@ -362,14 +364,16 @@ export class Repository {
 		apiKey: string,
 		movieMaxSize?: number,
 		episodeMaxSize?: number,
-		otherStreamsLimit?: number
+		otherStreamsLimit?: number,
+		hideCastOption?: boolean
 	) {
 		return this.torboxCastService.saveCastProfile(
 			userId,
 			apiKey,
 			movieMaxSize,
 			episodeMaxSize,
-			otherStreamsLimit
+			otherStreamsLimit,
+			hideCastOption
 		);
 	}
 
@@ -445,14 +449,16 @@ export class Repository {
 		apiKey: string,
 		movieMaxSize?: number,
 		episodeMaxSize?: number,
-		otherStreamsLimit?: number
+		otherStreamsLimit?: number,
+		hideCastOption?: boolean
 	) {
 		return this.allDebridCastService.saveCastProfile(
 			userId,
 			apiKey,
 			movieMaxSize,
 			episodeMaxSize,
-			otherStreamsLimit
+			otherStreamsLimit,
+			hideCastOption
 		);
 	}
 

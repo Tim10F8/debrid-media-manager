@@ -18,6 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			movieMaxSize,
 			episodeMaxSize,
 			otherStreamsLimit,
+			hideCastOption,
 		} = req.body;
 
 		if (!clientId || !clientSecret) {
@@ -27,10 +28,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		if (
 			movieMaxSize === undefined &&
 			episodeMaxSize === undefined &&
-			otherStreamsLimit === undefined
+			otherStreamsLimit === undefined &&
+			hideCastOption === undefined
 		) {
 			return res.status(400).json({
-				error: 'At least one setting (size limit or streams limit) must be provided',
+				error: 'At least one setting must be provided',
 			});
 		}
 
@@ -64,7 +66,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			refreshToken || null,
 			movieMaxSize !== undefined ? Number(movieMaxSize) : undefined,
 			episodeMaxSize !== undefined ? Number(episodeMaxSize) : undefined,
-			otherStreamsLimit !== undefined ? Number(otherStreamsLimit) : undefined
+			otherStreamsLimit !== undefined ? Number(otherStreamsLimit) : undefined,
+			hideCastOption !== undefined ? Boolean(hideCastOption) : undefined
 		);
 
 		return res.status(200).json(profile);

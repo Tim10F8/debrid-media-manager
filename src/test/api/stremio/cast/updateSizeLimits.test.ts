@@ -47,7 +47,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 
 		expect(res.status).toHaveBeenCalledWith(400);
 		expect(res.json).toHaveBeenCalledWith({
-			error: 'At least one setting (size limit or streams limit) must be provided',
+			error: 'At least one setting must be provided',
 		});
 	});
 
@@ -76,6 +76,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			movieMaxSize: 15,
 			episodeMaxSize: 0,
 			otherStreamsLimit: 5,
+			hideCastOption: false,
 			updatedAt: new Date(),
 		});
 
@@ -88,6 +89,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			'secret',
 			'refresh',
 			15,
+			undefined,
 			undefined,
 			undefined
 		);
@@ -112,6 +114,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			movieMaxSize: 0,
 			episodeMaxSize: 3,
 			otherStreamsLimit: 5,
+			hideCastOption: false,
 			updatedAt: new Date(),
 		});
 
@@ -124,6 +127,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			'refresh',
 			undefined,
 			3,
+			undefined,
 			undefined
 		);
 		expect(res.status).toHaveBeenCalledWith(200);
@@ -148,6 +152,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			movieMaxSize: 15,
 			episodeMaxSize: 3,
 			otherStreamsLimit: 5,
+			hideCastOption: false,
 			updatedAt: new Date(),
 		});
 
@@ -160,6 +165,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			'refresh',
 			15,
 			3,
+			undefined,
 			undefined
 		);
 		expect(res.status).toHaveBeenCalledWith(200);
@@ -183,6 +189,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			movieMaxSize: 0,
 			episodeMaxSize: 0,
 			otherStreamsLimit: 3,
+			hideCastOption: false,
 			updatedAt: new Date(),
 		});
 
@@ -195,7 +202,8 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			'refresh',
 			undefined,
 			undefined,
-			3
+			3,
+			undefined
 		);
 		expect(res.status).toHaveBeenCalledWith(200);
 	});
@@ -268,6 +276,7 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			movieMaxSize: 15,
 			episodeMaxSize: 3,
 			otherStreamsLimit: 4,
+			hideCastOption: false,
 			updatedAt: new Date(),
 		});
 
@@ -280,7 +289,8 @@ describe('/api/stremio/cast/updateSizeLimits', () => {
 			'refresh',
 			15,
 			3,
-			4
+			4,
+			undefined
 		);
 		expect(res.status).toHaveBeenCalledWith(200);
 	});
