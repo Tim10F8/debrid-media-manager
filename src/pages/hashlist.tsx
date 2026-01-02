@@ -845,7 +845,7 @@ function HashlistPage() {
 							setCurrentPage(1);
 						}}
 					>
-						{showOnlyAvailable ? 'Instant Only' : 'All Torrents'}
+						{showOnlyAvailable ? 'Show All' : 'Show Instant'}
 					</button>
 				)}
 				{mounted && rdKey && (
@@ -874,7 +874,7 @@ function HashlistPage() {
 							onClick={downloadNonDupeTorrentsInAd}
 							disabled={filteredList.length === 0 || !adKey}
 						>
-							AD ({filteredList.length})
+							AD Download ({filteredList.length})
 						</button>
 					</>
 				)}
@@ -889,7 +889,7 @@ function HashlistPage() {
 							onClick={downloadNonDupeTorrentsInTb}
 							disabled={filteredList.length === 0 || !tbKey}
 						>
-							TB ({filteredList.length})
+							TB Download ({filteredList.length})
 						</button>
 					</>
 				)}

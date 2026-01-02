@@ -105,6 +105,8 @@ const handler: NextApiHandler = async (req, res) => {
 
 		const [title, year, mediaType] = parseQuery(cleanKeyword);
 		const searchQuery = title.toLowerCase();
+		// Normalize query by removing leading articles (same as searchTitle processing)
+		const normalizedQuery = removeLeadingArticles(searchQuery);
 
 		// Search local IMDB database (fetch more to allow for filtering/ranking)
 		const imdbResults = await db.searchImdbTitles(searchQuery, {
@@ -127,22 +129,13 @@ const handler: NextApiHandler = async (req, res) => {
 		}));
 
 		// Calculate distance and match count for sorting
-		let queryTerms = searchQuery.split(/\W/).filter((w) => w);
-		if (queryTerms.length === 0) queryTerms = [searchQuery];
+		// Use normalizedQuery (without leading articles) for fair comparison with searchTitle
+		let queryTerms = normalizedQuery.split(/\W/).filter((w) => w);
+		if (queryTerms.length === 0) queryTerms = [normalizedQuery];
 
 		results = results.map((result) => {
-			const lowercaseTitle = result.title.toLowerCase();
-			const distanceValue = distance(lowercaseTitle, searchQuery);
-			if (articleRegex.test(lowercaseTitle)) {
-				const distanceValue2 = distance(result.searchTitle, searchQuery);
-				if (distanceValue2 < distanceValue) {
-					return {
-						...result,
-						distance: distanceValue2,
-						matchCount: countSearchTerms(result.searchTitle, queryTerms),
-					};
-				}
-			}
+			// Compare searchTitle (normalized) against normalizedQuery for consistency
+			const distanceValue = distance(result.searchTitle, normalizedQuery);
 			return {
 				...result,
 				distance: distanceValue,
@@ -156,7 +149,8 @@ const handler: NextApiHandler = async (req, res) => {
 		);
 
 		// Categorize matches (escape regex special characters to prevent injection)
-		const escapedQuery = escapeRegex(searchQuery);
+		// Use normalizedQuery for matching against normalized searchTitle
+		const escapedQuery = escapeRegex(normalizedQuery);
 		let regex1 = new RegExp('^' + escapedQuery + '$', 'i');
 		let exactMatches = results.filter((result) => regex1.test(result.searchTitle));
 		results = results.filter((result) => !regex1.test(result.searchTitle));

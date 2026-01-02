@@ -85,23 +85,74 @@ export class ImdbSearchService extends DatabaseClient {
 		return this.searchWithLike(cleanKeyword, typeFilter, yearFilter, limit);
 	}
 
+	// MySQL InnoDB default stopwords - these break search when using + (required) prefix
+	private static readonly FULLTEXT_STOPWORDS = new Set([
+		'a',
+		'about',
+		'an',
+		'are',
+		'as',
+		'at',
+		'be',
+		'by',
+		'com',
+		'de',
+		'en',
+		'for',
+		'from',
+		'how',
+		'i',
+		'in',
+		'is',
+		'it',
+		'la',
+		'of',
+		'on',
+		'or',
+		'that',
+		'the',
+		'this',
+		'to',
+		'was',
+		'what',
+		'when',
+		'where',
+		'who',
+		'will',
+		'with',
+		'und',
+		'www',
+	]);
+
 	private async searchBasicsFulltext(
 		keyword: string,
 		typeFilter: string,
 		yearFilter: string,
 		limit: number
 	): Promise<ImdbSearchResult[]> {
-		// Prepare keyword for fulltext boolean mode - escape special chars
-		const fulltextKeyword = keyword
+		// Prepare keyword for fulltext boolean mode
+		// Stopwords are optional (no +), non-stopwords are required (+)
+		const words = keyword
 			.split(' ')
-			.map((w) => `+${w.replace(/[+\-<>()~*'"@]/g, '')}*`)
-			.filter((w) => w.length > 2) // Filter out empty/short terms after cleanup
-			.join(' ');
+			.map((w) => w.replace(/[+\-<>()~*'"@]/g, ''))
+			.filter((w) => w.length >= 2);
 
-		// Return empty if no valid search terms remain
-		if (!fulltextKeyword.trim()) {
+		// Check if we have any non-stopwords (required terms)
+		const hasRequiredTerms = words.some(
+			(w) => !ImdbSearchService.FULLTEXT_STOPWORDS.has(w.toLowerCase())
+		);
+
+		// If all words are stopwords, skip fulltext (it won't be effective)
+		if (!hasRequiredTerms) {
 			return [];
 		}
+
+		const fulltextKeyword = words
+			.map((w) => {
+				const isStopword = ImdbSearchService.FULLTEXT_STOPWORDS.has(w.toLowerCase());
+				return isStopword ? `${w}*` : `+${w}*`;
+			})
+			.join(' ');
 
 		const query = Prisma.sql`
 			SELECT
@@ -147,17 +198,29 @@ export class ImdbSearchService extends DatabaseClient {
 		yearFilter: string,
 		limit: number
 	): Promise<ImdbSearchResult[]> {
-		// Prepare keyword for fulltext boolean mode - escape special chars
-		const fulltextKeyword = keyword
+		// Prepare keyword for fulltext boolean mode
+		// Stopwords are optional (no +), non-stopwords are required (+)
+		const words = keyword
 			.split(' ')
-			.map((w) => `+${w.replace(/[+\-<>()~*'"@]/g, '')}*`)
-			.filter((w) => w.length > 2) // Filter out empty/short terms after cleanup
-			.join(' ');
+			.map((w) => w.replace(/[+\-<>()~*'"@]/g, ''))
+			.filter((w) => w.length >= 2);
 
-		// Return empty if no valid search terms remain
-		if (!fulltextKeyword.trim()) {
+		// Check if we have any non-stopwords (required terms)
+		const hasRequiredTerms = words.some(
+			(w) => !ImdbSearchService.FULLTEXT_STOPWORDS.has(w.toLowerCase())
+		);
+
+		// If all words are stopwords, skip fulltext (it won't be effective)
+		if (!hasRequiredTerms) {
 			return [];
 		}
+
+		const fulltextKeyword = words
+			.map((w) => {
+				const isStopword = ImdbSearchService.FULLTEXT_STOPWORDS.has(w.toLowerCase());
+				return isStopword ? `${w}*` : `+${w}*`;
+			})
+			.join(' ');
 
 		// Use Prisma.raw for fulltext keyword since MATCH AGAINST needs literal string
 		const query = Prisma.sql`
