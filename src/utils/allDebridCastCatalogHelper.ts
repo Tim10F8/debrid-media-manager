@@ -60,7 +60,7 @@ export async function getAllDebridDMMLibrary(apiKey: string, page: number) {
 	}
 }
 
-export async function getAllDebridDMMTorrent(apiKey: string, magnetID: string) {
+export async function getAllDebridDMMTorrent(apiKey: string, magnetID: string, userid: string) {
 	const magnetIdNum = parseInt(magnetID, 10);
 	if (isNaN(magnetIdNum)) {
 		return { error: 'Invalid magnet ID', status: 400 };
@@ -101,7 +101,7 @@ export async function getAllDebridDMMTorrent(apiKey: string, magnetID: string) {
 			title: `${file.path.split('/').pop()} - ${(file.size / 1024 / 1024 / 1024).toFixed(2)} GB`,
 			streams: [
 				{
-					url: file.link,
+					url: `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${magnetID}:${index}`,
 					behaviorHints: {
 						bingeGroup: `dmm-ad:${magnetID}`,
 					},

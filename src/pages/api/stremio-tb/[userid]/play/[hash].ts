@@ -1,49 +1,9 @@
 import { repository as db } from '@/services/repository';
-import {
-	checkCachedStatus,
-	createTorrent,
-	deleteTorrent,
-	getTorrentList,
-	requestDownloadLink,
-} from '@/services/torbox';
-import { TorBoxTorrentInfo } from '@/services/types';
+import { requestDownloadLink } from '@/services/torbox';
 import { NextApiRequest, NextApiResponse } from 'next';
 
-const MAX_POLL_ATTEMPTS = 30;
-const POLL_INTERVAL_MS = 1000;
-
-async function waitForTorrentReady(
-	apiKey: string,
-	torrentId: number
-): Promise<TorBoxTorrentInfo | null> {
-	for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
-		const result = await getTorrentList(apiKey, { id: torrentId });
-		if (!result.success || !result.data) {
-			await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-			continue;
-		}
-
-		const torrent = Array.isArray(result.data) ? result.data[0] : result.data;
-		if (!torrent) {
-			await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-			continue;
-		}
-
-		if (
-			torrent.download_finished ||
-			torrent.download_state === 'completed' ||
-			torrent.download_state === 'cached'
-		) {
-			return torrent;
-		}
-
-		await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-	}
-
-	return null;
-}
-
-// Regenerate and play a TorBox download link
+// Play a TorBox file from an existing torrent
+// Format: torrentId:fileId (e.g., "123456:789")
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	res.setHeader('access-control-allow-origin', '*');
 
@@ -52,6 +12,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		res.status(400).json({
 			status: 'error',
 			errorMessage: 'Invalid "userid" or "hash" query parameter',
+		});
+		return;
+	}
+
+	// Parse torrentId:fileId format
+	const parts = hash.split(':');
+	if (parts.length !== 2) {
+		res.status(400).json({
+			status: 'error',
+			errorMessage: 'Invalid format. Expected torrentId:fileId',
+		});
+		return;
+	}
+
+	const torrentId = parseInt(parts[0], 10);
+	const fileId = parseInt(parts[1], 10);
+
+	if (isNaN(torrentId) || isNaN(fileId)) {
+		res.status(400).json({
+			status: 'error',
+			errorMessage: 'Invalid torrentId or fileId',
 		});
 		return;
 	}
@@ -72,89 +53,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return;
 	}
 
-	// Find the cast record to get the fileId
-	let castRecord: { fileId: number | null } | null = null;
-	try {
-		const allCasts = await db.getAllTorBoxUserCasts(userid);
-		const matchingCast = allCasts.find((c) => c.hash === hash);
-		if (matchingCast) {
-			// Need to query for fileId which isn't in getAllUserCasts
-			// For now, we'll find the biggest file in the torrent
-			castRecord = { fileId: null };
-		}
-	} catch (error) {
-		console.error('Failed to find cast record:', error);
-	}
-
 	const apiKey = profile.apiKey;
 
 	try {
-		// Check if the torrent is cached
-		const cachedStatus = await checkCachedStatus({ hash, list_files: true }, apiKey);
-		if (!cachedStatus.success || !cachedStatus.data) {
-			throw new Error('Failed to check cached status');
-		}
-
-		const cachedData = cachedStatus.data as Record<string, any>;
-		if (!cachedData[hash]) {
-			throw new Error('Torrent not cached on TorBox');
-		}
-
-		// Add the torrent
-		const createResult = await createTorrent(apiKey, {
-			magnet: `magnet:?xt=urn:btih:${hash}`,
+		// Get download link for the specific file
+		const downloadResult = await requestDownloadLink(apiKey, {
+			torrent_id: torrentId,
+			file_id: fileId,
 		});
 
-		if (
-			!createResult.success ||
-			!createResult.data ||
-			createResult.data.torrent_id === undefined
-		) {
-			throw new Error('Failed to add torrent to TorBox');
+		if (!downloadResult.success || !downloadResult.data) {
+			throw new Error('Failed to get download link');
 		}
 
-		const torrentId = createResult.data.torrent_id;
+		const streamUrl = downloadResult.data;
 
-		try {
-			// Wait for torrent to be ready
-			const torrent = await waitForTorrentReady(apiKey, torrentId);
-			if (!torrent) {
-				throw new Error('Torrent did not become ready in time');
-			}
-
-			// Find the biggest file (or use stored fileId if available)
-			if (!torrent.files || torrent.files.length === 0) {
-				throw new Error('No files in torrent');
-			}
-
-			const biggestFile = torrent.files.reduce((prev, current) => {
-				return (prev.size || 0) > (current.size || 0) ? prev : current;
-			});
-
-			const fileId = biggestFile.id;
-
-			// Get download link
-			const downloadResult = await requestDownloadLink(apiKey, {
-				torrent_id: torrentId,
-				file_id: fileId,
-			});
-
-			if (!downloadResult.success || !downloadResult.data) {
-				throw new Error('Failed to get download link');
-			}
-
-			const streamUrl = downloadResult.data;
-
-			// Clean up - delete the torrent after getting the link
-			await deleteTorrent(apiKey, torrentId);
-
-			// Redirect to the download URL
-			res.redirect(streamUrl);
-		} catch (e) {
-			// Clean up on error
-			await deleteTorrent(apiKey, torrentId);
-			throw e;
-		}
+		// Redirect to the download URL
+		res.redirect(streamUrl);
 	} catch (error: any) {
 		console.error(
 			'Failed to play TorBox link:',

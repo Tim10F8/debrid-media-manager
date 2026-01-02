@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			return;
 		}
 
-		const result = await getAllDebridDMMTorrent(profile.apiKey, magnetId);
+		const result = await getAllDebridDMMTorrent(profile.apiKey, magnetId, userid);
 
 		if ('error' in result) {
 			res.status(result.status).json({ error: result.error });

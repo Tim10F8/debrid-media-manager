@@ -1,5 +1,5 @@
 import { repository as db } from '@/services/repository';
-import { getTorrentList, requestDownloadLink } from '@/services/torbox';
+import { getTorrentList } from '@/services/torbox';
 import { TorBoxTorrentInfo } from '@/services/types';
 
 export const PAGE_SIZE = 12;
@@ -74,33 +74,19 @@ export async function getTorBoxDMMTorrent(userid: string, torrentID: string) {
 		return { error: 'Torrent not found', status: 404 };
 	}
 
-	// Get download links for each file
-	const videos = [];
-	for (const file of torrent.files || []) {
-		try {
-			const downloadResult = await requestDownloadLink(profile.apiKey, {
-				torrent_id: torrentIdNum,
-				file_id: file.id,
-			});
-
-			if (downloadResult.success && downloadResult.data) {
-				videos.push({
-					id: `dmm-tb:${torrentID}:${file.id}`,
-					title: `${file.short_name || file.name} - ${((file.size || 0) / 1024 / 1024 / 1024).toFixed(2)} GB`,
-					streams: [
-						{
-							url: downloadResult.data,
-							behaviorHints: {
-								bingeGroup: `dmm-tb:${torrentID}`,
-							},
-						},
-					],
-				});
-			}
-		} catch (e) {
-			console.error(`Failed to get download link for file ${file.id}:`, e);
-		}
-	}
+	// Build video list with internal play URLs (links are generated on-demand when played)
+	const videos = (torrent.files || []).map((file) => ({
+		id: `dmm-tb:${torrentID}:${file.id}`,
+		title: `${file.short_name || file.name} - ${((file.size || 0) / 1024 / 1024 / 1024).toFixed(2)} GB`,
+		streams: [
+			{
+				url: `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${torrentID}:${file.id}`,
+				behaviorHints: {
+					bingeGroup: `dmm-tb:${torrentID}`,
+				},
+			},
+		],
+	}));
 
 	// Sort videos by title
 	videos.sort((a, b) => a.title.localeCompare(b.title));
