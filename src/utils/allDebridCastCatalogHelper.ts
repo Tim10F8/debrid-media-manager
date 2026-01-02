@@ -35,9 +35,9 @@ function flattenFiles(files: MagnetFile[], parentPath: string = ''): FlatFile[] 
 
 export async function getAllDebridDMMLibrary(apiKey: string, page: number) {
 	try {
-		// Get all magnets with status "Ready" (statusCode 4)
+		// Get all magnets (don't use status=active filter - it means "downloading", not "ready")
 		console.log('[AD Library] Fetching magnets, page:', page);
-		const result = await getMagnetStatus(apiKey, undefined, 'active');
+		const result = await getMagnetStatus(apiKey);
 
 		if (!result.data?.magnets) {
 			console.log('[AD Library] No magnets data in response');
@@ -46,7 +46,7 @@ export async function getAllDebridDMMLibrary(apiKey: string, page: number) {
 
 		console.log('[AD Library] Total magnets:', result.data.magnets.length);
 
-		// Filter for ready magnets
+		// Filter for ready magnets (statusCode 4 = Ready)
 		const readyMagnets = result.data.magnets.filter((m) => m.statusCode === 4);
 		console.log('[AD Library] Ready magnets:', readyMagnets.length);
 
