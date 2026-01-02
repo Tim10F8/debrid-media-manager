@@ -38,7 +38,7 @@ describe('MainActions', () => {
 	};
 
 	it('always renders library and hash list links', () => {
-		render(<MainActions rdUser={null} tbUser={null} isLoading={false} />);
+		render(<MainActions rdUser={null} tbUser={null} adUser={false} isLoading={false} />);
 
 		const libraryLink = screen.getByRole('link', { name: /library/i });
 		expect(libraryLink.getAttribute('href')).toBe('/library');
@@ -48,32 +48,54 @@ describe('MainActions', () => {
 		expect(hashListLink.getAttribute('target')).toBe('_blank');
 	});
 
-	it('shows RD stremio action when only RD user is authenticated', () => {
-		render(<MainActions rdUser={baseRdUser} tbUser={null} isLoading={false} />);
+	it('shows RD cast action when only RD user is authenticated', () => {
+		render(<MainActions rdUser={baseRdUser} tbUser={null} adUser={false} isLoading={false} />);
 
-		const stremioLink = screen.getByRole('link', { name: /stremio/i });
-		expect(stremioLink.getAttribute('href')).toBe('/stremio');
+		const castLink = screen.getByRole('link', { name: /cast for real-debrid/i });
+		expect(castLink.getAttribute('href')).toBe('/stremio');
 	});
 
-	it('shows TB stremio action when only TB user is authenticated', () => {
-		render(<MainActions rdUser={null} tbUser={baseTbUser} isLoading={false} />);
+	it('shows TB cast action when only TB user is authenticated', () => {
+		render(<MainActions rdUser={null} tbUser={baseTbUser} adUser={false} isLoading={false} />);
 
-		const stremioLink = screen.getByRole('link', { name: /stremio/i });
-		expect(stremioLink.getAttribute('href')).toBe('/stremio-torbox');
+		const castLink = screen.getByRole('link', { name: /cast for torbox/i });
+		expect(castLink.getAttribute('href')).toBe('/stremio-torbox');
 	});
 
-	it('shows both stremio actions when both users are authenticated', () => {
-		render(<MainActions rdUser={baseRdUser} tbUser={baseTbUser} isLoading={false} />);
+	it('shows AD cast action when only AD user is authenticated', () => {
+		render(<MainActions rdUser={null} tbUser={null} adUser={true} isLoading={false} />);
 
-		const stremioLinks = screen.getAllByRole('link', { name: /rd|tb/i });
-		expect(stremioLinks).toHaveLength(2);
-		expect(stremioLinks[0].getAttribute('href')).toBe('/stremio');
-		expect(stremioLinks[1].getAttribute('href')).toBe('/stremio-torbox');
+		const castLink = screen.getByRole('link', { name: /cast for alldebrid/i });
+		expect(castLink.getAttribute('href')).toBe('/stremio-alldebrid');
 	});
 
-	it('hides stremio action when no user is authenticated', () => {
-		render(<MainActions rdUser={null} tbUser={null} isLoading={false} />);
+	it('shows both RD and TB cast actions when both users are authenticated', () => {
+		render(
+			<MainActions rdUser={baseRdUser} tbUser={baseTbUser} adUser={false} isLoading={false} />
+		);
 
-		expect(screen.queryByRole('link', { name: /stremio/i })).toBeNull();
+		const rdLink = screen.getByRole('link', { name: /cast for real-debrid/i });
+		const tbLink = screen.getByRole('link', { name: /cast for torbox/i });
+		expect(rdLink.getAttribute('href')).toBe('/stremio');
+		expect(tbLink.getAttribute('href')).toBe('/stremio-torbox');
+	});
+
+	it('shows all three cast actions when all users are authenticated', () => {
+		render(
+			<MainActions rdUser={baseRdUser} tbUser={baseTbUser} adUser={true} isLoading={false} />
+		);
+
+		const rdLink = screen.getByRole('link', { name: /cast for real-debrid/i });
+		const tbLink = screen.getByRole('link', { name: /cast for torbox/i });
+		const adLink = screen.getByRole('link', { name: /cast for alldebrid/i });
+		expect(rdLink.getAttribute('href')).toBe('/stremio');
+		expect(tbLink.getAttribute('href')).toBe('/stremio-torbox');
+		expect(adLink.getAttribute('href')).toBe('/stremio-alldebrid');
+	});
+
+	it('hides cast actions when no user is authenticated', () => {
+		render(<MainActions rdUser={null} tbUser={null} adUser={false} isLoading={false} />);
+
+		expect(screen.queryByRole('link', { name: /cast for/i })).toBeNull();
 	});
 });

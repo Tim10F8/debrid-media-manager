@@ -1,0 +1,125 @@
+import { getMagnetFiles, getMagnetStatus, MagnetFile } from '@/services/allDebrid';
+
+export const PAGE_SIZE = 12;
+
+interface FlatFile {
+	path: string;
+	size: number;
+	link: string;
+}
+
+function flattenFiles(files: MagnetFile[], parentPath: string = ''): FlatFile[] {
+	const result: FlatFile[] = [];
+
+	for (const file of files) {
+		const fullPath = parentPath ? `${parentPath}/${file.n}` : file.n;
+
+		if (file.l) {
+			result.push({
+				path: fullPath,
+				size: file.s || 0,
+				link: file.l,
+			});
+		} else if (file.e) {
+			result.push(...flattenFiles(file.e, fullPath));
+		}
+	}
+
+	return result;
+}
+
+export async function getAllDebridDMMLibrary(apiKey: string, page: number) {
+	try {
+		// Get all magnets with status "Ready" (statusCode 4)
+		const result = await getMagnetStatus(apiKey, undefined, 'active');
+
+		if (!result.data?.magnets) {
+			return [];
+		}
+
+		// Filter for ready magnets
+		const readyMagnets = result.data.magnets.filter((m) => m.statusCode === 4);
+
+		// Paginate
+		const offset = page * PAGE_SIZE;
+		const paginatedMagnets = readyMagnets.slice(offset, offset + PAGE_SIZE);
+
+		return paginatedMagnets.map((magnet) => ({
+			id: `dmm-ad:${magnet.id}`,
+			name: magnet.filename,
+			type: 'other',
+		}));
+	} catch (error) {
+		console.error('Error getting AllDebrid library:', error);
+		return [];
+	}
+}
+
+export async function getAllDebridDMMTorrent(apiKey: string, magnetID: string) {
+	const magnetIdNum = parseInt(magnetID, 10);
+	if (isNaN(magnetIdNum)) {
+		return { error: 'Invalid magnet ID', status: 400 };
+	}
+
+	try {
+		// Get magnet files with download links
+		const filesResult = await getMagnetFiles(apiKey, [magnetIdNum]);
+		const magnetFiles = filesResult.magnets[0];
+
+		if (magnetFiles.error) {
+			return { error: magnetFiles.error.message, status: 500 };
+		}
+
+		// Also get magnet info for the name
+		const statusResult = await getMagnetStatus(apiKey, magnetID);
+		const magnet = statusResult.data.magnets[0];
+
+		if (!magnet) {
+			return { error: 'Magnet not found', status: 404 };
+		}
+
+		// Flatten files
+		const flatFiles = flattenFiles(magnetFiles.files || []);
+
+		// Filter for video files
+		const videoExtensions = ['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v'];
+		const videoFiles = flatFiles.filter((f) => {
+			const filename = f.path.split('/').pop()?.toLowerCase() || '';
+			return videoExtensions.some((ext) => filename.endsWith(ext));
+		});
+
+		const videos = videoFiles.map((file, index) => ({
+			id: `dmm-ad:${magnetID}:${index}`,
+			title: `${file.path.split('/').pop()} - ${(file.size / 1024 / 1024 / 1024).toFixed(2)} GB`,
+			streams: [
+				{
+					url: file.link,
+					behaviorHints: {
+						bingeGroup: `dmm-ad:${magnetID}`,
+					},
+				},
+			],
+		}));
+
+		// Sort videos by title
+		videos.sort((a, b) => a.title.localeCompare(b.title));
+
+		const totalSize = flatFiles.reduce((sum, f) => sum + f.size, 0);
+
+		return {
+			data: {
+				meta: {
+					id: `dmm-ad:${magnetID}`,
+					type: 'other',
+					name: `DMM AD: ${magnet.filename} - ${(totalSize / 1024 / 1024 / 1024).toFixed(2)} GB`,
+					videos,
+				},
+				cacheMaxAge: 0,
+			},
+			status: 200,
+		};
+	} catch (error) {
+		console.error('Error getting AllDebrid torrent:', error);
+		return { error: 'Failed to get torrent info', status: 500 };
+	}
+}

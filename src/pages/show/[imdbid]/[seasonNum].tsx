@@ -11,6 +11,7 @@ import { useTorrentManagement } from '@/hooks/useTorrentManagement';
 import { SearchApiResponse, SearchResult } from '@/services/mediasearch';
 import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
+import { handleCastTvShowAllDebrid } from '@/utils/allDebridCastApiClient';
 import { getLocalStorageBoolean, getLocalStorageItemOrDefault } from '@/utils/browserStorage';
 import { handleCastTvShow } from '@/utils/castApiClient';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
@@ -697,6 +698,20 @@ const TvSearch: FunctionComponent = () => {
 		window.open(`stremio://detail/series/${imdbid}/${imdbid}:${seasonNum}:1`);
 	}
 
+	async function handleCastAllDebrid(hash: string, fileIds: string[]) {
+		await toast.promise(
+			handleCastTvShowAllDebrid(imdbid as string, adKey!, hash, fileIds),
+			{
+				loading: `Casting ${fileIds.length} episodes (AllDebrid)...`,
+				success: 'Casting succeeded.',
+				error: 'Casting failed.',
+			},
+			castToastOptions
+		);
+		// open stremio after casting
+		window.open(`stremio://detail/series/${imdbid}/${imdbid}:${seasonNum}:1`);
+	}
+
 	// Helper function to find the first complete season torrent
 	const getFirstCompleteSeasonTorrent = () => {
 		// Find torrents that have all or most episodes for the season
@@ -1177,6 +1192,7 @@ const TvSearch: FunctionComponent = () => {
 				handleShowInfo={handleShowInfo}
 				handleCast={handleCast}
 				handleCastTorBox={torboxKey ? handleCastTorBox : undefined}
+				handleCastAllDebrid={adKey ? handleCastAllDebrid : undefined}
 				handleCopyMagnet={(hash) => handleCopyOrDownloadMagnet(hash, shouldDownloadMagnets)}
 				checkServiceAvailability={checkServiceAvailability}
 				addRd={addRd}

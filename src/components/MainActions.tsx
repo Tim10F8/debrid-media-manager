@@ -6,67 +6,102 @@ import Link from 'next/link';
 interface MainActionsProps {
 	rdUser: RealDebridUser | null;
 	tbUser: TorBoxUser | null;
+	adUser: boolean;
 	isLoading: boolean;
 }
 
 const isLocalDev = process.env.NODE_ENV === 'development';
 
-export function MainActions({ rdUser, tbUser, isLoading }: MainActionsProps) {
-	const hasStremio = rdUser || tbUser;
+export function MainActions({ rdUser, tbUser, adUser, isLoading }: MainActionsProps) {
+	const castButtons = [
+		rdUser && {
+			href: '/stremio',
+			label: 'Cast for Real-Debrid',
+			borderColor: 'border-green-500',
+			bgColor: 'bg-green-900/30',
+			hoverColor: 'hover:bg-green-800/50',
+			textColor: 'text-green-100',
+			iconColor: 'text-green-400',
+		},
+		tbUser && {
+			href: '/stremio-torbox',
+			label: 'Cast for TorBox',
+			borderColor: 'border-purple-500',
+			bgColor: 'bg-purple-900/30',
+			hoverColor: 'hover:bg-purple-800/50',
+			textColor: 'text-purple-100',
+			iconColor: 'text-purple-400',
+		},
+		adUser && {
+			href: '/stremio-alldebrid',
+			label: 'Cast for AllDebrid',
+			borderColor: 'border-yellow-500',
+			bgColor: 'bg-yellow-900/30',
+			hoverColor: 'hover:bg-yellow-800/50',
+			textColor: 'text-yellow-100',
+			iconColor: 'text-yellow-400',
+		},
+	].filter(Boolean) as {
+		href: string;
+		label: string;
+		borderColor: string;
+		bgColor: string;
+		hoverColor: string;
+		textColor: string;
+		iconColor: string;
+	}[];
+
+	const castGridCols =
+		castButtons.length === 1
+			? 'grid-cols-1'
+			: castButtons.length === 2
+				? 'grid-cols-2'
+				: 'grid-cols-3';
 
 	return (
-		<div className="grid w-full grid-cols-3 gap-3">
-			<Link
-				href="/library"
-				className="haptic flex items-center justify-center gap-2 rounded border-2 border-cyan-500 bg-cyan-900/30 p-3 text-cyan-100 transition-colors hover:bg-cyan-800/50"
-			>
-				<BookOpen className="mr-1 inline-block h-4 w-4 text-cyan-400" />
-				Library
-			</Link>
-			<Link
-				href={isLocalDev ? '/hashlists' : 'https://hashlists.debridmediamanager.com'}
-				target={isLocalDev ? undefined : '_blank'}
-				className="haptic flex items-center justify-center gap-2 rounded border-2 border-indigo-500 bg-indigo-900/30 p-3 text-indigo-100 transition-colors hover:bg-indigo-800/50"
-			>
-				<Rocket className="mr-1 inline-block h-4 w-4 text-indigo-400" />
-				Hash lists
-			</Link>
-			{rdUser && !tbUser && (
+		<div className="flex w-full flex-col gap-3">
+			{/* First row: Library, Hash lists, Is RD Down */}
+			<div className="grid w-full grid-cols-3 gap-3">
 				<Link
-					href="/stremio"
-					className="haptic flex items-center justify-center gap-2 rounded border-2 border-green-500 bg-green-900/30 p-3 text-green-100 transition-colors hover:bg-green-800/50"
+					href="/library"
+					className="haptic flex items-center justify-center gap-2 rounded border-2 border-cyan-500 bg-cyan-900/30 p-3 text-cyan-100 transition-colors hover:bg-cyan-800/50"
 				>
-					<Sparkles className="mr-1 inline-block h-4 w-4 text-green-400" />
-					Stremio
+					<BookOpen className="mr-1 inline-block h-4 w-4 text-cyan-400" />
+					Library
 				</Link>
-			)}
-			{tbUser && !rdUser && (
 				<Link
-					href="/stremio-torbox"
-					className="haptic flex items-center justify-center gap-2 rounded border-2 border-purple-500 bg-purple-900/30 p-3 text-purple-100 transition-colors hover:bg-purple-800/50"
+					href={isLocalDev ? '/hashlists' : 'https://hashlists.debridmediamanager.com'}
+					target={isLocalDev ? undefined : '_blank'}
+					className="haptic flex items-center justify-center gap-2 rounded border-2 border-indigo-500 bg-indigo-900/30 p-3 text-indigo-100 transition-colors hover:bg-indigo-800/50"
 				>
-					<Sparkles className="mr-1 inline-block h-4 w-4 text-purple-400" />
-					Stremio
+					<Rocket className="mr-1 inline-block h-4 w-4 text-indigo-400" />
+					Hash lists
 				</Link>
-			)}
-			{rdUser && tbUser && (
-				<div className="flex gap-1">
+				{rdUser ? (
 					<Link
-						href="/stremio"
-						className="haptic flex flex-1 items-center justify-center gap-1 rounded border-2 border-green-500 bg-green-900/30 p-3 text-green-100 transition-colors hover:bg-green-800/50"
-						title="DMM Cast for Real-Debrid"
+						href="/is-real-debrid-down-or-just-me"
+						className="haptic flex items-center justify-center rounded border-2 border-emerald-500 bg-emerald-900/30 p-3 text-center text-sm text-emerald-100 transition-colors hover:bg-emerald-800/40"
 					>
-						<Sparkles className="inline-block h-4 w-4 text-green-400" />
-						<span className="text-xs">RD</span>
+						Is RD down?
 					</Link>
-					<Link
-						href="/stremio-torbox"
-						className="haptic flex flex-1 items-center justify-center gap-1 rounded border-2 border-purple-500 bg-purple-900/30 p-3 text-purple-100 transition-colors hover:bg-purple-800/50"
-						title="DMM Cast for TorBox"
-					>
-						<Sparkles className="inline-block h-4 w-4 text-purple-400" />
-						<span className="text-xs">TB</span>
-					</Link>
+				) : (
+					<div />
+				)}
+			</div>
+
+			{/* Second row: Cast buttons */}
+			{castButtons.length > 0 && (
+				<div className={`grid w-full gap-3 ${castGridCols}`}>
+					{castButtons.map((button) => (
+						<Link
+							key={button.href}
+							href={button.href}
+							className={`haptic flex items-center justify-center gap-2 rounded border-2 ${button.borderColor} ${button.bgColor} p-3 ${button.textColor} transition-colors ${button.hoverColor}`}
+						>
+							<Sparkles className={`mr-1 inline-block h-4 w-4 ${button.iconColor}`} />
+							{button.label}
+						</Link>
+					))}
 				</div>
 			)}
 		</div>

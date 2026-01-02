@@ -117,6 +117,37 @@ model TorBoxCastProfile {
   otherStreamsLimit Int      @default(5)   // Max community streams (0-5)
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ALLDEBRID CAST TABLES (DMM Cast for AllDebrid)
+// ═══════════════════════════════════════════════════════════════
+
+// AllDebrid Cast - stores individual casted content
+model AllDebridCast {
+  id        String   @id @default(uuid())
+  imdbId    String           // IMDB ID (format: tt1234567 or tt1234567:S:E)
+  userId    String           // 12-character hashed user ID (from AD username)
+  hash      String           // Torrent hash
+  url       String   @db.Text // Filename for display
+  updatedAt DateTime @updatedAt
+  size      BigInt   @default(0)  // File size in MB
+  link      String?  @db.Text     // Direct download link (expires)
+  magnetId  Int?             // AllDebrid magnet ID (for re-fetching links)
+  fileIndex Int?             // File index within flattened file list
+
+  @@unique([imdbId, userId, hash])
+  @@index([imdbId, userId, updatedAt])
+}
+
+// AllDebrid Cast Profile - stores user API key and preferences
+model AllDebridCastProfile {
+  userId            String   @id    // 12-character hashed user ID
+  apiKey            String   @db.Text // AllDebrid API key (stored securely)
+  updatedAt         DateTime @updatedAt
+  movieMaxSize      Float    @default(0)   // Max movie size filter (GB)
+  episodeMaxSize    Float    @default(0)   // Max episode size filter (GB)
+  otherStreamsLimit Int      @default(5)   // Max community streams (0-5)
+}
+
 model Titles {
   imdbid            String  @id
   title             String

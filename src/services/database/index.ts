@@ -1,3 +1,4 @@
+import { AllDebridCastService } from './allDebridCast';
 import { AnimeService } from './anime';
 import { AvailabilityService } from './availability';
 import { CastService } from './cast';
@@ -14,6 +15,7 @@ import { TorrentSnapshotService } from './torrentSnapshot';
 import { ZurgKeysService } from './zurgKeys';
 
 export {
+	AllDebridCastService,
 	AnimeService,
 	AvailabilityService,
 	CastService,

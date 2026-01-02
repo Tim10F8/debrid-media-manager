@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import {
+	AllDebridCastService,
 	AnimeService,
 	AvailabilityService,
 	CastService,
@@ -28,6 +29,7 @@ export type RepositoryDependencies = Partial<{
 	animeService: AnimeService;
 	castService: CastService;
 	torboxCastService: TorBoxCastService;
+	allDebridCastService: AllDebridCastService;
 	reportService: ReportService;
 	torrentSnapshotService: TorrentSnapshotService;
 	hashSearchService: HashSearchService;
@@ -45,6 +47,7 @@ export class Repository {
 	private animeService: AnimeService;
 	private castService: CastService;
 	private torboxCastService: TorBoxCastService;
+	private allDebridCastService: AllDebridCastService;
 	private reportService: ReportService;
 	private torrentSnapshotService: TorrentSnapshotService;
 	private hashSearchService: HashSearchService;
@@ -61,6 +64,7 @@ export class Repository {
 		animeService,
 		castService,
 		torboxCastService,
+		allDebridCastService,
 		reportService,
 		torrentSnapshotService,
 		hashSearchService,
@@ -76,6 +80,7 @@ export class Repository {
 		this.animeService = animeService ?? new AnimeService();
 		this.castService = castService ?? new CastService();
 		this.torboxCastService = torboxCastService ?? new TorBoxCastService();
+		this.allDebridCastService = allDebridCastService ?? new AllDebridCastService();
 		this.reportService = reportService ?? new ReportService();
 		this.torrentSnapshotService = torrentSnapshotService ?? new TorrentSnapshotService();
 		this.hashSearchService = hashSearchService ?? new HashSearchService();
@@ -96,6 +101,7 @@ export class Repository {
 			this.animeService.disconnect(),
 			this.castService.disconnect(),
 			this.torboxCastService.disconnect(),
+			this.allDebridCastService.disconnect(),
 			this.reportService.disconnect(),
 			this.torrentSnapshotService.disconnect(),
 			this.hashSearchService.disconnect(),
@@ -431,6 +437,94 @@ export class Repository {
 
 	public getTorBoxOtherStreams(imdbId: string, userId: string, limit?: number, maxSize?: number) {
 		return this.torboxCastService.getOtherStreams(imdbId, userId, limit, maxSize);
+	}
+
+	// AllDebrid Cast Service Methods
+	public saveAllDebridCastProfile(
+		userId: string,
+		apiKey: string,
+		movieMaxSize?: number,
+		episodeMaxSize?: number,
+		otherStreamsLimit?: number
+	) {
+		return this.allDebridCastService.saveCastProfile(
+			userId,
+			apiKey,
+			movieMaxSize,
+			episodeMaxSize,
+			otherStreamsLimit
+		);
+	}
+
+	public getAllDebridLatestCast(imdbId: string, userId: string) {
+		return this.allDebridCastService.getLatestCast(imdbId, userId);
+	}
+
+	public getAllDebridCastURLs(imdbId: string, userId: string) {
+		return this.allDebridCastService.getCastURLs(imdbId, userId);
+	}
+
+	public getAllDebridOtherCastURLs(imdbId: string, userId: string) {
+		return this.allDebridCastService.getOtherCastURLs(imdbId, userId);
+	}
+
+	public getAllDebridCastProfile(userId: string) {
+		return this.allDebridCastService.getCastProfile(userId);
+	}
+
+	public saveAllDebridCast(
+		imdbId: string,
+		userId: string,
+		hash: string,
+		url: string,
+		adLink: string,
+		fileSize: number,
+		magnetId?: number,
+		fileIndex?: number
+	) {
+		return this.allDebridCastService.saveCast(
+			imdbId,
+			userId,
+			hash,
+			url,
+			adLink,
+			fileSize,
+			magnetId,
+			fileIndex
+		);
+	}
+
+	public fetchAllDebridCastedMovies(userId: string) {
+		return this.allDebridCastService.fetchCastedMovies(userId);
+	}
+
+	public fetchAllDebridCastedShows(userId: string) {
+		return this.allDebridCastService.fetchCastedShows(userId);
+	}
+
+	public fetchAllAllDebridCastedLinks(userId: string) {
+		return this.allDebridCastService.fetchAllCastedLinks(userId);
+	}
+
+	public deleteAllDebridCastedLink(imdbId: string, userId: string, hash: string) {
+		return this.allDebridCastService.deleteCastedLink(imdbId, userId, hash);
+	}
+
+	public getAllAllDebridUserCasts(userId: string) {
+		return this.allDebridCastService.getAllUserCasts(userId);
+	}
+
+	public getAllDebridUserCastStreams(imdbId: string, userId: string, limit?: number) {
+		return this.allDebridCastService.getUserCastStreams(imdbId, userId, limit);
+	}
+
+	public getAllDebridOtherStreams(
+		imdbId: string,
+		userId: string,
+		limit?: number,
+		maxSize?: number
+	) {
+		return this.allDebridCastService.getOtherStreams(imdbId, userId, limit, maxSize);
 	}
 
 	// Torrent Snapshot Methods

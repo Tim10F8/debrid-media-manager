@@ -1,0 +1,441 @@
+import { DatabaseClient } from './client';
+
+interface LatestCast {
+	url: string;
+	link: string;
+}
+
+type EpisodeFilters = {
+	season?: number;
+	episode?: number;
+};
+
+function parseImdbId(imdbId: string): { baseImdbId: string } & EpisodeFilters {
+	const [baseImdbId, seasonPart, episodePart] = imdbId.split(':');
+	const season = seasonPart ? parseInt(seasonPart, 10) : undefined;
+	const episode = episodePart ? parseInt(episodePart, 10) : undefined;
+	return {
+		baseImdbId,
+		season: Number.isNaN(season) ? undefined : season,
+		episode: Number.isNaN(episode) ? undefined : episode,
+	};
+}
+
+export class AllDebridCastService extends DatabaseClient {
+	public async saveCastProfile(
+		userId: string,
+		apiKey: string,
+		movieMaxSize?: number,
+		episodeMaxSize?: number,
+		otherStreamsLimit?: number
+	) {
+		return this.prisma.allDebridCastProfile.upsert({
+			where: {
+				userId: userId,
+			},
+			update: {
+				apiKey,
+				...(movieMaxSize !== undefined && { movieMaxSize }),
+				...(episodeMaxSize !== undefined && { episodeMaxSize }),
+				...(otherStreamsLimit !== undefined && { otherStreamsLimit }),
+				updatedAt: new Date(),
+			},
+			create: {
+				userId: userId,
+				apiKey,
+				movieMaxSize: movieMaxSize ?? 0,
+				episodeMaxSize: episodeMaxSize ?? 0,
+				otherStreamsLimit: otherStreamsLimit ?? 5,
+				updatedAt: new Date(),
+			},
+		});
+	}
+
+	public async getLatestCast(imdbId: string, userId: string): Promise<LatestCast | null> {
+		const castItem = await this.prisma.allDebridCast.findFirst({
+			where: {
+				imdbId: imdbId,
+				userId: userId,
+			},
+			orderBy: {
+				updatedAt: 'desc',
+			},
+			select: {
+				url: true,
+				link: true,
+			},
+		});
+		return castItem && castItem.url && castItem.link
+			? { url: castItem.url, link: castItem.link }
+			: null;
+	}
+
+	public async getCastURLs(
+		imdbId: string,
+		userId: string
+	): Promise<{ url: string; link: string | null; size: number }[]> {
+		const castItems = await this.prisma.allDebridCast.findMany({
+			where: {
+				imdbId: imdbId,
+				userId: userId,
+				updatedAt: {
+					gt: new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000), // 30 days
+				},
+			},
+			orderBy: {
+				updatedAt: 'desc',
+			},
+			select: {
+				url: true,
+				size: true,
+				link: true,
+			},
+		});
+		return castItems
+			.filter(
+				(item): item is { url: string; link: string; size: bigint } => item.link !== null
+			)
+			.map((item) => ({
+				url: item.url,
+				link: item.link,
+				size: Number(item.size),
+			}));
+	}
+
+	public async getOtherCastURLs(
+		imdbId: string,
+		userId: string
+	): Promise<{ url: string; link: string; size: number }[]> {
+		const castItems = await this.prisma.allDebridCast.findMany({
+			where: {
+				imdbId: imdbId,
+				link: {
+					not: null,
+				},
+				size: {
+					gt: 10,
+				},
+				userId: {
+					not: userId,
+				},
+			},
+			distinct: ['size'],
+			orderBy: {
+				updatedAt: 'desc',
+			},
+			take: 2,
+			select: {
+				url: true,
+				link: true,
+				size: true,
+			},
+		});
+
+		return castItems
+			.filter((item): item is { url: string; link: string; size: bigint } => !!item.link)
+			.map((item) => ({
+				url: item.url,
+				link: item.link,
+				size: Number(item.size),
+			}));
+	}
+
+	public async getCastProfile(userId: string): Promise<{
+		apiKey: string;
+		movieMaxSize: number;
+		episodeMaxSize: number;
+		otherStreamsLimit?: number;
+	} | null> {
+		const profile = await this.prisma.allDebridCastProfile.findUnique({
+			where: { userId },
+			select: {
+				apiKey: true,
+				movieMaxSize: true,
+				episodeMaxSize: true,
+				otherStreamsLimit: true,
+			},
+		});
+		return profile;
+	}
+
+	public async saveCast(
+		imdbId: string,
+		userId: string,
+		hash: string,
+		url: string,
+		adLink: string,
+		fileSize: number,
+		magnetId?: number,
+		fileIndex?: number
+	): Promise<void> {
+		await this.prisma.allDebridCast.upsert({
+			where: {
+				imdbId_userId_hash: {
+					imdbId: imdbId,
+					userId: userId,
+					hash: hash,
+				},
+			},
+			update: {
+				imdbId: imdbId,
+				link: adLink,
+				url: url,
+				size: BigInt(fileSize),
+				magnetId: magnetId,
+				fileIndex: fileIndex,
+			},
+			create: {
+				imdbId: imdbId,
+				userId: userId,
+				hash: hash,
+				link: adLink,
+				url: url,
+				size: BigInt(fileSize),
+				magnetId: magnetId,
+				fileIndex: fileIndex,
+			},
+		});
+	}
+
+	public async fetchCastedMovies(userId: string): Promise<string[]> {
+		const movies = await this.prisma.allDebridCast.findMany({
+			where: {
+				userId: userId,
+				imdbId: {
+					not: {
+						contains: ':', // Excludes shows
+					},
+				},
+			},
+			orderBy: {
+				updatedAt: 'desc',
+			},
+			distinct: ['imdbId'],
+			select: {
+				imdbId: true,
+			},
+		});
+
+		return movies.map((movie) => movie.imdbId);
+	}
+
+	public async fetchCastedShows(userId: string): Promise<string[]> {
+		const showsWithDuplicates = await this.prisma.allDebridCast.findMany({
+			where: {
+				userId: userId,
+				imdbId: {
+					contains: ':', // Includes only shows
+				},
+			},
+			orderBy: {
+				updatedAt: 'desc',
+			},
+			select: {
+				imdbId: true,
+			},
+		});
+
+		const uniqueShows = showsWithDuplicates
+			.map((show) => show.imdbId.split(':')[0]) // Extracts the base imdbId of the show
+			.filter((value, index, self) => self.indexOf(value) === index); // Ensures uniqueness
+
+		return uniqueShows;
+	}
+
+	public async fetchAllCastedLinks(userId: string): Promise<
+		{
+			imdbId: string;
+			url: string;
+			hash: string;
+			size: number;
+			updatedAt: Date;
+		}[]
+	> {
+		const castItems = await this.prisma.allDebridCast.findMany({
+			where: {
+				userId: userId,
+			},
+			select: {
+				imdbId: true,
+				url: true,
+				hash: true,
+				size: true,
+				updatedAt: true,
+			},
+			orderBy: {
+				updatedAt: 'desc',
+			},
+		});
+
+		return castItems.map((item) => ({
+			...item,
+			size: Number(item.size),
+		}));
+	}
+
+	public async deleteCastedLink(imdbId: string, userId: string, hash: string): Promise<void> {
+		try {
+			await this.prisma.allDebridCast.delete({
+				where: {
+					imdbId_userId_hash: {
+						imdbId,
+						userId,
+						hash,
+					},
+				},
+			});
+		} catch (error: any) {
+			throw new Error(`Failed to delete casted link: ${error.message}`);
+		}
+	}
+
+	public async getAllUserCasts(userId: string): Promise<
+		{
+			imdbId: string;
+			hash: string;
+			url: string;
+			link: string | null;
+			size: number;
+		}[]
+	> {
+		const casts = await this.prisma.allDebridCast.findMany({
+			where: {
+				userId: userId,
+			},
+			select: {
+				imdbId: true,
+				hash: true,
+				url: true,
+				link: true,
+				size: true,
+			},
+		});
+		return casts.map((cast) => ({
+			imdbId: cast.imdbId,
+			hash: cast.hash,
+			url: cast.url,
+			link: cast.link,
+			size: Number(cast.size),
+		}));
+	}
+
+	public async getUserCastStreams(
+		imdbId: string,
+		userId: string,
+		limit: number = 5
+	): Promise<
+		{
+			url: string;
+			link: string;
+			size: number;
+			filename: string;
+			hash: string;
+		}[]
+	> {
+		const castItems = await this.prisma.allDebridCast.findMany({
+			where: {
+				imdbId: imdbId,
+				userId: userId,
+				link: {
+					not: null,
+				},
+				updatedAt: {
+					gt: new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000),
+				},
+			},
+			orderBy: {
+				updatedAt: 'desc',
+			},
+			select: {
+				url: true,
+				link: true,
+				size: true,
+				hash: true,
+			},
+			take: limit,
+		});
+
+		return castItems
+			.filter(
+				(item): item is { url: string; link: string; size: bigint; hash: string } =>
+					item.link !== null
+			)
+			.map((item) => ({
+				url: item.url,
+				link: item.link,
+				size: Number(item.size),
+				filename: item.url.split('/').pop() || 'Unknown',
+				hash: item.hash,
+			}));
+	}
+
+	public async getOtherStreams(
+		imdbId: string,
+		userId: string,
+		limit: number = 5,
+		maxSize?: number
+	): Promise<
+		{
+			url: string;
+			link: string;
+			size: number;
+			filename: string;
+			hash: string;
+		}[]
+	> {
+		const { baseImdbId, season: seasonFilter, episode: episodeFilter } = parseImdbId(imdbId);
+		const hasMaxSize = typeof maxSize === 'number' && maxSize > 0;
+		const normalizedMaxSizeMb = hasMaxSize ? Math.round(maxSize * 1024) : undefined;
+		const maxSizeCastLimit =
+			normalizedMaxSizeMb !== undefined ? BigInt(normalizedMaxSizeMb) : undefined;
+
+		// For AllDebrid, we only get streams from other AllDebrid Cast users
+		const otherCastItems = await this.prisma.allDebridCast.findMany({
+			where: {
+				imdbId: imdbId,
+				link: {
+					not: null,
+				},
+				size: {
+					gt: 10,
+					...(maxSizeCastLimit !== undefined && { lte: maxSizeCastLimit }),
+				},
+				userId: {
+					not: userId,
+				},
+			},
+			distinct: ['size'],
+			orderBy: {
+				size: 'desc',
+			},
+			select: {
+				url: true,
+				link: true,
+				size: true,
+				hash: true,
+			},
+			take: limit,
+		});
+
+		const castStreams = otherCastItems
+			.filter(
+				(item): item is { url: string; link: string; size: bigint; hash: string } =>
+					item.link !== null
+			)
+			.map((item) => ({
+				url: item.url,
+				link: item.link,
+				size: Number(item.size),
+				filename: item.url.split('/').pop() || 'Unknown',
+				hash: item.hash,
+			}));
+
+		console.log('[AllDebridCastService] Stream sources breakdown:', {
+			imdbId,
+			total: castStreams.length,
+			fromCast: castStreams.length,
+		});
+
+		return castStreams;
+	}
+}

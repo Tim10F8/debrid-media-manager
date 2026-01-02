@@ -11,6 +11,7 @@ import { useTorrentManagement } from '@/hooks/useTorrentManagement';
 import { SearchApiResponse, SearchResult } from '@/services/mediasearch';
 import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
+import { handleCastMovieAllDebrid } from '@/utils/allDebridCastApiClient';
 import { getLocalStorageBoolean, getLocalStorageItemOrDefault } from '@/utils/browserStorage';
 import { handleCastMovie } from '@/utils/castApiClient';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
@@ -617,6 +618,19 @@ const MovieSearch: FunctionComponent = () => {
 		window.open(`stremio://detail/movie/${imdbid}/${imdbid}`);
 	}
 
+	async function handleCastAllDebrid(hash: string) {
+		await toast.promise(
+			handleCastMovieAllDebrid(imdbid as string, adKey!, hash),
+			{
+				loading: 'Starting AllDebrid cast in Stremio...',
+				success: 'Cast started in Stremio',
+				error: 'AllDebrid cast failed in Stremio',
+			},
+			castToastOptions
+		);
+		window.open(`stremio://detail/movie/${imdbid}/${imdbid}`);
+	}
+
 	const getFirstAvailableRdTorrent = () => {
 		return filteredResults.find((r) => r.rdAvailable && !r.noVideos);
 	};
@@ -849,6 +863,7 @@ const MovieSearch: FunctionComponent = () => {
 						handleShowInfo={handleShowInfo}
 						handleCast={handleCast}
 						handleCastTorBox={torboxKey ? handleCastTorBox : undefined}
+						handleCastAllDebrid={adKey ? handleCastAllDebrid : undefined}
 						handleCopyMagnet={(hash) =>
 							handleCopyOrDownloadMagnet(hash, shouldDownloadMagnets)
 						}

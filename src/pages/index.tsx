@@ -200,15 +200,12 @@ function IndexPage() {
 					)}
 
 					<div className="flex w-full max-w-md flex-col items-center gap-6">
-						<MainActions rdUser={rdUser} tbUser={tbUser} isLoading={isLoading} />
-						{rdUser ? (
-							<Link
-								href="/is-real-debrid-down-or-just-me"
-								className="w-full rounded border-2 border-emerald-500 bg-emerald-900/30 px-4 py-2 text-center text-sm font-medium text-emerald-100 transition-colors hover:bg-emerald-800/40"
-							>
-								Is Real-Debrid down?
-							</Link>
-						) : null}
+						<MainActions
+							rdUser={rdUser}
+							tbUser={tbUser}
+							adUser={!!adUser}
+							isLoading={isLoading}
+						/>
 						<Link
 							href="/settings"
 							className="haptic-sm flex w-full items-center justify-between rounded border-2 border-gray-500 bg-gray-800/30 px-4 py-2 text-sm font-medium text-gray-100 transition-colors hover:bg-gray-700/50"

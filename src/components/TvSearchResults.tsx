@@ -28,6 +28,7 @@ type TvSearchResultsProps = {
 	handleShowInfo: (result: SearchResult) => void;
 	handleCast: (hash: string, fileIds: string[]) => Promise<void>;
 	handleCastTorBox?: (hash: string, fileIds: string[]) => Promise<void>;
+	handleCastAllDebrid?: (hash: string, fileIds: string[]) => Promise<void>;
 	handleCopyMagnet: (hash: string) => void;
 	checkServiceAvailability: (
 		result: SearchResult,
@@ -56,6 +57,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 	handleShowInfo,
 	handleCast,
 	handleCastTorBox,
+	handleCastAllDebrid,
 	handleCopyMagnet,
 	checkServiceAvailability,
 	addRd,
@@ -70,6 +72,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 	const [loadingHashes, setLoadingHashes] = useState<Set<string>>(new Set());
 	const [castingHashes, setCastingHashes] = useState<Set<string>>(new Set());
 	const [castingTbHashes, setCastingTbHashes] = useState<Set<string>>(new Set());
+	const [castingAdHashes, setCastingAdHashes] = useState<Set<string>>(new Set());
 	const [checkingHashes, setCheckingHashes] = useState<Map<string, string>>(new Map());
 	const [downloadMagnets, setDownloadMagnets] = useState(false);
 
@@ -185,6 +188,20 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 		}
 	};
 
+	const handleCastAllDebridWithLoading = async (hash: string, fileIds: string[]) => {
+		if (!handleCastAllDebrid || castingAdHashes.has(hash)) return;
+		setCastingAdHashes((prev) => new Set(prev).add(hash));
+		try {
+			await handleCastAllDebrid(hash, fileIds);
+		} finally {
+			setCastingAdHashes((prev) => {
+				const newSet = new Set(prev);
+				newSet.delete(hash);
+				return newSet;
+			});
+		}
+	};
+
 	const handleCheckWithLoading = async (result: SearchResult, services?: DebridService[]) => {
 		if (checkingHashes.has(result.hash)) return;
 		const label = resolveServiceLabel(services);
@@ -276,6 +293,7 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 						const isLoading = loadingHashes.has(r.hash);
 						const isCasting = castingHashes.has(r.hash);
 						const isCastingTb = castingTbHashes.has(r.hash);
+						const isCastingAd = castingAdHashes.has(r.hash);
 						const checkingLabel = checkingHashes.get(r.hash);
 
 						return (
@@ -496,6 +514,34 @@ const TvSearchResults: React.FC<TvSearchResultsProps> = ({
 														<>
 															<Cast className="mr-1 inline-block h-3 w-3 text-purple-400" />
 															Cast (TB)
+														</>
+													)}
+												</button>
+											)}
+
+										{/* Cast (AD) button */}
+										{adKey &&
+											handleCastAllDebrid &&
+											castableFileIds.length > 0 && (
+												<button
+													className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${isCastingAd ? 'cursor-not-allowed opacity-50' : ''}`}
+													onClick={() =>
+														handleCastAllDebridWithLoading(
+															r.hash,
+															castableFileIds
+														)
+													}
+													disabled={isCastingAd}
+												>
+													{isCastingAd ? (
+														<>
+															<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
+															Casting...
+														</>
+													) : (
+														<>
+															<Cast className="mr-1 inline-block h-3 w-3 text-yellow-400" />
+															Cast (AD)
 														</>
 													)}
 												</button>

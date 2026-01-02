@@ -27,6 +27,7 @@ type MovieSearchResultsProps = {
 	handleShowInfo: (result: SearchResult) => void;
 	handleCast: (hash: string) => Promise<void>;
 	handleCastTorBox?: (hash: string) => Promise<void>;
+	handleCastAllDebrid?: (hash: string) => Promise<void>;
 	handleCopyMagnet: (hash: string) => void;
 	checkServiceAvailability: (
 		result: SearchResult,
@@ -54,6 +55,7 @@ const MovieSearchResults = ({
 	handleShowInfo,
 	handleCast,
 	handleCastTorBox,
+	handleCastAllDebrid,
 	handleCopyMagnet,
 	checkServiceAvailability,
 	addRd,
@@ -68,6 +70,7 @@ const MovieSearchResults = ({
 	const [loadingHashes, setLoadingHashes] = useState<Set<string>>(new Set());
 	const [castingHashes, setCastingHashes] = useState<Set<string>>(new Set());
 	const [castingTbHashes, setCastingTbHashes] = useState<Set<string>>(new Set());
+	const [castingAdHashes, setCastingAdHashes] = useState<Set<string>>(new Set());
 	const [checkingHashes, setCheckingHashes] = useState<Map<string, string>>(new Map());
 	const [downloadMagnets, setDownloadMagnets] = useState(false);
 
@@ -211,6 +214,20 @@ const MovieSearchResults = ({
 		}
 	};
 
+	const handleCastAllDebridWithLoading = async (hash: string) => {
+		if (!handleCastAllDebrid || castingAdHashes.has(hash)) return;
+		setCastingAdHashes((prev) => new Set(prev).add(hash));
+		try {
+			await handleCastAllDebrid(hash);
+		} finally {
+			setCastingAdHashes((prev) => {
+				const newSet = new Set(prev);
+				newSet.delete(hash);
+				return newSet;
+			});
+		}
+	};
+
 	const handleCheckWithLoading = async (result: SearchResult, services?: DebridService[]) => {
 		if (checkingHashes.has(result.hash)) return;
 		const label = resolveServiceLabel(services);
@@ -291,6 +308,7 @@ const MovieSearchResults = ({
 				const isLoading = loadingHashes.has(r.hash);
 				const isCasting = castingHashes.has(r.hash);
 				const isCastingTb = castingTbHashes.has(r.hash);
+				const isCastingAd = castingAdHashes.has(r.hash);
 				const checkingLabel = checkingHashes.get(r.hash);
 
 				return (
@@ -502,6 +520,27 @@ const MovieSearchResults = ({
 											<span className="inline-flex items-center">
 												<Cast className="mr-1 h-3 w-3 text-purple-400" />
 												Cast (TB)
+											</span>
+										)}
+									</button>
+								)}
+
+								{/* Cast (AD) btn */}
+								{adKey && handleCastAllDebrid && (
+									<button
+										className={`haptic-sm inline rounded border-2 border-yellow-500 bg-yellow-900/30 px-1 text-xs text-yellow-100 transition-colors hover:bg-yellow-800/50 ${isCastingAd ? 'cursor-not-allowed opacity-50' : ''}`}
+										onClick={() => handleCastAllDebridWithLoading(r.hash)}
+										disabled={isCastingAd}
+									>
+										{isCastingAd ? (
+											<>
+												<Loader2 className="mr-1 inline-block h-3 w-3 animate-spin" />
+												Casting...
+											</>
+										) : (
+											<span className="inline-flex items-center">
+												<Cast className="mr-1 h-3 w-3 text-yellow-400" />
+												Cast (AD)
 											</span>
 										)}
 									</button>
