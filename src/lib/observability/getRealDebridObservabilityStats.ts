@@ -60,7 +60,7 @@ export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebri
 	const [streamMetrics, recentChecks, rdStats, torrentioChecks] = await Promise.all([
 		getStreamMetricsFromDb(),
 		repository.getRecentStreamChecks(5),
-		repository.getRdStats(24),
+		repository.getRdStats(1),
 		repository.getRecentTorrentioChecks(5),
 	]);
 

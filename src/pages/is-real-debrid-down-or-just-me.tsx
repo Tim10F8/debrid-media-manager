@@ -352,7 +352,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 						>
 							<h3 className="flex items-center gap-2 text-sm font-medium text-slate-300">
 								<Activity className="h-4 w-4" />
-								API Success Rate (24h)
+								API Success Rate (1h)
 							</h3>
 							<div className="mt-4">
 								<div className="flex items-baseline gap-2">
