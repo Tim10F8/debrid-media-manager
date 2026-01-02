@@ -2,6 +2,7 @@ import { RdOverallStats } from '@/services/database/rdOperational';
 import { repository } from '@/services/repository';
 
 import { getStreamMetricsFromDb, isHealthCheckInProgress } from './streamServersHealth';
+import { isTorrentioHealthCheckInProgress } from './torrentioHealth';
 
 export interface RecentCheckResult {
 	ok: boolean;
@@ -23,19 +24,44 @@ export interface CompactWorkingStreamMetrics {
 	recentChecks: RecentCheckResult[];
 }
 
+export interface TorrentioUrlCheckResult {
+	url: string;
+	ok: boolean;
+	status: number | null;
+	hasLocation: boolean;
+	locationValid: boolean;
+	latencyMs: number | null;
+	error: string | null;
+}
+
+export interface TorrentioCheckResult {
+	ok: boolean;
+	latencyMs: number | null;
+	error: string | null;
+	urls: TorrentioUrlCheckResult[];
+	checkedAt: number;
+}
+
+export interface TorrentioHealthMetrics {
+	inProgress: boolean;
+	recentChecks: TorrentioCheckResult[];
+}
+
 export interface RealDebridObservabilityStats {
 	workingStream: CompactWorkingStreamMetrics;
 	rdApi: RdOverallStats | null;
+	torrentio: TorrentioHealthMetrics | null;
 }
 
 /**
  * Gets Real-Debrid stream health stats from MySQL database.
  */
 export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebridObservabilityStats> {
-	const [streamMetrics, recentChecks, rdStats] = await Promise.all([
+	const [streamMetrics, recentChecks, rdStats, torrentioChecks] = await Promise.all([
 		getStreamMetricsFromDb(),
 		repository.getRecentStreamChecks(5),
 		repository.getRdStats(24),
+		repository.getRecentTorrentioChecks(5),
 	]);
 
 	return {
@@ -57,6 +83,16 @@ export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebri
 			})),
 		},
 		rdApi: rdStats,
+		torrentio: {
+			inProgress: isTorrentioHealthCheckInProgress(),
+			recentChecks: torrentioChecks.map((check) => ({
+				ok: check.ok,
+				latencyMs: check.latencyMs,
+				error: check.error,
+				urls: check.urls,
+				checkedAt: check.checkedAt.getTime(),
+			})),
+		},
 	};
 }
 

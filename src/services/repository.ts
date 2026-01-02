@@ -16,7 +16,7 @@ import {
 } from './database';
 import { HashSearchParams } from './database/hashSearch';
 import { RealDebridOperation } from './database/rdOperational';
-import { StreamServerStatus } from './database/streamHealth';
+import { StreamServerStatus, TorrentioUrlCheckResult } from './database/streamHealth';
 import { ScrapeSearchResult } from './mediasearch';
 import { TorrentInfoResponse } from './types';
 
@@ -473,6 +473,19 @@ export class Repository {
 
 	public getRecentStreamChecks(limit?: number) {
 		return this.streamHealthService.getRecentChecks(limit);
+	}
+
+	public recordTorrentioCheckResult(result: {
+		ok: boolean;
+		latencyMs: number | null;
+		error: string | null;
+		urls: TorrentioUrlCheckResult[];
+	}) {
+		return this.streamHealthService.recordTorrentioCheckResult(result);
+	}
+
+	public getRecentTorrentioChecks(limit?: number) {
+		return this.streamHealthService.getRecentTorrentioChecks(limit);
 	}
 
 	// History Aggregation Service Methods

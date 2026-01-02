@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { runHealthCheckNow } from '@/lib/observability/streamServersHealth';
+import { runTorrentioHealthCheckNow } from '@/lib/observability/torrentioHealth';
 
 interface CronResponse {
 	success: boolean;
@@ -10,6 +11,9 @@ interface CronResponse {
 		total: number;
 		rate: number;
 		avgLatencyMs: number | null;
+	};
+	torrentioHealth?: {
+		checked: boolean;
 	};
 	error?: string;
 }
@@ -36,8 +40,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 	}
 
 	try {
-		// Run stream health check
-		const streamMetrics = await runHealthCheckNow();
+		// Run stream health check and Torrentio health check in parallel
+		const [streamMetrics] = await Promise.all([
+			runHealthCheckNow(),
+			runTorrentioHealthCheckNow(),
+		]);
 
 		return res.status(200).json({
 			success: true,
@@ -50,6 +57,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 						avgLatencyMs: streamMetrics.avgLatencyMs,
 					}
 				: undefined,
+			torrentioHealth: {
+				checked: true,
+			},
 		});
 	} catch (error) {
 		console.error('[Cron] Job failed:', error);

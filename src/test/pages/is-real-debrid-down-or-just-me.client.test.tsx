@@ -25,6 +25,7 @@ function buildWorkingStream(): CompactWorkingStreamMetrics {
 const baseStats: RealDebridObservabilityStats = {
 	workingStream: buildWorkingStream(),
 	rdApi: null,
+	torrentio: { inProgress: false, recentChecks: [] },
 };
 
 type GlobalWithFetch = typeof globalThis & {

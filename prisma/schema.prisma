@@ -310,6 +310,18 @@ model StreamCheckResult {
   @@index([checkedAt])
 }
 
+// Torrentio Health - Individual check results (kept last 50 max)
+model TorrentioCheckResult {
+  id        Int      @id @default(autoincrement())
+  ok        Boolean  // Whether all 3 URLs returned 302 with real-debrid in location
+  latencyMs Float?   // Average latency across the 3 checks
+  error     String?  @db.Text // Error message if failed
+  urls      Json     @default("[]") // Results for each URL: [{url, ok, status, hasLocation}]
+  checkedAt DateTime @default(now())
+
+  @@index([checkedAt])
+}
+
 // Stream Health - Hourly snapshots (kept for 7 days)
 model StreamHealthHourly {
   id             Int      @id @default(autoincrement())

@@ -6,6 +6,7 @@ import {
 	AlertTriangle,
 	CheckCircle2,
 	Clock,
+	Globe,
 	Loader2,
 	RefreshCw,
 	Wifi,
@@ -123,6 +124,16 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 	const rdApi = stats.rdApi;
 	const rdApiPct = rdApi && rdApi.totalCount > 0 ? Math.round(rdApi.successRate * 100) : null;
 	const rdApiConsidered = rdApi ? rdApi.successCount + rdApi.failureCount : 0;
+
+	// Torrentio Health
+	const torrentio = stats.torrentio;
+	const torrentioChecks = torrentio?.recentChecks ?? [];
+	const torrentioPassedCount = torrentioChecks.filter((c) => c.ok).length;
+	const torrentioTotalChecks = torrentioChecks.length;
+	const torrentioPct =
+		torrentioTotalChecks > 0
+			? Math.round((torrentioPassedCount / torrentioTotalChecks) * 100)
+			: null;
 
 	// Determine status based on stream health (and optionally RD API)
 	const state: StatusState =
@@ -262,7 +273,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 					</header>
 
 					{/* Stream Health & Info */}
-					<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+					<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
 						<div
 							data-testid="working-stream-card"
 							className="rounded-xl border border-white/10 bg-white/5 p-6"
@@ -417,6 +428,80 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 							</div>
 						</div>
 
+						<div
+							data-testid="torrentio-card"
+							className="rounded-xl border border-white/10 bg-white/5 p-6"
+						>
+							<h3 className="flex items-center gap-2 text-sm font-medium text-slate-300">
+								<Globe className="h-4 w-4" />
+								Torrentio Health
+							</h3>
+							<div className="mt-4">
+								<div className="flex items-baseline gap-2">
+									<span
+										className={`text-3xl font-bold ${
+											torrentioPct === null
+												? 'text-slate-400'
+												: torrentioPct >= 80
+													? 'text-emerald-400'
+													: torrentioPct >= 40
+														? 'text-amber-400'
+														: 'text-rose-500'
+										}`}
+									>
+										{torrentioPct !== null ? `${torrentioPct}%` : '—'}
+									</span>
+									<span className="text-sm text-slate-500">
+										{torrentioTotalChecks > 0
+											? `${torrentioPassedCount}/${torrentioTotalChecks} passed`
+											: 'no data yet'}
+									</span>
+								</div>
+								{torrentioTotalChecks > 0 && (
+									<div className="mt-3 space-y-1.5">
+										<div className="text-xs font-medium text-slate-500">
+											Last {torrentioTotalChecks} checks
+										</div>
+										{torrentioChecks.map((check, i) => (
+											<div
+												key={i}
+												className="flex items-center justify-between text-xs"
+											>
+												<div className="flex items-center gap-2">
+													<span
+														className={`h-2 w-2 rounded-full ${check.ok ? 'bg-emerald-500' : 'bg-rose-500'}`}
+													/>
+													<span className="text-slate-400">
+														{new Date(
+															check.checkedAt
+														).toLocaleTimeString(FIXED_LOCALE, {
+															hour: '2-digit',
+															minute: '2-digit',
+														})}
+													</span>
+												</div>
+												<span
+													className={
+														check.ok
+															? 'text-emerald-400'
+															: 'text-rose-400'
+													}
+												>
+													{check.ok
+														? check.latencyMs
+															? `${Math.round(check.latencyMs)}ms`
+															: 'OK'
+														: check.latencyMs
+															? `Failed (${Math.round(check.latencyMs)}ms)`
+															: 'Failed'}
+												</span>
+											</div>
+										))}
+									</div>
+								)}
+							</div>
+						</div>
+
 						<div className="rounded-xl border border-white/10 bg-white/5 p-6 md:col-span-2 lg:col-span-1">
 							<div className="flex h-full flex-col justify-center gap-4">
 								<div>
@@ -424,9 +509,9 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 										About this data
 									</h3>
 									<p className="mt-2 text-sm text-slate-400">
-										This dashboard monitors Real-Debrid stream server
-										availability via automated health checks that run every 5
-										minutes.
+										This dashboard monitors Real-Debrid stream server and
+										Torrentio availability via automated health checks that run
+										every 5 minutes.
 									</p>
 								</div>
 

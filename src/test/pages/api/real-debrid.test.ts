@@ -28,6 +28,7 @@ describe('Real-Debrid observability API caching', () => {
 		const fakeStats: RealDebridObservabilityStats = {
 			workingStream: fakeWorkingStream,
 			rdApi: null,
+			torrentio: { inProgress: false, recentChecks: [] },
 		};
 		vi.spyOn(combined, 'getRealDebridObservabilityStatsFromDb').mockResolvedValue(fakeStats);
 
@@ -70,6 +71,7 @@ describe('Real-Debrid observability API caching', () => {
 		const fakeStats: RealDebridObservabilityStats = {
 			workingStream: fakeWorkingStream,
 			rdApi: null,
+			torrentio: { inProgress: false, recentChecks: [] },
 		};
 		const statsSpy = vi
 			.spyOn(combined, 'getRealDebridObservabilityStatsFromDb')

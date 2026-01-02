@@ -21,6 +21,7 @@ function buildEmptyStats(): RealDebridObservabilityStats {
 	return {
 		workingStream: fakeWorkingStream,
 		rdApi: null,
+		torrentio: { inProgress: false, recentChecks: [] },
 	};
 }
 

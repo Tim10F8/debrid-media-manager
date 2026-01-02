@@ -27,6 +27,24 @@ export interface StreamCheckResultData {
 	checkedAt: Date;
 }
 
+export interface TorrentioUrlCheckResult {
+	url: string;
+	ok: boolean;
+	status: number | null;
+	hasLocation: boolean;
+	locationValid: boolean;
+	latencyMs: number | null;
+	error: string | null;
+}
+
+export interface TorrentioCheckResultData {
+	ok: boolean;
+	latencyMs: number | null;
+	error: string | null;
+	urls: TorrentioUrlCheckResult[];
+	checkedAt: Date;
+}
+
 export class StreamHealthService extends DatabaseClient {
 	/**
 	 * Upserts a batch of stream server health results.
@@ -340,6 +358,78 @@ export class StreamHealthService extends DatabaseClient {
 				error?.message?.includes('Authentication failed')
 			) {
 				console.warn('getRecentChecks: Database error, returning empty array');
+				return [];
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Records an individual Torrentio check result.
+	 */
+	public async recordTorrentioCheckResult(result: {
+		ok: boolean;
+		latencyMs: number | null;
+		error: string | null;
+		urls: TorrentioUrlCheckResult[];
+	}): Promise<void> {
+		try {
+			await this.prisma.torrentioCheckResult.create({
+				data: {
+					ok: result.ok,
+					latencyMs: result.latencyMs,
+					error: result.error,
+					urls: result.urls as unknown as object[],
+				},
+			});
+
+			// Keep only last 50 results
+			const count = await this.prisma.torrentioCheckResult.count();
+			if (count > 50) {
+				const toDelete = count - 50;
+				const oldestRecords = await this.prisma.torrentioCheckResult.findMany({
+					orderBy: { checkedAt: 'asc' },
+					take: toDelete,
+					select: { id: true },
+				});
+				await this.prisma.torrentioCheckResult.deleteMany({
+					where: { id: { in: oldestRecords.map((r) => r.id) } },
+				});
+			}
+		} catch (error: any) {
+			if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
+				console.warn('TorrentioCheckResult table does not exist - cannot record result');
+				return;
+			}
+			console.error('Failed to record Torrentio check result:', error);
+		}
+	}
+
+	/**
+	 * Gets the most recent N Torrentio check results.
+	 */
+	public async getRecentTorrentioChecks(limit: number = 5): Promise<TorrentioCheckResultData[]> {
+		try {
+			const results = await this.prisma.torrentioCheckResult.findMany({
+				orderBy: { checkedAt: 'desc' },
+				take: limit,
+			});
+
+			return results.map((r) => ({
+				ok: r.ok,
+				latencyMs: r.latencyMs,
+				error: r.error,
+				urls: r.urls as unknown as TorrentioUrlCheckResult[],
+				checkedAt: r.checkedAt,
+			}));
+		} catch (error: any) {
+			if (
+				error?.code?.startsWith?.('P') ||
+				error?.name?.includes?.('Prisma') ||
+				error?.message?.includes('does not exist') ||
+				error?.message?.includes('Authentication failed')
+			) {
+				console.warn('getRecentTorrentioChecks: Database error, returning empty array');
 				return [];
 			}
 			throw error;
