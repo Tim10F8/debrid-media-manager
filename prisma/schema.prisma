@@ -26,6 +26,35 @@ model ScrapedTrue {
   updatedAt DateTime @updatedAt
 }
 
+// ═══════════════════════════════════════════════════════════════
+// MUSIC DATA TABLES (MusicBrainz Integration)
+// ═══════════════════════════════════════════════════════════════
+
+// Scraped music torrents, keyed by MusicBrainz release-group ID
+// Key format: "music:{mbid}" where mbid is the release-group UUID
+// Value: JSON array of {hash, title, fileSize, format, tracks}
+model ScrapedMusic {
+  key       String   @id // "music:{mbid}"
+  value     Json // Array of torrent entries
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+// Music metadata from MusicBrainz
+model MusicMetadata {
+  mbid       String   @id @db.VarChar(36) // MusicBrainz release-group UUID
+  artistMbid String?  @db.VarChar(36) // MusicBrainz artist UUID
+  artist     String   @db.VarChar(500)
+  album      String   @db.VarChar(500)
+  year       Int?
+  updatedAt  DateTime @updatedAt
+
+  @@index([artist])
+  @@index([year])
+  @@fulltext([artist, album])
+}
+
 model Search {
   key       String   @id
   value     Json
