@@ -4,6 +4,8 @@
 // Health checks are triggered by cron job alongside the stream health check.
 
 import { repository } from '@/services/repository';
+import ProxyManager from '@/utils/proxyManager';
+import axios from 'axios';
 
 const REQUEST_TIMEOUT_MS = 10000;
 
@@ -42,24 +44,26 @@ function getTorrentioTestUrls(rdKey: string): string[] {
 /**
  * Tests a single Torrentio URL with a HEAD request.
  * Expects HTTP 302 with a location header containing "real-debrid".
+ * Uses Tor proxy to avoid Cloudflare blocks on datacenter IPs.
  */
 async function testTorrentioUrl(url: string): Promise<TorrentioUrlCheckResult> {
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
 	try {
+		const proxyManager = new ProxyManager();
+		const agent = proxyManager.getTorProxy();
+
 		const startTime = performance.now();
-		const response = await fetch(url, {
-			method: 'HEAD',
-			signal: controller.signal,
-			redirect: 'manual', // Don't follow redirects, we want to check the 302
+		const response = await axios.head(url, {
+			httpAgent: agent,
+			httpsAgent: agent,
+			timeout: REQUEST_TIMEOUT_MS,
+			maxRedirects: 0, // Don't follow redirects, we want to check the 302
+			validateStatus: () => true, // Accept any status code
 		});
 		const endTime = performance.now();
-		clearTimeout(timeoutId);
 
 		const status = response.status;
-		const location = response.headers.get('location');
-		const hasLocation = location !== null && location.length > 0;
+		const location = response.headers['location'] as string | undefined;
+		const hasLocation = location !== undefined && location.length > 0;
 		const locationValid = hasLocation && location.toLowerCase().includes('real-debrid');
 
 		// Success: HTTP 302 with location containing "real-debrid"
@@ -81,11 +85,9 @@ async function testTorrentioUrl(url: string): Promise<TorrentioUrlCheckResult> {
 						: 'Location header does not contain real-debrid',
 		};
 	} catch (error) {
-		clearTimeout(timeoutId);
-
 		let errorMessage = 'Unknown error';
 		if (error instanceof Error) {
-			errorMessage = error.name === 'AbortError' ? 'Timeout' : error.message;
+			errorMessage = error.message;
 		}
 
 		return {
