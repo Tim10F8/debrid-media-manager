@@ -3,6 +3,7 @@ import Redis from 'ioredis';
 // Rate limit configs for different endpoint types
 export const RATE_LIMIT_CONFIGS = {
 	stream: { rateLimit: 1, windowSeconds: 5 }, // 1 request per 5 seconds for stream endpoints
+	torrents: { rateLimit: 1, windowSeconds: 2 }, // 1 request per 2 seconds for torrents API
 	default: { rateLimit: 5, windowSeconds: 1 }, // 5 requests per second for other endpoints
 } as const;
 
@@ -27,6 +28,10 @@ export function getRateLimitConfig(pathname: string): RateLimitConfig {
 	// Stream endpoints: /api/stremio[-tb|-ad]/USERID/stream/...
 	if (/^\/api\/stremio(?:-tb|-ad)?\/[A-Za-z0-9]+\/stream\//.test(pathname)) {
 		return RATE_LIMIT_CONFIGS.stream;
+	}
+	// Torrents API endpoints
+	if (pathname.startsWith('/api/torrents')) {
+		return RATE_LIMIT_CONFIGS.torrents;
 	}
 	return RATE_LIMIT_CONFIGS.default;
 }
@@ -225,18 +230,53 @@ export class HybridRateLimiter {
 }
 
 /**
- * Extract user ID from Stremio API path
- * User IDs are 12 characters, so we require at least 10 to distinguish from route segments like "id", "cast", "links"
+ * Get client IP from request headers
+ * Priority: cf-connecting-ip (Cloudflare) > x-forwarded-for > unknown
  */
-export function extractIdentifier(pathname: string, fallbackIp: string | null): string {
+export function getClientIp(
+	cfConnectingIp: string | null,
+	xForwardedFor: string | null
+): string {
+	// Cloudflare provides the real client IP in cf-connecting-ip
+	if (cfConnectingIp?.trim()) {
+		return cfConnectingIp.trim();
+	}
+	// Fallback to x-forwarded-for (first IP in the chain)
+	if (xForwardedFor?.trim()) {
+		return xForwardedFor.split(',')[0]?.trim() || 'unknown';
+	}
+	return 'unknown';
+}
+
+/**
+ * Extract identifier for rate limiting
+ * - For Stremio endpoints: use user ID from path, fallback to IP
+ * - For Torrents endpoints: always use IP
+ */
+export function extractIdentifier(
+	pathname: string,
+	cfConnectingIp: string | null,
+	xForwardedFor: string | null
+): string {
+	// For torrents API, always use IP-based rate limiting
+	if (pathname.startsWith('/api/torrents')) {
+		return getClientIp(cfConnectingIp, xForwardedFor);
+	}
+
+	// For Stremio API, try to extract user ID from path
 	const match = pathname.match(/^\/api\/stremio(?:-tb|-ad)?\/([A-Za-z0-9]{10,})/);
 	const userId = match?.[1];
-	return userId || fallbackIp?.split(',')[0]?.trim() || 'unknown';
+	if (userId) {
+		return userId;
+	}
+
+	// Fallback to IP
+	return getClientIp(cfConnectingIp, xForwardedFor);
 }
 
 /**
  * Check if path should be rate limited
  */
 export function shouldRateLimit(pathname: string): boolean {
-	return pathname.startsWith('/api/stremio');
+	return pathname.startsWith('/api/stremio') || pathname.startsWith('/api/torrents');
 }

@@ -26,8 +26,9 @@ export async function middleware(request: NextRequest) {
 		return NextResponse.next();
 	}
 
-	const fallbackIp = request.headers.get('x-forwarded-for');
-	const identifier = extractIdentifier(pathname, fallbackIp);
+	const cfConnectingIp = request.headers.get('cf-connecting-ip');
+	const xForwardedFor = request.headers.get('x-forwarded-for');
+	const identifier = extractIdentifier(pathname, cfConnectingIp, xForwardedFor);
 	const config = getRateLimitConfig(pathname);
 
 	const limiter = getRateLimiter();
@@ -55,5 +56,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-	matcher: '/api/stremio/:path*',
+	matcher: ['/api/stremio/:path*', '/api/torrents/:path*'],
 };
