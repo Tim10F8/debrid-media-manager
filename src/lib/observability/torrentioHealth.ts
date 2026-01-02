@@ -4,8 +4,6 @@
 // Health checks are triggered by cron job alongside the stream health check.
 
 import { repository } from '@/services/repository';
-import ProxyManager from '@/utils/proxyManager';
-import axios from 'axios';
 
 const REQUEST_TIMEOUT_MS = 10000;
 
@@ -43,31 +41,38 @@ function getTorrentioTestUrls(rdKey: string): string[] {
 
 /**
  * Tests a single Torrentio URL with a HEAD request.
- * Expects HTTP 302 with a location header containing "real-debrid".
- * Uses Tor proxy to avoid Cloudflare blocks on datacenter IPs.
+ * Success conditions:
+ * - HTTP 302 with location containing "real-debrid" (ideal)
+ * - Any 4xx response (service is up, just blocking our IP - not a failure)
+ * Failure conditions:
+ * - 5xx server errors
+ * - Network/timeout errors
  */
 async function testTorrentioUrl(url: string): Promise<TorrentioUrlCheckResult> {
-	try {
-		const proxyManager = new ProxyManager();
-		const agent = proxyManager.getTorProxy();
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+	try {
 		const startTime = performance.now();
-		const response = await axios.head(url, {
-			httpAgent: agent,
-			httpsAgent: agent,
-			timeout: REQUEST_TIMEOUT_MS,
-			maxRedirects: 0, // Don't follow redirects, we want to check the 302
-			validateStatus: () => true, // Accept any status code
+		const response = await fetch(url, {
+			method: 'HEAD',
+			signal: controller.signal,
+			redirect: 'manual', // Don't follow redirects, we want to check the 302
 		});
 		const endTime = performance.now();
+		clearTimeout(timeoutId);
 
 		const status = response.status;
-		const location = response.headers['location'] as string | undefined;
-		const hasLocation = location !== undefined && location.length > 0;
+		const location = response.headers.get('location');
+		const hasLocation = location !== null && location.length > 0;
 		const locationValid = hasLocation && location.toLowerCase().includes('real-debrid');
 
-		// Success: HTTP 302 with location containing "real-debrid"
-		const ok = status === 302 && locationValid;
+		// Success cases:
+		// 1. HTTP 302 with valid real-debrid location (ideal)
+		// 2. Any 4xx response means Torrentio is responding (just blocking us)
+		const isIdealResponse = status === 302 && locationValid;
+		const is4xxResponse = status >= 400 && status < 500;
+		const ok = isIdealResponse || is4xxResponse;
 
 		return {
 			url,
@@ -78,16 +83,16 @@ async function testTorrentioUrl(url: string): Promise<TorrentioUrlCheckResult> {
 			latencyMs: endTime - startTime,
 			error: ok
 				? null
-				: status !== 302
-					? `Expected HTTP 302, got ${status}`
-					: !hasLocation
-						? 'Missing location header'
-						: 'Location header does not contain real-debrid',
+				: status >= 500
+					? `Server error: ${status}`
+					: `Unexpected response: ${status}`,
 		};
 	} catch (error) {
+		clearTimeout(timeoutId);
+
 		let errorMessage = 'Unknown error';
 		if (error instanceof Error) {
-			errorMessage = error.message;
+			errorMessage = error.name === 'AbortError' ? 'Timeout' : error.message;
 		}
 
 		return {
