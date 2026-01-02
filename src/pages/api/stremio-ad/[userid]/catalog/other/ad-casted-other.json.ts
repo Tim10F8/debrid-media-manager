@@ -18,11 +18,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	try {
 		const profile = await db.getAllDebridCastProfile(userid);
 		if (!profile) {
+			console.log('[AD Catalog] No profile found for user:', userid);
 			res.status(200).json({ metas: [], cacheMaxAge: 0 });
 			return;
 		}
 
+		console.log('[AD Catalog] Fetching library for user:', userid);
 		const metas = await getAllDebridDMMLibrary(profile.apiKey, 0);
+		console.log('[AD Catalog] Got metas:', metas.length);
 
 		res.status(200).json({
 			metas,
@@ -30,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		});
 	} catch (error) {
 		console.error(
-			'Failed to get AllDebrid library:',
+			'[AD Catalog] Failed to get AllDebrid library:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
 		res.status(500).json({ error: 'Failed to get AllDebrid library' });

@@ -36,14 +36,19 @@ function flattenFiles(files: MagnetFile[], parentPath: string = ''): FlatFile[] 
 export async function getAllDebridDMMLibrary(apiKey: string, page: number) {
 	try {
 		// Get all magnets with status "Ready" (statusCode 4)
+		console.log('[AD Library] Fetching magnets, page:', page);
 		const result = await getMagnetStatus(apiKey, undefined, 'active');
 
 		if (!result.data?.magnets) {
+			console.log('[AD Library] No magnets data in response');
 			return [];
 		}
 
+		console.log('[AD Library] Total magnets:', result.data.magnets.length);
+
 		// Filter for ready magnets
 		const readyMagnets = result.data.magnets.filter((m) => m.statusCode === 4);
+		console.log('[AD Library] Ready magnets:', readyMagnets.length);
 
 		// Paginate
 		const offset = page * PAGE_SIZE;
@@ -55,7 +60,7 @@ export async function getAllDebridDMMLibrary(apiKey: string, page: number) {
 			type: 'other',
 		}));
 	} catch (error) {
-		console.error('Error getting AllDebrid library:', error);
+		console.error('[AD Library] Error getting AllDebrid library:', error);
 		return [];
 	}
 }
