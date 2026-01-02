@@ -198,9 +198,9 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 					</div>
 				)}
 
-				<div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8">
+				<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
 					{/* Header / Hero */}
-					<header className="flex flex-col items-center gap-6 py-8 text-center">
+					<header className="flex flex-col items-center gap-6 pt-8 text-center">
 						<div
 							className={`flex items-center gap-3 rounded-full border px-6 py-2 ${currentStatus.bgColorClass} ${currentStatus.borderColorClass}`}
 						>
@@ -248,58 +248,38 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 							</button>
 						</div>
 
-						<div className="mt-4 flex max-w-xl flex-col gap-4">
-							<div
-								className="h-px w-full bg-slate-800/40"
-								data-testid="dmm-marketing-separator"
-							/>
-							<p
-								className="text-xs text-slate-400 md:text-sm"
-								data-testid="dmm-marketing-copy"
-							>
-								Debrid Media Manager is a free, open source dashboard for
-								Real-Debrid, AllDebrid, and TorBox. Visit{' '}
-								<a
-									className="font-semibold text-sky-300 hover:text-white"
-									href="https://debridmediamanager.com/"
-									rel="noreferrer noopener"
-									target="_blank"
-									data-testid="dmm-marketing-link"
-								>
-									debridmediamanager.com
-								</a>{' '}
-								to search, download, and manage your library.
-							</p>
+						<div className="mt-4 grid w-full gap-6 md:grid-cols-2">
+							<div className="rounded-xl border border-white/10 bg-white/5 p-6">
+								<h3 className="text-lg font-medium text-white">
+									About this data
+								</h3>
+								<p className="mt-2 text-sm text-slate-400">
+									This status page is powered by{' '}
+									<a
+										className="font-semibold text-sky-300 hover:text-white"
+										href="https://debridmediamanager.com/"
+										rel="noreferrer noopener"
+										target="_blank"
+									>
+										Debrid Media Manager
+									</a>
+									, a free, open source dashboard for Real-Debrid, AllDebrid,
+									and TorBox. We run automated health checks every 5 minutes to
+									monitor stream server and Torrentio availability.
+								</p>
+							</div>
 
-							<div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-6">
-								<div className="flex flex-col gap-4">
-									<div>
-										<h3 className="text-lg font-medium text-white">
-											About this data
-										</h3>
-										<p className="mt-2 text-sm text-slate-400">
-											This dashboard monitors Real-Debrid stream server and
-											Torrentio availability via automated health checks that
-											run every 5 minutes.
-										</p>
-									</div>
-
-									<div className="flex flex-col gap-2 rounded-lg bg-black/20 p-4 text-sm">
-										<div className="flex items-center gap-2 text-slate-300">
-											<span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>
-											<span>
-												<strong>Is it just you?</strong> Check your internet
-												connection first.
-											</span>
-										</div>
-										<p className="pl-4 text-xs text-slate-500">
-											If Real-Debrid is down for everyone, you will see
-											failure here. If this page says &quot;Operational&quot;
-											but you can&apos;t connect, the issue might be your ISP
-											or local network.
-										</p>
-									</div>
-								</div>
+							<div className="rounded-xl border border-white/10 bg-white/5 p-6">
+								<h3 className="flex items-center gap-2 text-lg font-medium text-white">
+									<span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+									Is it just you?
+								</h3>
+								<p className="mt-2 text-sm text-slate-400">
+									Check your internet connection first. If Real-Debrid is down
+									for everyone, you&apos;ll see failure here. If this page says
+									&quot;Operational&quot; but you can&apos;t connect, the issue
+									might be your ISP or local network.
+								</p>
 							</div>
 						</div>
 					</header>
