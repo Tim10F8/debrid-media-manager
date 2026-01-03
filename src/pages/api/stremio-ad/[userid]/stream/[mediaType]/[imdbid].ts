@@ -104,6 +104,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 		});
 
 		for (const item of userCastItems) {
+			// Skip items without magnetId/fileIndex (should not happen for AllDebrid)
+			if (item.magnetId == null || item.fileIndex == null) {
+				continue;
+			}
+
 			const snapshot = snapshotMap.get(item.hash);
 			const metadata = snapshot ? extractStreamMetadata(snapshot.payload) : null;
 			const title = formatStremioStreamTitle(
@@ -115,20 +120,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 			);
 			const name = generateStreamName(item.size, metadata);
 
-			// Use magnetId:fileIndex if available, otherwise fall back to hash with filename (legacy)
-			let playUrl: string;
-			if (item.magnetId != null && item.fileIndex != null) {
-				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.magnetId}:${item.fileIndex}`;
-			} else {
-				// Legacy: include filename to match the correct file in the magnet
-				const encodedFilename = encodeURIComponent(item.filename ?? '');
-				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.hash}?file=${encodedFilename}`;
-			}
-
 			streams.push({
 				name,
 				title,
-				url: playUrl,
+				url: `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.magnetId}:${item.fileIndex}`,
 				behaviorHints: {
 					bingeGroup: `dmm-ad:${imdbidStr}:yours`,
 				},
@@ -137,6 +132,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
 		for (let i = 0; i < otherItems.length; i++) {
 			const item = otherItems[i];
+
+			// Skip items without magnetId/fileIndex (should not happen for AllDebrid)
+			if (item.magnetId == null || item.fileIndex == null) {
+				continue;
+			}
+
 			const snapshot = snapshotMap.get(item.hash);
 			const metadata = snapshot ? extractStreamMetadata(snapshot.payload) : null;
 			const title = formatStremioStreamTitle(
@@ -148,20 +149,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 			);
 			const name = generateStreamName(item.size, metadata);
 
-			// Use magnetId:fileIndex if available, otherwise fall back to hash with filename (legacy)
-			let playUrl: string;
-			if (item.magnetId != null && item.fileIndex != null) {
-				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.magnetId}:${item.fileIndex}`;
-			} else {
-				// Legacy: include filename to match the correct file in the magnet
-				const encodedFilename = encodeURIComponent(item.filename ?? '');
-				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.hash}?file=${encodedFilename}`;
-			}
-
 			streams.push({
 				name,
 				title,
-				url: playUrl,
+				url: `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.magnetId}:${item.fileIndex}`,
 				behaviorHints: {
 					bingeGroup: `dmm-ad:${imdbidStr}:other:${i + 1}`,
 				},
