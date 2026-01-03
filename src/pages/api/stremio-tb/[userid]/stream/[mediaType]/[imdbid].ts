@@ -111,13 +111,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 			);
 			const name = generateStreamName(item.size, metadata);
 
-			// Use torrentId:fileId if available, otherwise fall back to hash with filename (legacy)
+			// Build play URL with fallback parameters for when torrent IDs become stale
+			const encodedFilename = encodeURIComponent(item.filename ?? '');
 			let playUrl: string;
 			if (item.torrentId != null && item.fileId != null) {
-				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.torrentId}:${item.fileId}`;
+				// Include hash+filename as fallback in case torrent was deleted from TorBox
+				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.torrentId}:${item.fileId}?h=${item.hash}&file=${encodedFilename}`;
 			} else {
-				// Legacy: include filename to match the correct file in the torrent
-				const encodedFilename = encodeURIComponent(item.filename ?? '');
+				// Legacy: use hash with filename to match the correct file
 				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.hash}?file=${encodedFilename}`;
 			}
 
@@ -144,13 +145,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 			);
 			const name = generateStreamName(item.size, metadata);
 
-			// Use torrentId:fileId if available, otherwise fall back to hash with filename (legacy)
+			// Build play URL with fallback parameters for when torrent IDs become stale
+			const encodedFilename = encodeURIComponent(item.filename ?? '');
 			let playUrl: string;
 			if (item.torrentId != null && item.fileId != null) {
-				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.torrentId}:${item.fileId}`;
+				// Include hash+filename as fallback in case torrent was deleted from TorBox
+				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.torrentId}:${item.fileId}?h=${item.hash}&file=${encodedFilename}`;
 			} else {
-				// Legacy: include filename to match the correct file in the torrent
-				const encodedFilename = encodeURIComponent(item.filename ?? '');
+				// Legacy: use hash with filename to match the correct file
 				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.hash}?file=${encodedFilename}`;
 			}
 
