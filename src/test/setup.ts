@@ -1,6 +1,18 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
+// Mock rate limiting wrappers to pass through handlers unchanged in tests
+vi.mock('@/services/rateLimit/withRateLimit', () => ({
+	withRateLimit: (handler: unknown) => handler,
+	withCustomRateLimit: (handler: unknown) => handler,
+	withIpRateLimit: (handler: unknown) => handler,
+	RATE_LIMIT_CONFIGS: {
+		stream: { rateLimit: 1, windowSeconds: 5 },
+		torrents: { rateLimit: 1, windowSeconds: 2 },
+		default: { rateLimit: 5, windowSeconds: 1 },
+	},
+}));
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
 	writable: true,

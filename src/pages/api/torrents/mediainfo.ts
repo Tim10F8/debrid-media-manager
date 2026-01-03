@@ -1,4 +1,5 @@
 import type { MediaInfoResponse } from '@/components/showInfo/types';
+import { RATE_LIMIT_CONFIGS, withIpRateLimit } from '@/services/rateLimit/withRateLimit';
 import { repository } from '@/services/repository';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
@@ -85,10 +86,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 	}
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
 	if (req.method !== 'GET') {
 		return res.status(405).json({ message: 'Method not allowed' });
 	}
 
 	return handleGet(req, res);
 }
+
+export default withIpRateLimit(handler, RATE_LIMIT_CONFIGS.torrents);

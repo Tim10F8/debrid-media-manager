@@ -1,4 +1,5 @@
 import { TrackerStatsService } from '@/services/database/trackerStats';
+import { RATE_LIMIT_CONFIGS, withIpRateLimit } from '@/services/rateLimit/withRateLimit';
 import { torrentScraper } from '@/utils/torrentScraper';
 import { NextApiHandler } from 'next';
 
@@ -80,4 +81,4 @@ const handler: NextApiHandler = async (req, res) => {
 	}
 };
 
-export default handler;
+export default withIpRateLimit(handler, RATE_LIMIT_CONFIGS.torrents);

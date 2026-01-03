@@ -1,3 +1,4 @@
+import { withRateLimit } from '@/services/rateLimit/withRateLimit';
 import { repository as db } from '@/services/repository';
 import { isLegacyToken } from '@/utils/castApiHelpers';
 import {
@@ -9,7 +10,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 
 // lists all available streams for a movie or show
 // note, addon prefix is /api/stremio/${userid}
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
 	res.setHeader('access-control-allow-origin', '*');
 
 	const { userid, mediaType, imdbid } = req.query;
@@ -172,3 +173,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return;
 	}
 }
+
+export default withRateLimit(handler);

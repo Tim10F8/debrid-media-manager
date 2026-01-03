@@ -1,4 +1,5 @@
 import { flattenAndRemoveDuplicates, sortByFileSize } from '@/services/mediasearch';
+import { RATE_LIMIT_CONFIGS, withIpRateLimit } from '@/services/rateLimit/withRateLimit';
 import { repository as db } from '@/services/repository';
 import { validateTokenWithHash } from '@/utils/token';
 import { NextApiHandler } from 'next';
@@ -101,4 +102,4 @@ const handler: NextApiHandler = async (req, res) => {
 	}
 };
 
-export default handler;
+export default withIpRateLimit(handler, RATE_LIMIT_CONFIGS.torrents);

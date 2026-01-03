@@ -1,3 +1,4 @@
+import { RATE_LIMIT_CONFIGS, withIpRateLimit } from '@/services/rateLimit/withRateLimit';
 import { repository } from '@/services/repository';
 import * as v from '@badrap/valita';
 import { Prisma } from '@prisma/client';
@@ -163,7 +164,7 @@ function deriveSnapshotId(hash: string, added: unknown): { id: string; date: Dat
 	};
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
 	if (req.method !== 'POST') {
 		return res.status(405).json({ message: 'Method not allowed' });
 	}
@@ -207,3 +208,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	return res.status(201).json({ success: true, id });
 }
+
+export default withIpRateLimit(handler, RATE_LIMIT_CONFIGS.torrents);
