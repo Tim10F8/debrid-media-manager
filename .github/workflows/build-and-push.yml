@@ -25,7 +25,7 @@ jobs:
 
       - name: Deploy to Docker Swarm
         run: |
-          docker service update --image dmm-prod:latest --force dmm_web
+          docker stack deploy -c docker-compose.yml dmm --resolve-image always
 
       - name: Purge Cloudflare Cache
         run: |
