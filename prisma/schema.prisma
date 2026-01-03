@@ -48,11 +48,46 @@ model MusicMetadata {
   artist     String   @db.VarChar(500)
   album      String   @db.VarChar(500)
   year       Int?
+  coverUrl   String?  @db.VarChar(500) // Album cover URL from iTunes
   updatedAt  DateTime @updatedAt
 
   @@index([artist])
   @@index([year])
   @@fulltext([artist, album])
+}
+
+// Available music torrents (cached in debrid service)
+model AvailableMusic {
+  hash             String               @id
+  mbid             String               @db.VarChar(36) // MusicBrainz release-group UUID
+  filename         String
+  originalFilename String
+  bytes            BigInt
+  originalBytes    BigInt
+  host             String               // "rd", "ad", "tb"
+  progress         Int
+  status           String
+  ended            DateTime
+  updatedAt        DateTime             @updatedAt
+  files            AvailableMusicFile[]
+
+  @@index([status])
+  @@index([mbid])
+  @@index([mbid, hash])
+  @@index([mbid, status, bytes])
+}
+
+// Files within available music torrents
+model AvailableMusicFile {
+  link           String         @id
+  file_id        Int
+  hash           String
+  path           String         @db.Text
+  bytes          BigInt
+  trackNumber    Int?           // Track number if detectable
+  availableMusic AvailableMusic @relation(fields: [hash], references: [hash], onDelete: Cascade)
+
+  @@index([hash])
 }
 
 model Search {
