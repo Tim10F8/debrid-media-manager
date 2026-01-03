@@ -6,7 +6,7 @@ import {
 	getRateLimitConfig,
 	HybridRateLimiter,
 	shouldRateLimit,
-} from './src/services/rateLimit/middlewareRateLimiter';
+} from './services/rateLimit/middlewareRateLimiter';
 
 // Singleton rate limiter instance
 let rateLimiter: HybridRateLimiter | null = null;
