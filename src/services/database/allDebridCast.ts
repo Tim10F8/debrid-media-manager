@@ -335,6 +335,8 @@ export class AllDebridCastService extends DatabaseClient {
 			size: number;
 			filename: string;
 			hash: string;
+			magnetId: number | null;
+			fileIndex: number | null;
 		}[]
 	> {
 		const castItems = await this.prisma.allDebridCast.findMany({
@@ -356,13 +358,15 @@ export class AllDebridCastService extends DatabaseClient {
 				link: true,
 				size: true,
 				hash: true,
+				magnetId: true,
+				fileIndex: true,
 			},
 			take: limit,
 		});
 
 		return castItems
 			.filter(
-				(item): item is { url: string; link: string; size: bigint; hash: string } =>
+				(item): item is { url: string; link: string; size: bigint; hash: string; magnetId: number | null; fileIndex: number | null } =>
 					item.link !== null
 			)
 			.map((item) => ({
@@ -371,6 +375,8 @@ export class AllDebridCastService extends DatabaseClient {
 				size: Number(item.size),
 				filename: item.url.split('/').pop() || 'Unknown',
 				hash: item.hash,
+				magnetId: item.magnetId,
+				fileIndex: item.fileIndex,
 			}));
 	}
 
@@ -386,6 +392,8 @@ export class AllDebridCastService extends DatabaseClient {
 			size: number;
 			filename: string;
 			hash: string;
+			magnetId: number | null;
+			fileIndex: number | null;
 		}[]
 	> {
 		const { baseImdbId, season: seasonFilter, episode: episodeFilter } = parseImdbId(imdbId);
@@ -418,13 +426,15 @@ export class AllDebridCastService extends DatabaseClient {
 				link: true,
 				size: true,
 				hash: true,
+				magnetId: true,
+				fileIndex: true,
 			},
 			take: limit,
 		});
 
 		const castStreams = otherCastItems
 			.filter(
-				(item): item is { url: string; link: string; size: bigint; hash: string } =>
+				(item): item is { url: string; link: string; size: bigint; hash: string; magnetId: number | null; fileIndex: number | null } =>
 					item.link !== null
 			)
 			.map((item) => ({
@@ -433,6 +443,8 @@ export class AllDebridCastService extends DatabaseClient {
 				size: Number(item.size),
 				filename: item.url.split('/').pop() || 'Unknown',
 				hash: item.hash,
+				magnetId: item.magnetId,
+				fileIndex: item.fileIndex,
 			}));
 
 		console.log('[AllDebridCastService] Stream sources breakdown:', {

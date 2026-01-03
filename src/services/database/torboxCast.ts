@@ -391,6 +391,8 @@ export class TorBoxCastService extends DatabaseClient {
 			size: number;
 			filename: string;
 			hash: string;
+			torrentId: number | null;
+			fileId: number | null;
 		}[]
 	> {
 		const castItems = await this.prisma.torBoxCast.findMany({
@@ -412,13 +414,15 @@ export class TorBoxCastService extends DatabaseClient {
 				link: true,
 				size: true,
 				hash: true,
+				torrentId: true,
+				fileId: true,
 			},
 			take: limit,
 		});
 
 		return castItems
 			.filter(
-				(item): item is { url: string; link: string; size: bigint; hash: string } =>
+				(item): item is { url: string; link: string; size: bigint; hash: string; torrentId: number | null; fileId: number | null } =>
 					item.link !== null
 			)
 			.map((item) => ({
@@ -427,6 +431,8 @@ export class TorBoxCastService extends DatabaseClient {
 				size: Number(item.size),
 				filename: item.url.split('/').pop() || 'Unknown',
 				hash: item.hash,
+				torrentId: item.torrentId,
+				fileId: item.fileId,
 			}));
 	}
 
@@ -442,6 +448,8 @@ export class TorBoxCastService extends DatabaseClient {
 			size: number;
 			filename: string;
 			hash: string;
+			torrentId: number | null;
+			fileId: number | null;
 		}[]
 	> {
 		const { baseImdbId, season: seasonFilter, episode: episodeFilter } = parseImdbId(imdbId);
@@ -475,13 +483,15 @@ export class TorBoxCastService extends DatabaseClient {
 				link: true,
 				size: true,
 				hash: true,
+				torrentId: true,
+				fileId: true,
 			},
 			take: limit,
 		});
 
 		const castStreams = otherCastItems
 			.filter(
-				(item): item is { url: string; link: string; size: bigint; hash: string } =>
+				(item): item is { url: string; link: string; size: bigint; hash: string; torrentId: number | null; fileId: number | null } =>
 					item.link !== null
 			)
 			.map((item) => ({
@@ -490,6 +500,8 @@ export class TorBoxCastService extends DatabaseClient {
 				size: Number(item.size),
 				filename: item.url.split('/').pop() || 'Unknown',
 				hash: item.hash,
+				torrentId: item.torrentId,
+				fileId: item.fileId,
 			}));
 
 		console.log('[TorBoxCastService] Stream sources breakdown:', {

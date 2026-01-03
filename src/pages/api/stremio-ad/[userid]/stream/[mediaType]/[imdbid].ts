@@ -115,10 +115,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 			);
 			const name = generateStreamName(item.size, metadata);
 
+			// Use magnetId:fileIndex if available, otherwise fall back to hash with filename (legacy)
+			let playUrl: string;
+			if (item.magnetId != null && item.fileIndex != null) {
+				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.magnetId}:${item.fileIndex}`;
+			} else {
+				// Legacy: include filename to match the correct file in the magnet
+				const encodedFilename = encodeURIComponent(item.filename ?? '');
+				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.hash}?file=${encodedFilename}`;
+			}
+
 			streams.push({
 				name,
 				title,
-				url: `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.hash}`,
+				url: playUrl,
 				behaviorHints: {
 					bingeGroup: `dmm-ad:${imdbidStr}:yours`,
 				},
@@ -138,10 +148,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 			);
 			const name = generateStreamName(item.size, metadata);
 
+			// Use magnetId:fileIndex if available, otherwise fall back to hash with filename (legacy)
+			let playUrl: string;
+			if (item.magnetId != null && item.fileIndex != null) {
+				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.magnetId}:${item.fileIndex}`;
+			} else {
+				// Legacy: include filename to match the correct file in the magnet
+				const encodedFilename = encodeURIComponent(item.filename ?? '');
+				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.hash}?file=${encodedFilename}`;
+			}
+
 			streams.push({
 				name,
 				title,
-				url: `${process.env.DMM_ORIGIN}/api/stremio-ad/${userid}/play/${item.hash}`,
+				url: playUrl,
 				behaviorHints: {
 					bingeGroup: `dmm-ad:${imdbidStr}:other:${i + 1}`,
 				},

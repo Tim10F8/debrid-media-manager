@@ -111,10 +111,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 			);
 			const name = generateStreamName(item.size, metadata);
 
+			// Use torrentId:fileId if available, otherwise fall back to hash with filename (legacy)
+			let playUrl: string;
+			if (item.torrentId != null && item.fileId != null) {
+				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.torrentId}:${item.fileId}`;
+			} else {
+				// Legacy: include filename to match the correct file in the torrent
+				const encodedFilename = encodeURIComponent(item.filename ?? '');
+				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.hash}?file=${encodedFilename}`;
+			}
+
 			streams.push({
 				name,
 				title,
-				url: `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.hash}`,
+				url: playUrl,
 				behaviorHints: {
 					bingeGroup: `dmm-tb:${imdbidStr}:yours`,
 				},
@@ -134,10 +144,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 			);
 			const name = generateStreamName(item.size, metadata);
 
+			// Use torrentId:fileId if available, otherwise fall back to hash with filename (legacy)
+			let playUrl: string;
+			if (item.torrentId != null && item.fileId != null) {
+				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.torrentId}:${item.fileId}`;
+			} else {
+				// Legacy: include filename to match the correct file in the torrent
+				const encodedFilename = encodeURIComponent(item.filename ?? '');
+				playUrl = `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.hash}?file=${encodedFilename}`;
+			}
+
 			streams.push({
 				name,
 				title,
-				url: `${process.env.DMM_ORIGIN}/api/stremio-tb/${userid}/play/${item.hash}`,
+				url: playUrl,
 				behaviorHints: {
 					bingeGroup: `dmm-tb:${imdbidStr}:other:${i + 1}`,
 				},

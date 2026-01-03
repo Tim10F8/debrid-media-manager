@@ -1,38 +1,25 @@
 import { repository as db } from '@/services/repository';
 import { requestDownloadLink } from '@/services/torbox';
+import {
+	getBiggestFileTorBoxStreamUrl,
+	getFileByNameTorBoxStreamUrl,
+} from '@/utils/getTorBoxStreamUrl';
 import { NextApiRequest, NextApiResponse } from 'next';
 
 // Play a TorBox file from an existing torrent
-// Format: torrentId:fileId (e.g., "123456:789")
+// Supports two formats:
+// 1. torrentId:fileId (e.g., "123456:789") - direct lookup
+// 2. hash (e.g., "fbadffe5476df0674dbec75e81426895e40b6427") - legacy format
+//    - With ?file=filename: matches specific file by name (for TV episodes)
+//    - Without ?file: uses biggest file (for movies)
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	res.setHeader('access-control-allow-origin', '*');
 
-	const { userid, hash } = req.query;
+	const { userid, hash, file } = req.query;
 	if (typeof userid !== 'string' || typeof hash !== 'string') {
 		res.status(400).json({
 			status: 'error',
 			errorMessage: 'Invalid "userid" or "hash" query parameter',
-		});
-		return;
-	}
-
-	// Parse torrentId:fileId format
-	const parts = hash.split(':');
-	if (parts.length !== 2) {
-		res.status(400).json({
-			status: 'error',
-			errorMessage: 'Invalid format. Expected torrentId:fileId',
-		});
-		return;
-	}
-
-	const torrentId = parseInt(parts[0], 10);
-	const fileId = parseInt(parts[1], 10);
-
-	if (isNaN(torrentId) || isNaN(fileId)) {
-		res.status(400).json({
-			status: 'error',
-			errorMessage: 'Invalid torrentId or fileId',
 		});
 		return;
 	}
@@ -56,17 +43,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	const apiKey = profile.apiKey;
 
 	try {
-		// Get download link for the specific file
-		const downloadResult = await requestDownloadLink(apiKey, {
-			torrent_id: torrentId,
-			file_id: fileId,
-		});
+		let streamUrl: string;
 
-		if (!downloadResult.success || !downloadResult.data) {
-			throw new Error('Failed to get download link');
+		// Check if it's torrentId:fileId format or a torrent hash
+		if (hash.includes(':')) {
+			// Format: torrentId:fileId
+			const parts = hash.split(':');
+			if (parts.length !== 2) {
+				res.status(400).json({
+					status: 'error',
+					errorMessage: 'Invalid format. Expected torrentId:fileId',
+				});
+				return;
+			}
+
+			const torrentId = parseInt(parts[0], 10);
+			const fileId = parseInt(parts[1], 10);
+
+			if (isNaN(torrentId) || isNaN(fileId)) {
+				res.status(400).json({
+					status: 'error',
+					errorMessage: 'Invalid torrentId or fileId',
+				});
+				return;
+			}
+
+			// Get download link for the specific file
+			const downloadResult = await requestDownloadLink(apiKey, {
+				torrent_id: torrentId,
+				file_id: fileId,
+			});
+
+			if (!downloadResult.success || !downloadResult.data) {
+				throw new Error('Failed to get download link');
+			}
+
+			streamUrl = downloadResult.data;
+		} else {
+			// Legacy format: torrent hash
+			const filename = typeof file === 'string' ? file : undefined;
+
+			if (filename) {
+				// Match by filename (for TV episodes from season packs)
+				const [url] = await getFileByNameTorBoxStreamUrl(apiKey, hash, filename);
+				if (!url) {
+					throw new Error(`Failed to find file "${filename}" in torrent`);
+				}
+				streamUrl = url;
+			} else {
+				// No filename provided - use biggest file (for movies)
+				const [url] = await getBiggestFileTorBoxStreamUrl(apiKey, hash);
+				if (!url) {
+					throw new Error('Failed to get stream URL for torrent');
+				}
+				streamUrl = url;
+			}
 		}
-
-		const streamUrl = downloadResult.data;
 
 		// Redirect to the download URL
 		res.redirect(streamUrl);
