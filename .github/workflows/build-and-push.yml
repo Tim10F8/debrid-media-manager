@@ -27,6 +27,7 @@ jobs:
         run: |
           cp docker-compose.yml /home/ben/dmm/docker-compose.yml
           cd /home/ben/dmm && docker stack deploy -c docker-compose.yml dmm --resolve-image always
+          docker service update --image dmm-prod:latest --force dmm_web
 
       - name: Purge Cloudflare Cache
         run: |
