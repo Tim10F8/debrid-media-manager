@@ -1,6 +1,6 @@
 import { RealDebridUser } from '@/hooks/auth';
 import { TorBoxUser } from '@/services/types';
-import { BookOpen, Rocket, Sparkles } from 'lucide-react';
+import { BookOpen, Music2, Rocket, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 interface MainActionsProps {
@@ -79,10 +79,11 @@ export function MainActions({ rdUser, tbUser, adUser, isLoading }: MainActionsPr
 				</Link>
 				{rdUser ? (
 					<Link
-						href="/is-real-debrid-down-or-just-me"
-						className="haptic flex items-center justify-center rounded border-2 border-emerald-500 bg-emerald-900/30 p-3 text-center text-sm text-emerald-100 transition-colors hover:bg-emerald-800/40"
+						href="/albums"
+						className="haptic flex items-center justify-center gap-2 rounded border-2 border-pink-500 bg-pink-900/30 p-3 text-pink-100 transition-colors hover:bg-pink-800/50"
 					>
-						Is RD down?
+						<Music2 className="mr-1 inline-block h-4 w-4 text-pink-400" />
+						Music
 					</Link>
 				) : (
 					<div />
@@ -103,6 +104,16 @@ export function MainActions({ rdUser, tbUser, adUser, isLoading }: MainActionsPr
 						</Link>
 					))}
 				</div>
+			)}
+
+			{/* Is RD Down - full width */}
+			{rdUser && (
+				<Link
+					href="/is-real-debrid-down-or-just-me"
+					className="haptic flex w-full items-center justify-center rounded border-2 border-emerald-500 bg-emerald-900/30 p-3 text-center text-sm text-emerald-100 transition-colors hover:bg-emerald-800/40"
+				>
+					Is RD down?
+				</Link>
 			)}
 		</div>
 	);

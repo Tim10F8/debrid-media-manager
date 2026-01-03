@@ -939,3 +939,5 @@ export default function AlbumsPage() {
 		</>
 	);
 }
+
+AlbumsPage.disableLibraryProvider = true;

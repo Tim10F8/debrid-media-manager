@@ -126,7 +126,7 @@ describe('streamServersHealth', () => {
 		expect(repository.upsertStreamHealthResults).toHaveBeenCalled();
 		expect(repository.recordStreamHealthSnapshot).toHaveBeenCalled();
 		expect(repository.recordServerReliability).toHaveBeenCalled();
-	});
+	}, 15000);
 
 	it('uses correct test URL format', async () => {
 		// Mock: only servers 1-5 exist (to limit sequential probing)

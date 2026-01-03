@@ -647,6 +647,16 @@ export const deleteTorrent = async (
 	}
 };
 
+// Normalize RD link ID to 13 characters
+function normalizeRdLink(link: string): string {
+	const match = link.match(/^(https:\/\/real-debrid\.com\/d\/)([A-Z0-9]+)$/i);
+	if (match) {
+		const [, base, id] = match;
+		return base + id.substring(0, 13);
+	}
+	return link;
+}
+
 export const unrestrictLink = async (
 	accessToken: string,
 	link: string,
@@ -665,7 +675,7 @@ export const unrestrictLink = async (
 		) {
 			params.append('ip', ipAddress);
 		}
-		params.append('link', link);
+		params.append('link', normalizeRdLink(link));
 		if (password) {
 			params.append('password', password);
 		}

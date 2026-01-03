@@ -69,13 +69,21 @@ describe('StremioPage', () => {
 		castTokenMock.mockReturnValue('token123');
 		render(<StremioPage />);
 
-		const installLink = screen.getByRole('link', { name: /install$/i });
-		const installHref = installLink.getAttribute('href') || '';
+		const installLinks = screen.getAllByRole('link', { name: /^install$/i });
+		const installLink = installLinks.find((link) =>
+			link.getAttribute('href')?.includes('/manifest.json')
+		);
+		expect(installLink).toBeTruthy();
+		const installHref = installLink?.getAttribute('href') || '';
 		expect(installHref).toContain('stremio://localhost');
 		expect(installHref).toContain('/api/stremio/token123/manifest.json');
 
-		const webLink = screen.getByRole('link', { name: /install \(web\)/i });
-		const webHref = webLink.getAttribute('href') || '';
+		const webLinks = screen.getAllByRole('link', { name: /install \(web\)/i });
+		const webLink = webLinks.find((link) =>
+			decodeURIComponent(link.getAttribute('href') || '').includes('/manifest.json')
+		);
+		expect(webLink).toBeTruthy();
+		const webHref = webLink?.getAttribute('href') || '';
 		expect(decodeURIComponent(webHref)).toContain('/api/stremio/token123/manifest.json');
 
 		expect(screen.getByText(/Warning: Never share this install URL/i)).toBeInTheDocument();
