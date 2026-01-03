@@ -25,7 +25,8 @@ jobs:
 
       - name: Deploy to Docker Swarm
         run: |
-          docker stack deploy -c docker-compose.yml dmm --resolve-image always
+          cp docker-compose.yml /home/ben/dmm/docker-compose.yml
+          cd /home/ben/dmm && docker stack deploy -c docker-compose.yml dmm --resolve-image always
 
       - name: Purge Cloudflare Cache
         run: |
