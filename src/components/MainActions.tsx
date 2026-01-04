@@ -103,7 +103,7 @@ export function MainActions({ rdUser, tbUser, adUser, isLoading }: MainActionsPr
 					href="/is-real-debrid-down-or-just-me"
 					className="haptic flex w-full items-center justify-center rounded border-2 border-emerald-500 bg-emerald-900/30 p-3 text-center text-sm text-emerald-100 transition-colors hover:bg-emerald-800/40"
 				>
-					Is RD down?
+					Is Real-Debrid down or just me?
 				</Link>
 			)}
 		</div>
