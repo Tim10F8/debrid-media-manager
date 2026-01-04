@@ -12,6 +12,7 @@ import { SearchApiResponse, SearchResult } from '@/services/mediasearch';
 import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
 import { handleCastMovieAllDebrid } from '@/utils/allDebridCastApiClient';
+import axiosWithRetry from '@/utils/axiosWithRetry';
 import { getLocalStorageBoolean, getLocalStorageItemOrDefault } from '@/utils/browserStorage';
 import { handleCastMovie } from '@/utils/castApiClient';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
@@ -33,7 +34,6 @@ import { generateTokenAndHash } from '@/utils/token';
 import { handleCastMovieTorBox } from '@/utils/torboxCastApiClient';
 import { getMultipleTrackerStats } from '@/utils/trackerStats';
 import { withAuth } from '@/utils/withAuth';
-import axios from 'axios';
 import { Cast, CloudOff, Eye as EyeIcon, Loader2, Search, Sparkles, Zap } from 'lucide-react';
 import getConfig from 'next/config';
 import Head from 'next/head';
@@ -179,7 +179,7 @@ const MovieSearch: FunctionComponent = () => {
 
 		const fetchMovieInfo = async () => {
 			try {
-				const response = await axios.get(`/api/info/movie?imdbid=${imdbid}`);
+				const response = await axiosWithRetry.get(`/api/info/movie?imdbid=${imdbid}`);
 				setMovieInfo(response.data);
 			} catch (error) {
 				console.error('Failed to fetch movie info:', error);
@@ -420,7 +420,7 @@ const MovieSearch: FunctionComponent = () => {
 					path = encodeURIComponent(path);
 				}
 				let endpoint = `${config.externalSearchApiHostname || ''}/${path}`;
-				const response = await axios.get<SearchApiResponse>(endpoint);
+				const response = await axiosWithRetry.get<SearchApiResponse>(endpoint);
 
 				if (response.status !== 200) {
 					setSearchState(response.headers.status ?? 'loaded');

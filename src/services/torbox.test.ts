@@ -11,19 +11,33 @@ import {
 	requestDownloadLink,
 } from './torbox';
 
+const mocks = vi.hoisted(() => ({
+	postMock: vi.fn(),
+	getMock: vi.fn(),
+	requestMock: vi.fn(),
+}));
+
 const axiosInstance = {
-	post: vi.fn(),
-	get: vi.fn(),
+	post: mocks.postMock,
+	get: mocks.getMock,
 	interceptors: {
 		request: { use: vi.fn(), eject: vi.fn() },
 		response: { use: vi.fn(), eject: vi.fn() },
 	},
-	request: vi.fn(),
+	request: mocks.requestMock,
 };
 
 vi.mock('axios', () => ({
 	default: {
-		create: vi.fn(() => axiosInstance),
+		create: vi.fn(() => ({
+			post: mocks.postMock,
+			get: mocks.getMock,
+			interceptors: {
+				request: { use: vi.fn(), eject: vi.fn() },
+				response: { use: vi.fn(), eject: vi.fn() },
+			},
+			request: mocks.requestMock,
+		})),
 	},
 }));
 
@@ -59,13 +73,19 @@ describe('torbox service helpers', () => {
 		await controlTorrent('token', { operation: 'pause', torrent_id: 5 });
 		expect(axiosInstance.post).toHaveBeenCalledWith(
 			expect.stringContaining('/controltorrent'),
-			expect.objectContaining({ operation: 'pause', torrent_id: 5 })
+			expect.objectContaining({ operation: 'pause', torrent_id: 5 }),
+			expect.objectContaining({
+				headers: expect.objectContaining({ Authorization: 'Bearer token' }),
+			})
 		);
 
 		await deleteTorrent('token', 2);
 		expect(axiosInstance.post).toHaveBeenCalledWith(
 			expect.stringContaining('/controltorrent'),
-			expect.objectContaining({ operation: 'delete', torrent_id: 2 })
+			expect.objectContaining({ operation: 'delete', torrent_id: 2 }),
+			expect.objectContaining({
+				headers: expect.objectContaining({ Authorization: 'Bearer token' }),
+			})
 		);
 	});
 

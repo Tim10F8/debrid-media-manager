@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 import getConfig from 'next/config';
 
 // Safely access Next.js runtime config in test/non-Next environments
@@ -15,16 +15,147 @@ const config = (() => {
 	}
 })();
 
-// Helper function to create axios config with Bearer token
-const getAxiosConfig = (apikey?: string): AxiosRequestConfig => {
-	const axiosConfig: AxiosRequestConfig = {};
-	if (apikey) {
-		axiosConfig.headers = {
-			Authorization: `Bearer ${apikey}`,
-		};
+// Constants for timeout and retry
+const REQUEST_TIMEOUT = 10000;
+const MIN_REQUEST_INTERVAL = (60 * 1000) / 250; // 240ms between requests (matching RealDebrid)
+
+// Global rate limiter for all AllDebrid API requests
+let globalRequestQueue: Promise<void> = Promise.resolve();
+let globalLastRequestTime = 0;
+
+// Delay function using MessageChannel to avoid browser throttling in background tabs
+function delayWithMessageChannel(ms: number): Promise<void> {
+	if (typeof MessageChannel === 'undefined') {
+		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
-	return axiosConfig;
-};
+
+	return new Promise((resolve) => {
+		const start = performance.now();
+		const channel = new MessageChannel();
+
+		const check = () => {
+			if (performance.now() - start >= ms) {
+				channel.port1.close();
+				channel.port2.close();
+				resolve();
+			} else {
+				channel.port2.postMessage(null);
+			}
+		};
+
+		channel.port1.onmessage = check;
+		channel.port2.postMessage(null);
+	});
+}
+
+// Shared rate limiting function that serializes all requests
+async function enforceRateLimit(): Promise<void> {
+	globalRequestQueue = globalRequestQueue.then(async () => {
+		const now = Date.now();
+		const timeSinceLastRequest = now - globalLastRequestTime;
+
+		if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+			await delayWithMessageChannel(MIN_REQUEST_INTERVAL - timeSinceLastRequest);
+		}
+
+		globalLastRequestTime = Date.now();
+	});
+
+	await globalRequestQueue;
+}
+
+// Add a cache-aware ID generator to ensure unique cache entries for retries
+let requestCount = 0;
+function getUniqueRequestId() {
+	return `req-${Date.now()}-${requestCount++}`;
+}
+
+// Extend the Axios request config type to include our custom properties
+interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
+	__isRetryRequest?: boolean;
+	__retryCount?: number;
+}
+
+// Helper function to calculate exponential backoff delay with jitter
+function calculateRetryDelay(retryCount: number): number {
+	// Base delay: 1s, doubled each attempt (1s, 2s, 4s, 8s, 16s)
+	const baseDelay = Math.pow(2, retryCount - 1) * 1000;
+
+	// Cap at 60s first
+	const cappedDelay = Math.min(baseDelay, 60000);
+
+	// Add ±20% jitter to prevent thundering herd
+	const jitterFactor = 0.8 + Math.random() * 0.4;
+	const delayWithJitter = cappedDelay * jitterFactor;
+
+	return delayWithJitter;
+}
+
+// Create a global axios instance for AllDebrid API requests
+const allDebridAxios = axios.create({
+	timeout: REQUEST_TIMEOUT,
+});
+
+// Add request interceptor for rate limiting and cache busting
+allDebridAxios.interceptors.request.use(async (config: ExtendedAxiosRequestConfig) => {
+	await enforceRateLimit();
+
+	// Add cache-busting parameter for retries to prevent hitting cached errors
+	if (config.__isRetryRequest && config.url) {
+		const url = new URL(config.url, 'http://dummy-base.com');
+		url.searchParams.set('_cache_buster', getUniqueRequestId());
+		config.url = config.url.startsWith('http') ? url.toString() : url.pathname + url.search;
+	}
+
+	return config;
+});
+
+// Add response interceptor for handling retries with exponential backoff
+allDebridAxios.interceptors.response.use(
+	(response) => response,
+	async (error) => {
+		const originalConfig = error.config as ExtendedAxiosRequestConfig;
+
+		if (!originalConfig) {
+			return Promise.reject(error);
+		}
+
+		if (originalConfig.__retryCount === undefined) {
+			originalConfig.__retryCount = 0;
+		}
+
+		// Max 7 retries (matching RealDebrid)
+		if (originalConfig.__retryCount >= 7) {
+			return Promise.reject(error);
+		}
+
+		// Retry on 5xx server errors OR 429 rate limit errors
+		const status = error.response?.status;
+		const shouldRetry = (status >= 500 && status < 600) || status === 429;
+
+		if (!shouldRetry) {
+			return Promise.reject(error);
+		}
+
+		originalConfig.__retryCount++;
+		originalConfig.__isRetryRequest = true;
+
+		const delay = calculateRetryDelay(originalConfig.__retryCount);
+
+		const errorType = error.response?.status === 429 ? 'rate limit' : 'server';
+		console.log(
+			`AllDebrid API request failed with ${error.response?.status} ${errorType} error. Retrying (attempt ${originalConfig.__retryCount}/7) after ${Math.round(delay)}ms delay...`
+		);
+
+		await delayWithMessageChannel(delay);
+
+		try {
+			return await allDebridAxios.request(originalConfig);
+		} catch (retryError) {
+			return Promise.reject(retryError);
+		}
+	}
+);
 
 // API Response wrapper
 interface ApiResponse<T> {
@@ -185,7 +316,7 @@ interface MagnetStatusResponse {
 export const getPin = async (): Promise<PinData> => {
 	try {
 		const endpoint = `${config.allDebridHostname}/v4.1/pin/get`;
-		const response = await axios.get<ApiResponse<PinData>>(endpoint);
+		const response = await allDebridAxios.get<ApiResponse<PinData>>(endpoint);
 
 		if (response.data.status === 'error') {
 			throw new Error(response.data.error?.message || 'Unknown error');
@@ -205,7 +336,7 @@ export const checkPin = async (pin: string, check: string): Promise<PinCheckData
 		params.append('pin', pin);
 		params.append('check', check);
 
-		let pinCheck = await axios.post<ApiResponse<PinCheckData>>(endpoint, params, {
+		let pinCheck = await allDebridAxios.post<ApiResponse<PinCheckData>>(endpoint, params, {
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
 			},
@@ -217,7 +348,7 @@ export const checkPin = async (pin: string, check: string): Promise<PinCheckData
 
 		while (!pinCheck.data.data!.activated) {
 			await new Promise((resolve) => setTimeout(resolve, 5000));
-			pinCheck = await axios.post<ApiResponse<PinCheckData>>(endpoint, params, {
+			pinCheck = await allDebridAxios.post<ApiResponse<PinCheckData>>(endpoint, params, {
 				headers: {
 					'Content-Type': 'application/x-www-form-urlencoded',
 				},
@@ -240,7 +371,9 @@ export const checkPin = async (pin: string, check: string): Promise<PinCheckData
 export const getAllDebridUser = async (apikey: string) => {
 	const endpoint = `${config.allDebridHostname}/v4/user`;
 	try {
-		const response = await axios.get<ApiResponse<UserData>>(endpoint, getAxiosConfig(apikey));
+		const response = await allDebridAxios.get<ApiResponse<UserData>>(endpoint, {
+			headers: { Authorization: `Bearer ${apikey}` },
+		});
 
 		if (response.data.status === 'error') {
 			throw new Error(response.data.error?.message || 'Unknown error');
@@ -270,12 +403,16 @@ export const uploadMagnet = async (apikey: string, hashes: string[]): Promise<Ma
 		const params = new URLSearchParams();
 		magnets.forEach((m) => params.append('magnets[]', m));
 
-		const response = await axios.post<ApiResponse<MagnetUploadData>>(endpoint, params, {
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-				Authorization: `Bearer ${apikey}`,
-			},
-		});
+		const response = await allDebridAxios.post<ApiResponse<MagnetUploadData>>(
+			endpoint,
+			params,
+			{
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+					Authorization: `Bearer ${apikey}`,
+				},
+			}
+		);
 
 		if (response.data.status === 'error') {
 			throw new Error(response.data.error?.message || 'Unknown error');
@@ -352,12 +489,16 @@ export const getMagnetStatus = async (
 	}
 
 	try {
-		const response = await axios.post<ApiResponse<MagnetStatusData>>(endpoint, params, {
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-				Authorization: `Bearer ${apikey}`,
-			},
-		});
+		const response = await allDebridAxios.post<ApiResponse<MagnetStatusData>>(
+			endpoint,
+			params,
+			{
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+					Authorization: `Bearer ${apikey}`,
+				},
+			}
+		);
 
 		if (response.data.status === 'error') {
 			throw new Error(response.data.error?.message || 'Unknown error');
@@ -424,7 +565,7 @@ export const getMagnetFiles = async (
 		const params = new URLSearchParams();
 		validIds.forEach((id) => params.append('id[]', id.toString()));
 
-		const response = await axios.post<ApiResponse<MagnetFilesData>>(endpoint, params, {
+		const response = await allDebridAxios.post<ApiResponse<MagnetFilesData>>(endpoint, params, {
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
 				Authorization: `Bearer ${apikey}`,
@@ -452,12 +593,16 @@ export const deleteMagnet = async (apikey: string, id: string): Promise<MagnetDe
 		const params = new URLSearchParams();
 		params.append('id', id);
 
-		const response = await axios.post<ApiResponse<MagnetDeleteData>>(endpoint, params, {
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-				Authorization: `Bearer ${apikey}`,
-			},
-		});
+		const response = await allDebridAxios.post<ApiResponse<MagnetDeleteData>>(
+			endpoint,
+			params,
+			{
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+					Authorization: `Bearer ${apikey}`,
+				},
+			}
+		);
 
 		if (response.data.status === 'error') {
 			throw new Error(response.data.error?.message || 'Unknown error');
@@ -477,12 +622,16 @@ export const restartMagnet = async (apikey: string, id: string): Promise<MagnetR
 		const params = new URLSearchParams();
 		params.append('id', id);
 
-		const response = await axios.post<ApiResponse<MagnetRestartData>>(endpoint, params, {
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-				Authorization: `Bearer ${apikey}`,
-			},
-		});
+		const response = await allDebridAxios.post<ApiResponse<MagnetRestartData>>(
+			endpoint,
+			params,
+			{
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+					Authorization: `Bearer ${apikey}`,
+				},
+			}
+		);
 
 		if (!response.data || response.data.status === 'error') {
 			throw new Error(response.data?.error?.message || 'Unknown error');
@@ -502,8 +651,8 @@ export const adInstantCheck = async (
 ): Promise<MagnetInstantData> => {
 	const endpoint = `${config.allDebridHostname}/v4.1/magnet/instant`;
 	try {
-		const response = await axios.get<MagnetInstantData>(endpoint, {
-			...getAxiosConfig(apikey),
+		const response = await allDebridAxios.get<MagnetInstantData>(endpoint, {
+			headers: { Authorization: `Bearer ${apikey}` },
 			params: { magnets: hashes },
 		});
 
@@ -534,13 +683,16 @@ export const uploadMagnetAd = async (apiKey: string, hash: string): Promise<Magn
 	params.append('magnets[]', `magnet:?xt=urn:btih:${hash}`);
 
 	try {
-		const response = await axios.post<ApiResponse<MagnetUploadData>>(endpoint, params, {
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-				Authorization: `Bearer ${apiKey}`,
-			},
-			timeout: 10000,
-		});
+		const response = await allDebridAxios.post<ApiResponse<MagnetUploadData>>(
+			endpoint,
+			params,
+			{
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+					Authorization: `Bearer ${apiKey}`,
+				},
+			}
+		);
 
 		if (response.data.status === 'error') {
 			throw new Error(response.data.error?.message || 'Upload failed');
@@ -567,7 +719,7 @@ export const getMagnetStatusAd = async (
 	params.append('id', magnetId.toString());
 
 	try {
-		const response = await axios.post<ApiResponse<{ magnets: MagnetStatus }>>(
+		const response = await allDebridAxios.post<ApiResponse<{ magnets: MagnetStatus }>>(
 			endpoint,
 			params,
 			{
@@ -575,7 +727,6 @@ export const getMagnetStatusAd = async (
 					'Content-Type': 'application/x-www-form-urlencoded',
 					Authorization: `Bearer ${apiKey}`,
 				},
-				timeout: 10000,
 			}
 		);
 
@@ -594,53 +745,31 @@ export const getMagnetStatusAd = async (
 /**
  * Delete a magnet by ID
  * Simplified wrapper around deleteMagnet for consistency with other AD availability functions
- * Includes retry logic for transient errors (503, network issues)
+ * Uses axios interceptor for retry logic on 429/5xx errors
  */
 export const deleteMagnetAd = async (apiKey: string, magnetId: number): Promise<void> => {
 	const endpoint = `${config.allDebridHostname}/v4/magnet/delete`;
 	const params = new URLSearchParams();
 	params.append('id', magnetId.toString());
 
-	const maxRetries = 3;
-	const retryDelay = 2000; // 2 seconds
-
-	for (let attempt = 1; attempt <= maxRetries; attempt++) {
-		try {
-			const response = await axios.post<ApiResponse<MagnetDeleteData>>(endpoint, params, {
+	try {
+		const response = await allDebridAxios.post<ApiResponse<MagnetDeleteData>>(
+			endpoint,
+			params,
+			{
 				headers: {
 					'Content-Type': 'application/x-www-form-urlencoded',
 					Authorization: `Bearer ${apiKey}`,
 				},
-				timeout: 10000,
-			});
-
-			if (response.data.status === 'error') {
-				throw new Error(response.data.error?.message || 'Delete failed');
 			}
+		);
 
-			// Success - exit function
-			return;
-		} catch (error: any) {
-			const isTransientError =
-				error.response?.status === 503 || // Service Unavailable
-				error.code === 'ECONNRESET' ||
-				error.code === 'ETIMEDOUT';
-
-			const isLastAttempt = attempt === maxRetries;
-
-			if (isTransientError && !isLastAttempt) {
-				console.warn(
-					`Error deleting magnet (attempt ${attempt}/${maxRetries}), retrying in ${retryDelay}ms:`,
-					error.message
-				);
-				await new Promise((resolve) => setTimeout(resolve, retryDelay * attempt));
-				continue; // Retry
-			}
-
-			// Non-transient error or last attempt - throw
-			console.error('Error deleting magnet:', error.message);
-			throw error;
+		if (response.data.status === 'error') {
+			throw new Error(response.data.error?.message || 'Delete failed');
 		}
+	} catch (error: any) {
+		console.error('Error deleting magnet:', error.message);
+		throw error;
 	}
 };
 
@@ -703,7 +832,7 @@ export const unlockLink = async (apiKey: string, link: string): Promise<UnlockLi
 		const params = new URLSearchParams();
 		params.append('link', link);
 
-		const response = await axios.post<ApiResponse<UnlockLinkData>>(endpoint, params, {
+		const response = await allDebridAxios.post<ApiResponse<UnlockLinkData>>(endpoint, params, {
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
 				Authorization: `Bearer ${apiKey}`,

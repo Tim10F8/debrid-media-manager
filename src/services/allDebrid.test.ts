@@ -14,12 +14,22 @@ import {
 const mocks = vi.hoisted(() => ({
 	getMock: vi.fn(),
 	postMock: vi.fn(),
+	requestMock: vi.fn(),
 }));
 
 vi.mock('axios', () => ({
 	default: {
 		get: mocks.getMock,
 		post: mocks.postMock,
+		create: vi.fn(() => ({
+			get: mocks.getMock,
+			post: mocks.postMock,
+			request: mocks.requestMock,
+			interceptors: {
+				request: { use: vi.fn(), eject: vi.fn() },
+				response: { use: vi.fn(), eject: vi.fn() },
+			},
+		})),
 	},
 }));
 

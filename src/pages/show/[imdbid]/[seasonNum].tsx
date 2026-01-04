@@ -12,6 +12,7 @@ import { SearchApiResponse, SearchResult } from '@/services/mediasearch';
 import { TorrentInfoResponse } from '@/services/types';
 import UserTorrentDB from '@/torrent/db';
 import { handleCastTvShowAllDebrid } from '@/utils/allDebridCastApiClient';
+import axiosWithRetry from '@/utils/axiosWithRetry';
 import { getLocalStorageBoolean, getLocalStorageItemOrDefault } from '@/utils/browserStorage';
 import { handleCastTvShow } from '@/utils/castApiClient';
 import { handleCopyOrDownloadMagnet } from '@/utils/copyMagnet';
@@ -38,7 +39,7 @@ import { generateTokenAndHash } from '@/utils/token';
 import { handleCastTvShowTorBox } from '@/utils/torboxCastApiClient';
 import { getMultipleTrackerStats } from '@/utils/trackerStats';
 import { withAuth } from '@/utils/withAuth';
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
 import { CloudOff, Loader2, RotateCcw, Search, Sparkles, Tv, Zap } from 'lucide-react';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -170,7 +171,7 @@ const TvSearch: FunctionComponent = () => {
 
 		const fetchShowInfo = async () => {
 			try {
-				const response = await axios.get(`/api/info/show?imdbid=${imdbid}`);
+				const response = await axiosWithRetry.get(`/api/info/show?imdbid=${imdbid}`);
 				setShowInfo(response.data);
 
 				if (parseInt(seasonNum as string) > response.data.season_count) {
@@ -386,7 +387,7 @@ const TvSearch: FunctionComponent = () => {
 
 		try {
 			// Start DMM fetch
-			const dmmPromise = axios.get<SearchApiResponse>(
+			const dmmPromise = axiosWithRetry.get<SearchApiResponse>(
 				`/api/torrents/tv?imdbId=${imdbId}&seasonNum=${seasonNum}&dmmProblemKey=${tokenWithTimestamp}&solution=${tokenHash}&onlyTrusted=${onlyTrustedTorrents}&maxSize=${episodeMaxSize}&page=${page}`
 			);
 

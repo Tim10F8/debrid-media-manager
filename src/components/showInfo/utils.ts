@@ -1,5 +1,5 @@
+import axiosWithRetry from '@/utils/axiosWithRetry';
 import { filenameParse } from '@ctrl/video-filename-parser';
-import axios from 'axios';
 import { languageEmojis } from './languages';
 import { MediaInfoResponse } from './types';
 
@@ -59,7 +59,9 @@ export const fetchMediaInfo = async (hash: string): Promise<MediaInfoResponse | 
 	if (!hash) return null;
 
 	try {
-		const response = await axios.get<MediaInfoResponse>(snapshotEndpoint, { params: { hash } });
+		const response = await axiosWithRetry.get<MediaInfoResponse>(snapshotEndpoint, {
+			params: { hash },
+		});
 		if (hasMediaInfoPayload(response.data)) {
 			return response.data;
 		}
@@ -73,7 +75,7 @@ export const fetchMediaInfo = async (hash: string): Promise<MediaInfoResponse | 
 
 	try {
 		const password = await generatePasswordHash(hash);
-		const response = await axios.get<MediaInfoResponse>(
+		const response = await axiosWithRetry.get<MediaInfoResponse>(
 			'https://debridmediamanager.com/mediainfo',
 			{ params: { hash, password } }
 		);

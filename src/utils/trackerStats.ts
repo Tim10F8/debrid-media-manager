@@ -1,3 +1,5 @@
+import { fetchWithRetry } from './fetchWithRetry';
+
 // Helper function to batch arrays into chunks
 function batchArray<T>(array: T[], batchSize: number): T[][] {
 	const batches: T[][] = [];
@@ -15,7 +17,7 @@ export async function getMultipleTrackerStats(hashes: string[]): Promise<any[]> 
 
 		// Process each batch
 		for (const batch of batches) {
-			const response = await fetch('/api/torrents/stats/bulk', {
+			const response = await fetchWithRetry('/api/torrents/stats/bulk', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -53,7 +55,7 @@ export async function getCachedTrackerStats(
 ): Promise<any | null> {
 	try {
 		// First, try to get stored stats
-		const storedResponse = await fetch(`/api/torrents/stats/stored?hash=${hash}`, {
+		const storedResponse = await fetchWithRetry(`/api/torrents/stats/stored?hash=${hash}`, {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json',
@@ -82,7 +84,7 @@ export async function getCachedTrackerStats(
 
 		// If no stored stats, they're stale, or force refresh is requested, fetch fresh ones
 		// This should only be called during availability checks when the setting is enabled
-		const freshResponse = await fetch(`/api/torrents/stats?hash=${hash}`, {
+		const freshResponse = await fetchWithRetry(`/api/torrents/stats?hash=${hash}`, {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json',

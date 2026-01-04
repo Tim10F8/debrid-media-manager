@@ -1,18 +1,28 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('axios', () => {
-	const get = vi.fn();
-	return {
-		__esModule: true,
-		default: { get },
-		get,
-	};
-});
+const mocks = vi.hoisted(() => ({
+	getMock: vi.fn(),
+}));
 
-import axios from 'axios';
+vi.mock('axios', () => ({
+	__esModule: true,
+	default: {
+		get: mocks.getMock,
+		create: vi.fn(() => ({
+			get: mocks.getMock,
+			post: vi.fn(),
+			interceptors: {
+				request: { use: vi.fn(), eject: vi.fn() },
+				response: { use: vi.fn(), eject: vi.fn() },
+			},
+		})),
+	},
+	get: mocks.getMock,
+}));
+
 import * as utils from './utils';
 
-const axiosGetMock = vi.mocked(axios.get);
+const axiosGetMock = mocks.getMock;
 
 const sampleMediaInfo = {
 	SelectedFiles: {
