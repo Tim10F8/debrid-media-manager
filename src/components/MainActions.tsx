@@ -1,6 +1,6 @@
 import { RealDebridUser } from '@/hooks/auth';
 import { TorBoxUser } from '@/services/types';
-import { BookOpen, Rocket, Sparkles } from 'lucide-react';
+import { BookOpen, Music2, Rocket, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 interface MainActionsProps {
@@ -78,7 +78,13 @@ export function MainActions({ rdUser, tbUser, adUser, isLoading }: MainActionsPr
 					Hash lists
 				</Link>
 				{/* Music button disabled for now */}
-				<div />
+				<div
+					className="flex cursor-not-allowed items-center justify-center gap-2 rounded border-2 border-gray-600 bg-gray-800/30 p-3 text-gray-500 opacity-50"
+					title="Coming soon"
+				>
+					<Music2 className="mr-1 inline-block h-4 w-4 text-gray-500" />
+					Music
+				</div>
 			</div>
 
 			{/* Second row: Cast buttons */}
