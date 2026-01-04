@@ -25,6 +25,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 		return res.status(200).end();
 	}
 
+	let profile;
+	try {
+		profile = await db.getAllDebridCastProfile(userid);
+		if (!profile) {
+			throw new Error(`no profile found for user ${userid}`);
+		}
+	} catch (error) {
+		console.error(
+			'Failed to get AllDebrid profile:',
+			error instanceof Error ? error.message : 'Unknown error'
+		);
+		res.status(500).json({ error: `Failed to get AllDebrid profile for user ${userid}` });
+		return;
+	}
+
 	const imdbidStr = (imdbid as string).replace(/\.json$/, '');
 	const typeSlug = mediaType === 'movie' ? 'movie' : 'show';
 	let externalUrl = `${process.env.DMM_ORIGIN}/${typeSlug}/${imdbidStr}`;
@@ -35,20 +50,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 		externalUrl = `${process.env.DMM_ORIGIN}/${typeSlug}/${imdbid2}/${season}`;
 	}
 
-	let profile;
-	try {
-		profile = await db.getAllDebridCastProfile(userid);
-	} catch (error) {
-		console.error(
-			'Failed to get AllDebrid profile:',
-			error instanceof Error ? error.message : 'Unknown error'
-		);
-	}
-
 	const streams: any[] = [];
 
 	// Add cast option unless hidden in profile settings
-	if (!profile?.hideCastOption) {
+	if (!profile.hideCastOption) {
 		streams.push({
 			name: 'DMM Cast AD✨',
 			title: 'Cast a file inside a torrent',
@@ -57,15 +62,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 				bingeGroup: `dmm-ad:${imdbidStr}:cast`,
 			},
 		});
-	}
-
-	// If no profile, just return the base cast stream (if not hidden)
-	if (!profile) {
-		res.status(200).json({
-			streams,
-			cacheMaxAge: 0,
-		});
-		return;
 	}
 
 	try {

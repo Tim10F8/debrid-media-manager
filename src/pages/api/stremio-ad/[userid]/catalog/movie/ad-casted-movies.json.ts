@@ -4,6 +4,10 @@ import { NextApiRequest, NextApiResponse } from 'next';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	res.setHeader('access-control-allow-origin', '*');
 
+	if (req.method === 'OPTIONS') {
+		return res.status(200).end();
+	}
+
 	const { userid } = req.query;
 
 	if (typeof userid !== 'string') {
@@ -20,6 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		const metas = movies.map((imdbId) => ({
 			id: imdbId,
 			type: 'movie',
+			poster: `https://images.metahub.space/poster/small/${imdbId}/img`,
 		}));
 
 		res.status(200).json({
