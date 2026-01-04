@@ -1,3 +1,4 @@
+import { CastSettingsPanel } from '@/components/CastSettingsPanel';
 import { useAllDebridCastToken } from '@/hooks/allDebridCastToken';
 import { withAuth } from '@/utils/withAuth';
 import {
@@ -157,17 +158,7 @@ export function StremioAllDebridPage() {
 					</div>
 				</div>
 
-				<div className="mt-6 rounded-lg border border-yellow-500/30 bg-yellow-900/20 p-4 text-sm text-gray-300">
-					<p className="mb-2 font-semibold text-yellow-400">💡 Tip:</p>
-					<p>
-						You can control the maximum file size for streams in the{' '}
-						<Link href="/settings" className="text-yellow-400 hover:underline">
-							Settings page
-						</Link>
-						. Your movie and episode size limits will automatically apply to the Stremio
-						Cast addon stream selection.
-					</p>
-				</div>
+				<CastSettingsPanel service="ad" accentColor="yellow" />
 			</div>
 
 			<div className="mt-6 flex gap-4">
