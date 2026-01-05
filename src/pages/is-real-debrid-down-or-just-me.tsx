@@ -363,6 +363,11 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 										</div>
 									</div>
 								)}
+								{workingStream.total > 0 && (
+									<div className="mt-3 text-xs text-slate-500">
+										Latencies measured from Germany
+									</div>
+								)}
 							</div>
 						</div>
 

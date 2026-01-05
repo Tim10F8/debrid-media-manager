@@ -153,31 +153,21 @@ export class StreamHealthService extends DatabaseClient {
 	}
 
 	/**
-	 * Deletes all stream server health entries for deprecated hosts.
-	 * This includes:
-	 * - .cloud domain variants
-	 * - -4 IPv4 variants
-	 * - Old numbered servers (1.download.real-debrid.com through 999.download.real-debrid.com)
+	 * Deletes all stream server health entries for hosts not in the valid list.
+	 * @param validHosts - Array of valid host strings that should be kept
 	 */
-	public async deleteDeprecatedHosts(): Promise<number> {
+	public async deleteDeprecatedHosts(validHosts: string[]): Promise<number> {
 		try {
-			// First, get all hosts and filter for deprecated ones
+			// Get all hosts in the database
 			const allHosts = await this.prisma.streamServerHealth.findMany({
 				select: { host: true },
 			});
 
+			// Find hosts that are not in the valid list
+			const validHostSet = new Set(validHosts);
 			const deprecatedHosts = allHosts
 				.map((h) => h.host)
-				.filter((host) => {
-					// Match .cloud variants
-					if (host.includes('.download.real-debrid.cloud')) return true;
-					// Match -4 IPv4 variants
-					if (host.includes('-4.download.real-debrid.com')) return true;
-					// Match old numbered servers (e.g., 1.download.real-debrid.com, 100.download.real-debrid.com)
-					const numberedMatch = host.match(/^(\d+)\.download\.real-debrid\.com$/);
-					if (numberedMatch) return true;
-					return false;
-				});
+				.filter((host) => !validHostSet.has(host));
 
 			if (deprecatedHosts.length === 0) {
 				return 0;
@@ -190,7 +180,10 @@ export class StreamHealthService extends DatabaseClient {
 			});
 
 			if (result.count > 0) {
-				console.log(`[StreamHealth] Deleted ${result.count} deprecated host entries`);
+				console.log(
+					`[StreamHealth] Deleted ${result.count} deprecated host entries:`,
+					deprecatedHosts
+				);
 			}
 			return result.count;
 		} catch (error: any) {

@@ -222,8 +222,9 @@ async function executeCheck(): Promise<void> {
 		);
 		const fastestServer = sortedByLatency[0]?.id ?? null;
 
-		// Clean up deprecated host entries (old numbered servers no longer tested)
-		await repository.deleteDeprecatedStreamHosts();
+		// Clean up deprecated host entries (servers no longer in our test list)
+		const validHosts = statuses.map((s) => s.id);
+		await repository.deleteDeprecatedStreamHosts(validHosts);
 		const dbResults = statuses.map((s) => ({
 			host: s.id,
 			status: s.status,
