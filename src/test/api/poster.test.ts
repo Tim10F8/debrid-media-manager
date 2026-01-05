@@ -1,16 +1,23 @@
 import handler from '@/pages/api/poster';
+import { getMdblistClient } from '@/services/mdblistClient';
 import { createMockRequest } from '@/test/utils/api';
 import axios from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('axios');
+vi.mock('@/services/mdblistClient');
+
 const mockedAxios = vi.mocked(axios, true);
+const mockedGetMdblistClient = vi.mocked(getMdblistClient);
 
 describe('/api/poster', () => {
 	let mockReq: any;
 	let mockRes: any;
+	let mockMdblistClient: { getInfoByImdbId: ReturnType<typeof vi.fn> };
 
 	beforeEach(() => {
+		vi.clearAllMocks();
+
 		mockReq = createMockRequest();
 		mockRes = {
 			status: vi.fn().mockReturnThis(),
@@ -22,7 +29,12 @@ describe('/api/poster', () => {
 			_getHeaders: () => ({}),
 			_setStatusCode: vi.fn(),
 		} as any;
-		vi.clearAllMocks();
+
+		// Mock mdblist client (fallback when TMDB has no poster)
+		mockMdblistClient = {
+			getInfoByImdbId: vi.fn().mockResolvedValue({ poster: null }),
+		};
+		mockedGetMdblistClient.mockReturnValue(mockMdblistClient as any);
 	});
 
 	it('should return 400 when imdbid is missing', async () => {
