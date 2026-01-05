@@ -20,6 +20,7 @@ vi.mock('@/services/repository', () => ({
 		getAllStreamStatuses: vi.fn().mockResolvedValue([]),
 		recordStreamHealthSnapshot: vi.fn().mockResolvedValue(undefined),
 		recordServerReliability: vi.fn().mockResolvedValue(undefined),
+		recordStreamCheckResult: vi.fn().mockResolvedValue(undefined),
 	},
 }));
 
@@ -59,89 +60,42 @@ describe('streamServersHealth', () => {
 		__testing.reset();
 	});
 
-	it('returns top 5 servers based on current ceiling', () => {
-		// Default ceiling is 100
-		expect(__testing.getCeiling()).toBe(100);
-
+	it('returns all location-based servers', () => {
+		const locations = __testing.getServerLocations();
 		const servers = __testing.getServerList();
 
-		// Should return top 5 servers (100, 99, 98, 97, 96)
-		expect(servers.length).toBe(5);
-		expect(servers[0].host).toBe('100.download.real-debrid.com');
-		expect(servers[4].host).toBe('96.download.real-debrid.com');
-	});
+		// Should return all 23 location-based servers
+		expect(locations.length).toBe(23);
+		expect(servers.length).toBe(23);
 
-	it('updates ceiling when higher servers are discovered', async () => {
-		// Initial ceiling is 100, mock servers 1-115 exist (higher than ceiling)
-		const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-			const match = url.match(/https:\/\/(\d+)\.download\.real-debrid\.com/);
-			if (match) {
-				const serverNum = parseInt(match[1], 10);
-				if (serverNum <= 115) {
-					return mockPartialContentResponse();
-				}
-				// Servers > 115 don't exist (DNS failure)
-				const error = new Error('getaddrinfo ENOTFOUND');
-				throw error;
-			}
-			return mockPartialContentResponse();
-		});
-		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		// Verify some expected locations
+		expect(locations).toContain('rbx');
+		expect(locations).toContain('lax1');
+		expect(locations).toContain('tyo1');
+		expect(locations).toContain('sgp1');
 
-		const server = await __testing.discoverAndPick();
-
-		// Should have picked a server from top 5 (115, 114, 113, 112, 111)
-		expect(server).not.toBeNull();
-		const match = server!.host.match(/^(\d+)\.download\.real-debrid\.com$/);
-		expect(match).not.toBeNull();
-		const serverNum = parseInt(match![1], 10);
-		expect(serverNum).toBeGreaterThanOrEqual(111);
-		expect(serverNum).toBeLessThanOrEqual(115);
-
-		// Ceiling should be updated to highest found (115 > initial 100)
-		expect(__testing.getCeiling()).toBe(115);
+		// Verify server host format
+		expect(servers[0].host).toMatch(/^[a-z0-9]+\.download\.real-debrid\.com$/);
 	});
 
 	it('persists results to database after a run', async () => {
 		const { repository } = await import('@/services/repository');
 
-		// Mock: only servers 1-5 exist (to limit sequential probing)
-		const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-			const match = url.match(/https:\/\/(\d+)\.download\.real-debrid\.com/);
-			if (match) {
-				const serverNum = parseInt(match[1], 10);
-				if (serverNum <= 5) {
-					return mockPartialContentResponse();
-				}
-				const error = new Error('getaddrinfo ENOTFOUND');
-				throw error;
-			}
-			return mockPartialContentResponse();
-		});
+		// Mock all servers responding successfully
+		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		await __testing.runNow();
 
-		// Should have called upsertStreamHealthResults
+		// Should have called database persistence functions
 		expect(repository.upsertStreamHealthResults).toHaveBeenCalled();
 		expect(repository.recordStreamHealthSnapshot).toHaveBeenCalled();
 		expect(repository.recordServerReliability).toHaveBeenCalled();
+		expect(repository.recordStreamCheckResult).toHaveBeenCalled();
 	}, 15000);
 
-	it('uses correct test URL format', async () => {
-		// Mock: only servers 1-5 exist (to limit sequential probing)
-		const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-			const match = url.match(/https:\/\/(\d+)\.download\.real-debrid\.com/);
-			if (match) {
-				const serverNum = parseInt(match[1], 10);
-				if (serverNum <= 5) {
-					return mockPartialContentResponse();
-				}
-				const error = new Error('getaddrinfo ENOTFOUND');
-				throw error;
-			}
-			return mockPartialContentResponse();
-		});
+	it('uses correct test URL format with random float', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(mockPartialContentResponse());
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		await __testing.runNow();
@@ -150,17 +104,40 @@ describe('streamServersHealth', () => {
 			typeof arg === 'string' ? arg : ((arg as { url?: string })?.url ?? String(arg ?? ''))
 		);
 
-		// Filter to only speedtest URLs (exclude host existence check URLs)
-		const speedtestUrls = requestedUrls.filter((url) => url.includes('/speedtest/'));
-
-		// Speedtest URLs should contain /speedtest/test.rar path (fallback when no token)
-		speedtestUrls.slice(0, 10).forEach((url) => {
-			expect(url).toContain('/speedtest/test.rar');
+		// All URLs should use the new format: /speedtest/test.rar/{randomFloat}
+		requestedUrls.forEach((url) => {
+			expect(url).toMatch(
+				/^https:\/\/[a-z0-9]+\.download\.real-debrid\.com\/speedtest\/test\.rar\/0\.\d+$/
+			);
 		});
 	});
 
+	it('tests all servers and calculates pass percentage', async () => {
+		const { repository } = await import('@/services/repository');
+
+		// Mock: half the servers pass, half fail
+		let callCount = 0;
+		const fetchMock = vi.fn().mockImplementation(async () => {
+			callCount++;
+			// Alternate between success and failure
+			if (callCount % 2 === 0) {
+				return mockPartialContentResponse();
+			}
+			throw new Error('Connection refused');
+		});
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		await __testing.runNow();
+
+		// Should have recorded snapshot with working/total counts
+		expect(repository.recordStreamHealthSnapshot).toHaveBeenCalledWith(
+			expect.objectContaining({
+				totalServers: 23,
+			})
+		);
+	}, 30000);
+
 	// Skipped: retry logic with real delays makes these tests too slow
-	// The retry mechanism (1s, 2s delays) × 360 servers would take too long
 	it.skip('handles timeout errors gracefully', async () => {
 		const { repository } = await import('@/services/repository');
 
