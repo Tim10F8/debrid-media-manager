@@ -117,9 +117,9 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 	// Stream Health Logic - determines overall status
 	const workingStream = stats.workingStream;
 	const recentChecks = workingStream?.recentChecks ?? [];
-	const passedCount = recentChecks.filter((c) => c.ok).length;
 	const totalChecks = recentChecks.length;
-	const streamPct = totalChecks > 0 ? Math.round((passedCount / totalChecks) * 100) : null;
+	// Use the actual server rate (working/total) for status determination
+	const streamPct = workingStream.total > 0 ? Math.round(workingStream.rate * 100) : null;
 
 	// RD API Health
 	const rdApi = stats.rdApi;
@@ -136,9 +136,9 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 			? Math.round((torrentioPassedCount / torrentioTotalChecks) * 100)
 			: null;
 
-	// Determine status based on stream health (and optionally RD API)
+	// Determine status based on stream health (working servers / total servers)
 	const state: StatusState =
-		totalChecks === 0 ? 'idle' : streamPct !== null && streamPct < 50 ? 'down' : 'up';
+		workingStream.total === 0 ? 'idle' : streamPct !== null && streamPct < 50 ? 'down' : 'up';
 
 	const statusMeta: Record<
 		StatusState,
@@ -250,9 +250,7 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 
 						<div className="mt-4 grid w-full gap-6 md:grid-cols-2">
 							<div className="rounded-xl border border-white/10 bg-white/5 p-6">
-								<h3 className="text-lg font-medium text-white">
-									About this data
-								</h3>
+								<h3 className="text-lg font-medium text-white">About this data</h3>
 								<p className="mt-2 text-sm text-slate-400">
 									This status page is powered by{' '}
 									<a
@@ -263,8 +261,8 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 									>
 										Debrid Media Manager
 									</a>
-									, a free, open source dashboard for Real-Debrid, AllDebrid,
-									and TorBox. We run automated health checks every 5 minutes to
+									, a free, open source dashboard for Real-Debrid, AllDebrid, and
+									TorBox. We run automated health checks every 5 minutes to
 									monitor stream server and Torrentio availability.
 								</p>
 							</div>
@@ -275,8 +273,8 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 									Is it just you?
 								</h3>
 								<p className="mt-2 text-sm text-slate-400">
-									Check your internet connection first. If Real-Debrid is down
-									for everyone, you&apos;ll see failure here. If this page says
+									Check your internet connection first. If Real-Debrid is down for
+									everyone, you&apos;ll see failure here. If this page says
 									&quot;Operational&quot; but you can&apos;t connect, the issue
 									might be your ISP or local network.
 								</p>
@@ -298,20 +296,22 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 								<div className="flex items-baseline gap-2">
 									<span
 										className={`text-3xl font-bold ${
-											streamPct === null
+											workingStream.total === 0
 												? 'text-slate-400'
-												: streamPct >= 80
+												: workingStream.rate >= 0.8
 													? 'text-emerald-400'
-													: streamPct >= 40
+													: workingStream.rate >= 0.4
 														? 'text-amber-400'
 														: 'text-rose-500'
 										}`}
 									>
-										{streamPct !== null ? `${streamPct}%` : '—'}
+										{workingStream.total > 0
+											? `${Math.round(workingStream.rate * 100)}%`
+											: '—'}
 									</span>
 									<span className="text-sm text-slate-500">
-										{totalChecks > 0
-											? `${passedCount}/${totalChecks} passed`
+										{workingStream.total > 0
+											? `${workingStream.working}/${workingStream.total} servers`
 											: 'no data yet'}
 									</span>
 								</div>
@@ -330,12 +330,19 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 														className={`h-2 w-2 rounded-full ${check.ok ? 'bg-emerald-500' : 'bg-rose-500'}`}
 													/>
 													<span className="text-slate-400">
-														{new Date(
-															check.checkedAt
-														).toLocaleTimeString(FIXED_LOCALE, {
-															hour: '2-digit',
-															minute: '2-digit',
-														})}
+														{check.server
+															? check.server
+																	.replace(
+																		'.download.real-debrid.com',
+																		''
+																	)
+																	.toUpperCase()
+															: new Date(
+																	check.checkedAt
+																).toLocaleTimeString(FIXED_LOCALE, {
+																	hour: '2-digit',
+																	minute: '2-digit',
+																})}
 													</span>
 												</div>
 												<span
@@ -355,6 +362,30 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 										))}
 									</div>
 								)}
+								{workingStream.failedServers &&
+									workingStream.failedServers.length > 0 && (
+										<div className="mt-3 space-y-1.5">
+											<div className="text-xs font-medium text-rose-400">
+												Failed servers ({workingStream.failedServers.length}
+												)
+											</div>
+											<div className="flex flex-wrap gap-1">
+												{workingStream.failedServers.map((server) => (
+													<span
+														key={server}
+														className="rounded bg-rose-500/20 px-1.5 py-0.5 text-xs text-rose-400"
+													>
+														{server
+															.replace(
+																'.download.real-debrid.com',
+																''
+															)
+															.toUpperCase()}
+													</span>
+												))}
+											</div>
+										</div>
+									)}
 							</div>
 						</div>
 
