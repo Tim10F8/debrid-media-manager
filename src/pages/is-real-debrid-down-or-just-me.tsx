@@ -116,8 +116,8 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 
 	// Stream Health Logic - determines overall status
 	const workingStream = stats.workingStream;
-	const recentChecks = workingStream?.recentChecks ?? [];
-	const totalChecks = recentChecks.length;
+	const workingServers = workingStream?.workingServers ?? [];
+	const failedServers = workingStream?.failedServers ?? [];
 	// Use the actual server rate (working/total) for status determination
 	const streamPct = workingStream.total > 0 ? Math.round(workingStream.rate * 100) : null;
 
@@ -315,77 +315,54 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 											: 'no data yet'}
 									</span>
 								</div>
-								{totalChecks > 0 && (
+								{workingServers.length > 0 && (
 									<div className="mt-3 space-y-1.5">
-										<div className="text-xs font-medium text-slate-500">
-											Last {totalChecks} checks
+										<div className="text-xs font-medium text-emerald-400">
+											Working servers ({workingServers.length})
 										</div>
-										{recentChecks.map((check, i) => (
-											<div
-												key={i}
-												className="flex items-center justify-between text-xs"
-											>
-												<div className="flex items-center gap-2">
-													<span
-														className={`h-2 w-2 rounded-full ${check.ok ? 'bg-emerald-500' : 'bg-rose-500'}`}
-													/>
-													<span className="text-slate-400">
-														{check.server
-															? check.server
-																	.replace(
-																		'.download.real-debrid.com',
-																		''
-																	)
-																	.toUpperCase()
-															: new Date(
-																	check.checkedAt
-																).toLocaleTimeString(FIXED_LOCALE, {
-																	hour: '2-digit',
-																	minute: '2-digit',
-																})}
-													</span>
-												</div>
+										<div className="flex flex-wrap gap-1">
+											{workingServers.map((s) => (
 												<span
-													className={
-														check.ok
-															? 'text-emerald-400'
-															: 'text-rose-400'
+													key={s.server}
+													className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-xs text-emerald-400"
+													title={
+														s.latencyMs
+															? `${Math.round(s.latencyMs)}ms`
+															: 'OK'
 													}
 												>
-													{check.ok
-														? check.latencyMs
-															? `${Math.round(check.latencyMs)}ms`
-															: 'OK'
-														: 'Failed'}
+													{s.server
+														.replace('.download.real-debrid.com', '')
+														.toUpperCase()}
+													{s.latencyMs && (
+														<span className="ml-1 text-emerald-500/70">
+															{Math.round(s.latencyMs)}ms
+														</span>
+													)}
 												</span>
-											</div>
-										))}
+											))}
+										</div>
 									</div>
 								)}
-								{workingStream.failedServers &&
-									workingStream.failedServers.length > 0 && (
-										<div className="mt-3 space-y-1.5">
-											<div className="text-xs font-medium text-rose-400">
-												Failed servers ({workingStream.failedServers.length}
-												)
-											</div>
-											<div className="flex flex-wrap gap-1">
-												{workingStream.failedServers.map((server) => (
-													<span
-														key={server}
-														className="rounded bg-rose-500/20 px-1.5 py-0.5 text-xs text-rose-400"
-													>
-														{server
-															.replace(
-																'.download.real-debrid.com',
-																''
-															)
-															.toUpperCase()}
-													</span>
-												))}
-											</div>
+								{failedServers.length > 0 && (
+									<div className="mt-3 space-y-1.5">
+										<div className="text-xs font-medium text-rose-400">
+											Failed servers ({failedServers.length})
 										</div>
-									)}
+										<div className="flex flex-wrap gap-1">
+											{failedServers.map((server) => (
+												<span
+													key={server}
+													className="rounded bg-rose-500/20 px-1.5 py-0.5 text-xs text-rose-400"
+												>
+													{server
+														.replace('.download.real-debrid.com', '')
+														.toUpperCase()}
+												</span>
+											))}
+										</div>
+									</div>
+								)}
 							</div>
 						</div>
 

@@ -1,7 +1,11 @@
 import { RdOverallStats } from '@/services/database/rdOperational';
 import { repository } from '@/services/repository';
 
-import { getStreamMetricsFromDb, isHealthCheckInProgress } from './streamServersHealth';
+import {
+	getStreamMetricsFromDb,
+	getStreamStatusesFromDb,
+	isHealthCheckInProgress,
+} from './streamServersHealth';
 import { isTorrentioHealthCheckInProgress } from './torrentioHealth';
 
 export interface RecentCheckResult {
@@ -11,12 +15,18 @@ export interface RecentCheckResult {
 	checkedAt: number;
 }
 
+export interface ServerWithLatency {
+	server: string;
+	latencyMs: number | null;
+}
+
 export interface CompactWorkingStreamMetrics {
 	total: number;
 	working: number;
 	rate: number;
 	lastChecked: number | null;
 	failedServers: string[];
+	workingServers: ServerWithLatency[];
 	lastError: string | null;
 	inProgress: boolean;
 	avgLatencyMs: number | null;
@@ -57,12 +67,23 @@ export interface RealDebridObservabilityStats {
  * Gets Real-Debrid stream health stats from MySQL database.
  */
 export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebridObservabilityStats> {
-	const [streamMetrics, recentChecks, rdStats, torrentioChecks] = await Promise.all([
-		getStreamMetricsFromDb(),
-		repository.getRecentStreamChecks(5),
-		repository.getRdStats(1),
-		repository.getRecentTorrentioChecks(5),
-	]);
+	const [streamMetrics, streamStatuses, recentChecks, rdStats, torrentioChecks] =
+		await Promise.all([
+			getStreamMetricsFromDb(),
+			getStreamStatusesFromDb(),
+			repository.getRecentStreamChecks(5),
+			repository.getRdStats(1),
+			repository.getRecentTorrentioChecks(5),
+		]);
+
+	// Extract working servers with latencies, sorted by latency (fastest first)
+	const workingServers: ServerWithLatency[] = streamStatuses
+		.filter((s) => s.ok)
+		.map((s) => ({
+			server: s.host,
+			latencyMs: s.latencyMs,
+		}))
+		.sort((a, b) => (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity));
 
 	return {
 		workingStream: {
@@ -71,6 +92,7 @@ export async function getRealDebridObservabilityStatsFromDb(): Promise<RealDebri
 			rate: streamMetrics.rate,
 			lastChecked: streamMetrics.lastChecked,
 			failedServers: streamMetrics.failedServers,
+			workingServers,
 			lastError: null,
 			inProgress: isHealthCheckInProgress(),
 			avgLatencyMs: streamMetrics.avgLatencyMs,

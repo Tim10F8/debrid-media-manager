@@ -14,6 +14,7 @@ function buildWorkingStream(): CompactWorkingStreamMetrics {
 		rate: 0,
 		lastChecked: null,
 		failedServers: [],
+		workingServers: [],
 		lastError: null,
 		inProgress: false,
 		avgLatencyMs: null,

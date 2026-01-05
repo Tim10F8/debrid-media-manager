@@ -12,6 +12,7 @@ function buildEmptyStats(): RealDebridObservabilityStats {
 		rate: 0,
 		lastChecked: null,
 		failedServers: [],
+		workingServers: [],
 		lastError: null,
 		inProgress: false,
 		avgLatencyMs: null,
