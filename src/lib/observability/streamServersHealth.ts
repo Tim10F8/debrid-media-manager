@@ -29,7 +29,6 @@ const SERVER_LOCATIONS = [
 	'mum1',
 	'nyk1',
 	'qro1',
-	'rbx1',
 	'sao1',
 	'scl1',
 	'sea1',

@@ -64,9 +64,9 @@ describe('streamServersHealth', () => {
 		const locations = __testing.getServerLocations();
 		const servers = __testing.getServerList();
 
-		// Should return all 23 location-based servers
-		expect(locations.length).toBe(23);
-		expect(servers.length).toBe(23);
+		// Should return all 22 location-based servers
+		expect(locations.length).toBe(22);
+		expect(servers.length).toBe(22);
 
 		// Verify some expected locations
 		expect(locations).toContain('rbx');
@@ -132,7 +132,7 @@ describe('streamServersHealth', () => {
 		// Should have recorded snapshot with working/total counts
 		expect(repository.recordStreamHealthSnapshot).toHaveBeenCalledWith(
 			expect.objectContaining({
-				totalServers: 23,
+				totalServers: 22,
 			})
 		);
 	}, 30000);
