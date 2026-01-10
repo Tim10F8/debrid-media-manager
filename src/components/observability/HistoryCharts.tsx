@@ -359,6 +359,12 @@ export function HistoryCharts() {
 											borderRadius: '8px',
 										}}
 										labelStyle={{ color: '#f1f5f9' }}
+										labelFormatter={(_, payload) => {
+											if (payload && payload.length > 0) {
+												return payload[0].payload.label;
+											}
+											return '';
+										}}
 										formatter={(value) => [
 											formatPercent(value as number),
 											'Working Rate',
@@ -420,6 +426,12 @@ export function HistoryCharts() {
 											borderRadius: '8px',
 										}}
 										labelStyle={{ color: '#f1f5f9' }}
+										labelFormatter={(_, payload) => {
+											if (payload && payload.length > 0) {
+												return payload[0].payload.label;
+											}
+											return '';
+										}}
 										formatter={(value) => [
 											formatPercent(value as number),
 											'Success Rate',
@@ -487,6 +499,12 @@ export function HistoryCharts() {
 											borderRadius: '8px',
 										}}
 										labelStyle={{ color: '#f1f5f9' }}
+										labelFormatter={(_, payload) => {
+											if (payload && payload.length > 0) {
+												return payload[0].payload.label;
+											}
+											return '';
+										}}
 										formatter={(value) => [
 											formatPercent(value as number),
 											'Success Rate',
