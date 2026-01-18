@@ -10,6 +10,8 @@ import axios from 'axios';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 
 const REQUEST_TIMEOUT_MS = 10000;
+const TOR_MAX_RETRIES = 3;
+const MDBLIST_URL = 'https://mdblist.com/lists/linaspurinis/imdb-moviemeter-top-100/json/';
 
 /**
  * Creates a Tor SOCKS proxy agent for requests to Torrentio.
@@ -17,11 +19,47 @@ const REQUEST_TIMEOUT_MS = 10000;
  */
 function getTorAgent(): SocksProxyAgent {
 	return new SocksProxyAgent(
-		`socks5h://${Date.now()}:any_password@${process.env.PROXY || 'localhost:9050'}`,
+		`socks5h://${Date.now()}-${Math.random().toString(36)}:any_password@${process.env.PROXY || 'localhost:9050'}`,
 		{ timeout: REQUEST_TIMEOUT_MS }
 	);
 }
-const MDBLIST_URL = 'https://mdblist.com/lists/linaspurinis/imdb-moviemeter-top-100/json/';
+
+/**
+ * Verifies a Tor agent is working by checking ipinfo.io.
+ * Returns the IP if successful, null if failed.
+ */
+async function verifyTorAgent(agent: SocksProxyAgent): Promise<string | null> {
+	try {
+		const response = await axios.get<{ ip: string }>('https://ipinfo.io/json', {
+			httpAgent: agent,
+			httpsAgent: agent,
+			timeout: 5000,
+		});
+		return response.data.ip || null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Gets a working Tor agent by trying new circuits until one works.
+ * Returns the agent and the IP it's using, or null if all retries failed.
+ */
+async function getWorkingTorAgent(): Promise<{ agent: SocksProxyAgent; ip: string } | null> {
+	for (let i = 0; i < TOR_MAX_RETRIES; i++) {
+		const agent = getTorAgent();
+		const ip = await verifyTorAgent(agent);
+		if (ip) {
+			console.log(`[TorrentioHealth] Tor circuit working, IP: ${ip}`);
+			return { agent, ip };
+		}
+		console.warn(
+			`[TorrentioHealth] Tor circuit ${i + 1}/${TOR_MAX_RETRIES} failed, retrying...`
+		);
+	}
+	console.error('[TorrentioHealth] All Tor circuits failed');
+	return null;
+}
 const NUM_TEST_MOVIES = 3;
 
 // Track if a check is currently running (to prevent concurrent runs)
@@ -141,14 +179,13 @@ async function getTestMovies(): Promise<TestMovie[]> {
 
 /**
  * Fetches the stream manifest for a movie and returns a random stream.
- * Uses Tor proxy to avoid Cloudflare blocking.
+ * Uses provided Tor proxy agent to avoid Cloudflare blocking.
  */
 async function fetchRandomStreamFromManifest(
-	_rdKey: string,
-	imdbId: string
+	imdbId: string,
+	torAgent: SocksProxyAgent
 ): Promise<{ stream: TorrentioStream } | null> {
 	const url = `https://torrentio.strem.fun/stream/movie/${imdbId}.json`;
-	const torAgent = getTorAgent();
 
 	try {
 		const response = await axios.get<TorrentioManifestResponse>(url, {
@@ -193,9 +230,11 @@ function buildResolveUrl(rdKey: string, stream: TorrentioStream): string {
  * - 5xx server errors
  * - Network/timeout errors
  */
-async function testTorrentioUrl(testUrl: TorrentioTestUrl): Promise<TorrentioUrlCheckResult> {
+async function testTorrentioUrl(
+	testUrl: TorrentioTestUrl,
+	torAgent: SocksProxyAgent
+): Promise<TorrentioUrlCheckResult> {
 	const { url, expectedStatus } = testUrl;
-	const torAgent = getTorAgent();
 	const startTime = performance.now();
 
 	try {
@@ -277,6 +316,18 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 }> {
 	const allResults: TorrentioUrlCheckResult[] = [];
 
+	// Get a working Tor agent first
+	const torResult = await getWorkingTorAgent();
+	if (!torResult) {
+		return {
+			ok: false,
+			latencyMs: null,
+			error: 'All Tor circuits failed',
+			urls: [],
+		};
+	}
+	const { agent: torAgent } = torResult;
+
 	// Fetch test movies from MDBList (or use fallback)
 	const testMovies = await getTestMovies();
 
@@ -284,7 +335,7 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 	for (const movie of testMovies) {
 		const manifestUrl = `https://torrentio.strem.fun/stream/movie/${movie.imdbId}.json`;
 		const startTime = performance.now();
-		const manifestResult = await fetchRandomStreamFromManifest(rdKey, movie.imdbId);
+		const manifestResult = await fetchRandomStreamFromManifest(movie.imdbId, torAgent);
 		const manifestLatency = performance.now() - startTime;
 
 		if (!manifestResult) {
@@ -314,7 +365,10 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 
 		// Now test the resolve URL for the randomly picked torrent
 		const resolveUrl = buildResolveUrl(rdKey, manifestResult.stream);
-		const resolveResult = await testTorrentioUrl({ url: resolveUrl, expectedStatus: 302 });
+		const resolveResult = await testTorrentioUrl(
+			{ url: resolveUrl, expectedStatus: 302 },
+			torAgent
+		);
 		allResults.push(resolveResult);
 	}
 
