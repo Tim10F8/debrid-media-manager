@@ -127,17 +127,21 @@ async function getTestMovies(): Promise<TestMovie[]> {
 
 /**
  * Fetches the stream manifest for a movie and returns a random stream.
+ * Uses the unauthenticated endpoint to avoid rate limiting on authenticated requests.
+ * The authenticated resolve endpoint is tested separately.
  */
 async function fetchRandomStreamFromManifest(
-	rdKey: string,
+	_rdKey: string,
 	imdbId: string
-): Promise<{ stream: TorrentioStream; manifestUrl: string } | null> {
-	const manifestUrl = `https://torrentio.strem.fun/realdebrid=${rdKey}/stream/movie/${imdbId}.json`;
+): Promise<{ stream: TorrentioStream } | null> {
+	// Use unauthenticated endpoint to fetch streams (avoids rate limiting)
+	// The authenticated endpoint is only needed for resolve, not for listing streams
+	const url = `https://torrentio.strem.fun/stream/movie/${imdbId}.json`;
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
 	try {
-		const response = await fetch(manifestUrl, {
+		const response = await fetch(url, {
 			method: 'GET',
 			signal: controller.signal,
 		});
@@ -154,7 +158,7 @@ async function fetchRandomStreamFromManifest(
 
 		// Pick a random stream from the available ones
 		const randomIndex = Math.floor(Math.random() * data.streams.length);
-		return { stream: data.streams[randomIndex], manifestUrl };
+		return { stream: data.streams[randomIndex] };
 	} catch {
 		clearTimeout(timeoutId);
 		return null;
@@ -261,8 +265,9 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 	// Fetch test movies from MDBList (or use fallback)
 	const testMovies = await getTestMovies();
 
-	// Process each movie: fetch manifest, then test resolve for a random torrent
+	// Process each movie: fetch manifest (unauthenticated), then test resolve (authenticated)
 	for (const movie of testMovies) {
+		const manifestUrl = `https://torrentio.strem.fun/stream/movie/${movie.imdbId}.json`;
 		const startTime = performance.now();
 		const manifestResult = await fetchRandomStreamFromManifest(rdKey, movie.imdbId);
 		const manifestLatency = performance.now() - startTime;
@@ -270,7 +275,7 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 		if (!manifestResult) {
 			// Manifest fetch failed
 			allResults.push({
-				url: `https://torrentio.strem.fun/realdebrid=${rdKey}/stream/movie/${movie.imdbId}.json`,
+				url: manifestUrl,
 				ok: false,
 				status: null,
 				hasLocation: false,
@@ -283,7 +288,7 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 
 		// Manifest succeeded
 		allResults.push({
-			url: manifestResult.manifestUrl,
+			url: manifestUrl,
 			ok: true,
 			status: 200,
 			hasLocation: false,
