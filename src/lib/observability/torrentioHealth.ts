@@ -25,12 +25,13 @@ function getTorAgent(): SocksProxyAgent {
 }
 
 /**
- * Verifies a Tor agent is working by checking ipinfo.io.
+ * Verifies a Tor agent is working by checking ipify.org.
+ * (ipinfo.io blocks Tor exit nodes, so we use ipify.org instead)
  * Returns the IP if successful, null if failed.
  */
 async function verifyTorAgent(agent: SocksProxyAgent): Promise<string | null> {
 	try {
-		const response = await axios.get<{ ip: string }>('https://ipinfo.io/json', {
+		const response = await axios.get<{ ip: string }>('https://api.ipify.org?format=json', {
 			httpAgent: agent,
 			httpsAgent: agent,
 			timeout: 5000,
