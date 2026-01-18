@@ -3,10 +3,24 @@
 // 1. Fetches the stream manifest from Torrentio
 // 2. Picks a random torrent and tests the resolve endpoint
 // Health checks are triggered by cron job alongside the stream health check.
+// Uses Tor proxy to avoid Cloudflare blocking.
 
 import { repository } from '@/services/repository';
+import axios from 'axios';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 const REQUEST_TIMEOUT_MS = 10000;
+
+/**
+ * Creates a Tor SOCKS proxy agent for requests to Torrentio.
+ * Uses a unique username per request to get a fresh circuit.
+ */
+function getTorAgent(): SocksProxyAgent {
+	return new SocksProxyAgent(
+		`socks5h://${Date.now()}:any_password@${process.env.PROXY || 'localhost:9050'}`,
+		{ timeout: REQUEST_TIMEOUT_MS }
+	);
+}
 const MDBLIST_URL = 'https://mdblist.com/lists/linaspurinis/imdb-moviemeter-top-100/json/';
 const NUM_TEST_MOVIES = 3;
 
@@ -127,31 +141,27 @@ async function getTestMovies(): Promise<TestMovie[]> {
 
 /**
  * Fetches the stream manifest for a movie and returns a random stream.
- * Uses the unauthenticated endpoint to avoid rate limiting on authenticated requests.
- * The authenticated resolve endpoint is tested separately.
+ * Uses Tor proxy to avoid Cloudflare blocking.
  */
 async function fetchRandomStreamFromManifest(
 	_rdKey: string,
 	imdbId: string
 ): Promise<{ stream: TorrentioStream } | null> {
-	// Use unauthenticated endpoint to fetch streams (avoids rate limiting)
-	// The authenticated endpoint is only needed for resolve, not for listing streams
 	const url = `https://torrentio.strem.fun/stream/movie/${imdbId}.json`;
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+	const torAgent = getTorAgent();
 
 	try {
-		const response = await fetch(url, {
-			method: 'GET',
-			signal: controller.signal,
+		const response = await axios.get<TorrentioManifestResponse>(url, {
+			httpAgent: torAgent,
+			httpsAgent: torAgent,
+			timeout: REQUEST_TIMEOUT_MS,
+			headers: {
+				'user-agent':
+					'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+			},
 		});
-		clearTimeout(timeoutId);
 
-		if (!response.ok) {
-			return null;
-		}
-
-		const data = (await response.json()) as TorrentioManifestResponse;
+		const data = response.data;
 		if (!data.streams || data.streams.length === 0) {
 			return null;
 		}
@@ -160,7 +170,6 @@ async function fetchRandomStreamFromManifest(
 		const randomIndex = Math.floor(Math.random() * data.streams.length);
 		return { stream: data.streams[randomIndex] };
 	} catch {
-		clearTimeout(timeoutId);
 		return null;
 	}
 }
@@ -175,7 +184,7 @@ function buildResolveUrl(rdKey: string, stream: TorrentioStream): string {
 }
 
 /**
- * Tests a single Torrentio URL with a HEAD request.
+ * Tests a single Torrentio URL with a HEAD request via Tor proxy.
  * Success conditions:
  * - Expected status matches (200 for stream manifests, 302 for resolve URLs)
  * - For 302: location header must contain "real-debrid"
@@ -186,22 +195,26 @@ function buildResolveUrl(rdKey: string, stream: TorrentioStream): string {
  */
 async function testTorrentioUrl(testUrl: TorrentioTestUrl): Promise<TorrentioUrlCheckResult> {
 	const { url, expectedStatus } = testUrl;
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+	const torAgent = getTorAgent();
+	const startTime = performance.now();
 
 	try {
-		const startTime = performance.now();
-		const response = await fetch(url, {
-			method: 'HEAD',
-			signal: controller.signal,
-			redirect: 'manual', // Don't follow redirects, we want to check the 302
+		const response = await axios.head(url, {
+			httpAgent: torAgent,
+			httpsAgent: torAgent,
+			timeout: REQUEST_TIMEOUT_MS,
+			maxRedirects: 0, // Don't follow redirects, we want to check the 302
+			validateStatus: () => true, // Accept any status code
+			headers: {
+				'user-agent':
+					'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+			},
 		});
 		const endTime = performance.now();
-		clearTimeout(timeoutId);
 
 		const status = response.status;
-		const location = response.headers.get('location');
-		const hasLocation = location !== null && location.length > 0;
+		const location = response.headers['location'] as string | undefined;
+		const hasLocation = !!location && location.length > 0;
 		const locationValid = hasLocation && location.toLowerCase().includes('real-debrid');
 
 		// Success cases:
@@ -227,11 +240,13 @@ async function testTorrentioUrl(testUrl: TorrentioTestUrl): Promise<TorrentioUrl
 					: `Unexpected response: ${status}`,
 		};
 	} catch (error) {
-		clearTimeout(timeoutId);
+		const endTime = performance.now();
 
 		let errorMessage = 'Unknown error';
-		if (error instanceof Error) {
-			errorMessage = error.name === 'AbortError' ? 'Timeout' : error.message;
+		if (axios.isAxiosError(error)) {
+			errorMessage = error.code === 'ECONNABORTED' ? 'Timeout' : error.message;
+		} else if (error instanceof Error) {
+			errorMessage = error.message;
 		}
 
 		return {
@@ -240,7 +255,7 @@ async function testTorrentioUrl(testUrl: TorrentioTestUrl): Promise<TorrentioUrl
 			status: null,
 			hasLocation: false,
 			locationValid: false,
-			latencyMs: null,
+			latencyMs: endTime - startTime,
 			error: errorMessage,
 		};
 	}
