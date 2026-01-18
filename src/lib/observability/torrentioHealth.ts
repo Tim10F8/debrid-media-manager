@@ -1,11 +1,14 @@
 // Torrentio health check module.
-// Tests 3 specific Torrentio resolve URLs with HEAD requests expecting HTTP 302
-// and a location header containing "real-debrid".
+// Fetches popular movies from MDBList, then for each:
+// 1. Fetches the stream manifest from Torrentio
+// 2. Picks a random torrent and tests the resolve endpoint
 // Health checks are triggered by cron job alongside the stream health check.
 
 import { repository } from '@/services/repository';
 
 const REQUEST_TIMEOUT_MS = 10000;
+const MDBLIST_URL = 'https://mdblist.com/lists/linaspurinis/imdb-moviemeter-top-100/json/';
+const NUM_TEST_MOVIES = 3;
 
 // Track if a check is currently running (to prevent concurrent runs)
 let checkInProgress = false;
@@ -33,39 +36,138 @@ export interface TorrentioTestUrl {
 	expectedStatus: number;
 }
 
+interface TorrentioStream {
+	infoHash: string;
+	fileIdx: number;
+	behaviorHints?: {
+		filename?: string;
+	};
+	title?: string;
+}
+
+interface TorrentioManifestResponse {
+	streams?: TorrentioStream[];
+}
+
+interface MdbListMovie {
+	id: number;
+	rank: number;
+	title: string;
+	imdb_id: string;
+	mediatype: string;
+	release_year: number;
+}
+
+// Fallback movies if MDBList API fails
+const FALLBACK_MOVIES: TestMovie[] = [
+	{ imdbId: 'tt0816692', name: 'Interstellar' },
+	{ imdbId: 'tt0241527', name: 'Harry Potter' },
+	{ imdbId: 'tt0120737', name: 'Lord of the Rings' },
+];
+
+interface TestMovie {
+	imdbId: string;
+	name: string;
+}
+
 /**
- * Builds the Torrentio test URLs with the RD key.
- * Includes both resolve URLs (expect 302) and stream manifest URLs (expect 200).
+ * Fetches popular movies from MDBList and picks random ones for testing.
+ * Falls back to hardcoded movies if the API fails.
  */
-function getTorrentioTestUrls(rdKey: string): TorrentioTestUrl[] {
-	return [
-		// Resolve URLs - expect HTTP 302 with real-debrid location
-		{
-			url: `https://torrentio.strem.fun/resolve/realdebrid/${rdKey}/163d2082453d037f3bec8bb77ddce782797a7fc3/null/0/Interstellar.2014.IMAX.2160p.10bit.HDR.BluRay.6CH.x265.HEVC-PSA.mkv`,
-			expectedStatus: 302,
-		},
-		{
-			url: `https://torrentio.strem.fun/resolve/realdebrid/${rdKey}/4dafd19cb07dd72000c254f8377d881bbb168836/null/0/The%20Lord%20of%20the%20Rings%20-%20The%20Fellowship%20of%20the%20Ring%20(2001)%20Extended%20(2160p%20BluRay%20x265%2010bit%20HDR%20Tigole).mkv`,
-			expectedStatus: 302,
-		},
-		{
-			url: `https://torrentio.strem.fun/resolve/realdebrid/${rdKey}/8a48b47dc85313b110ad164255817c3d6f93cf73/null/1/01.%20Harry%20Potter%20and%20the%20Sorcerer's%20Stone%20(2001)%202160p%2010Bit%20UHD%20BDRIP%20x265%20AC3.mkv`,
-			expectedStatus: 302,
-		},
-		// Stream manifest URLs - expect HTTP 200
-		{
-			url: `https://torrentio.strem.fun/realdebrid=${rdKey}/stream/movie/tt0816692.json`,
-			expectedStatus: 200,
-		},
-		{
-			url: `https://torrentio.strem.fun/realdebrid=${rdKey}/stream/movie/tt0241527.json`,
-			expectedStatus: 200,
-		},
-		{
-			url: `https://torrentio.strem.fun/realdebrid=${rdKey}/stream/movie/tt0120737.json`,
-			expectedStatus: 200,
-		},
-	];
+async function getTestMovies(): Promise<TestMovie[]> {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+	try {
+		const response = await fetch(MDBLIST_URL, {
+			method: 'GET',
+			signal: controller.signal,
+		});
+		clearTimeout(timeoutId);
+
+		if (!response.ok) {
+			console.warn('[TorrentioHealth] MDBList API returned non-OK status, using fallback');
+			return FALLBACK_MOVIES;
+		}
+
+		const movies = (await response.json()) as MdbListMovie[];
+		if (!Array.isArray(movies) || movies.length === 0) {
+			console.warn('[TorrentioHealth] MDBList returned empty list, using fallback');
+			return FALLBACK_MOVIES;
+		}
+
+		// Filter to only movies with valid IMDB IDs
+		const validMovies = movies.filter(
+			(m) => m.mediatype === 'movie' && m.imdb_id && m.imdb_id.startsWith('tt')
+		);
+
+		if (validMovies.length < NUM_TEST_MOVIES) {
+			console.warn('[TorrentioHealth] Not enough valid movies from MDBList, using fallback');
+			return FALLBACK_MOVIES;
+		}
+
+		// Pick random movies from the list
+		const shuffled = validMovies.sort(() => Math.random() - 0.5);
+		const selected = shuffled.slice(0, NUM_TEST_MOVIES);
+
+		console.log(
+			`[TorrentioHealth] Testing with movies: ${selected.map((m) => m.title).join(', ')}`
+		);
+
+		return selected.map((m) => ({
+			imdbId: m.imdb_id,
+			name: m.title,
+		}));
+	} catch (error) {
+		clearTimeout(timeoutId);
+		console.warn('[TorrentioHealth] Failed to fetch from MDBList, using fallback:', error);
+		return FALLBACK_MOVIES;
+	}
+}
+
+/**
+ * Fetches the stream manifest for a movie and returns a random stream.
+ */
+async function fetchRandomStreamFromManifest(
+	rdKey: string,
+	imdbId: string
+): Promise<{ stream: TorrentioStream; manifestUrl: string } | null> {
+	const manifestUrl = `https://torrentio.strem.fun/realdebrid=${rdKey}/stream/movie/${imdbId}.json`;
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+	try {
+		const response = await fetch(manifestUrl, {
+			method: 'GET',
+			signal: controller.signal,
+		});
+		clearTimeout(timeoutId);
+
+		if (!response.ok) {
+			return null;
+		}
+
+		const data = (await response.json()) as TorrentioManifestResponse;
+		if (!data.streams || data.streams.length === 0) {
+			return null;
+		}
+
+		// Pick a random stream from the available ones
+		const randomIndex = Math.floor(Math.random() * data.streams.length);
+		return { stream: data.streams[randomIndex], manifestUrl };
+	} catch {
+		clearTimeout(timeoutId);
+		return null;
+	}
+}
+
+/**
+ * Builds the resolve URL from a stream.
+ */
+function buildResolveUrl(rdKey: string, stream: TorrentioStream): string {
+	const filename = stream.behaviorHints?.filename || stream.title || `file_${stream.fileIdx}`;
+	const encodedFilename = encodeURIComponent(filename);
+	return `https://torrentio.strem.fun/resolve/realdebrid/${rdKey}/${stream.infoHash}/null/${stream.fileIdx}/${encodedFilename}`;
 }
 
 /**
@@ -142,7 +244,11 @@ async function testTorrentioUrl(testUrl: TorrentioTestUrl): Promise<TorrentioUrl
 
 /**
  * Runs the Torrentio health check.
- * Tests all 6 URLs and returns true only if all pass.
+ * For each test movie:
+ * 1. Fetches the stream manifest (tests manifest endpoint)
+ * 2. Picks a random torrent from the results
+ * 3. Tests the resolve URL for that torrent (tests resolve endpoint)
+ * Returns true only if all checks pass.
  */
 async function runTorrentioCheck(rdKey: string): Promise<{
 	ok: boolean;
@@ -150,11 +256,50 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 	error: string | null;
 	urls: TorrentioUrlCheckResult[];
 }> {
-	const testUrls = getTorrentioTestUrls(rdKey);
-	const results = await Promise.all(testUrls.map(testTorrentioUrl));
+	const allResults: TorrentioUrlCheckResult[] = [];
 
-	const allOk = results.every((r) => r.ok);
-	const resultsWithLatency = results.filter((r) => r.latencyMs !== null);
+	// Fetch test movies from MDBList (or use fallback)
+	const testMovies = await getTestMovies();
+
+	// Process each movie: fetch manifest, then test resolve for a random torrent
+	for (const movie of testMovies) {
+		const startTime = performance.now();
+		const manifestResult = await fetchRandomStreamFromManifest(rdKey, movie.imdbId);
+		const manifestLatency = performance.now() - startTime;
+
+		if (!manifestResult) {
+			// Manifest fetch failed
+			allResults.push({
+				url: `https://torrentio.strem.fun/realdebrid=${rdKey}/stream/movie/${movie.imdbId}.json`,
+				ok: false,
+				status: null,
+				hasLocation: false,
+				locationValid: false,
+				latencyMs: manifestLatency,
+				error: `Failed to fetch manifest for ${movie.name}`,
+			});
+			continue;
+		}
+
+		// Manifest succeeded
+		allResults.push({
+			url: manifestResult.manifestUrl,
+			ok: true,
+			status: 200,
+			hasLocation: false,
+			locationValid: false,
+			latencyMs: manifestLatency,
+			error: null,
+		});
+
+		// Now test the resolve URL for the randomly picked torrent
+		const resolveUrl = buildResolveUrl(rdKey, manifestResult.stream);
+		const resolveResult = await testTorrentioUrl({ url: resolveUrl, expectedStatus: 302 });
+		allResults.push(resolveResult);
+	}
+
+	const allOk = allResults.every((r) => r.ok);
+	const resultsWithLatency = allResults.filter((r) => r.latencyMs !== null);
 
 	// Calculate average latency of all checks that got a response
 	let avgLatencyMs: number | null = null;
@@ -166,7 +311,7 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 	// Build error message if any failed
 	let error: string | null = null;
 	if (!allOk) {
-		const failedUrls = results.filter((r) => !r.ok);
+		const failedUrls = allResults.filter((r) => !r.ok);
 		error = failedUrls.map((r) => r.error).join('; ');
 	}
 
@@ -174,7 +319,7 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 		ok: allOk,
 		latencyMs: avgLatencyMs,
 		error,
-		urls: results,
+		urls: allResults,
 	};
 }
 
@@ -252,6 +397,10 @@ export const __testing = {
 	async runNow() {
 		return runTorrentioHealthCheckNow();
 	},
-	getTorrentioTestUrls,
+	FALLBACK_MOVIES,
+	MDBLIST_URL,
+	getTestMovies,
+	fetchRandomStreamFromManifest,
+	buildResolveUrl,
 	testTorrentioUrl,
 };

@@ -263,7 +263,16 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 									</a>
 									, a free, open source dashboard for Real-Debrid, AllDebrid, and
 									TorBox. We run automated health checks every 5 minutes to
-									monitor stream server and Torrentio availability.
+									monitor stream server and{' '}
+									<a
+										className="font-semibold text-sky-300 hover:text-white"
+										href="https://torrentio.strem.fun/configure"
+										rel="noreferrer noopener"
+										target="_blank"
+									>
+										Torrentio
+									</a>{' '}
+									availability.
 								</p>
 							</div>
 
@@ -459,7 +468,14 @@ const RealDebridStatusPage: NextPage & { disableLibraryProvider?: boolean } = ()
 						>
 							<h3 className="flex items-center gap-2 text-sm font-medium text-slate-300">
 								<Globe className="h-4 w-4" />
-								Torrentio Health
+								<a
+									href="https://torrentio.strem.fun/configure"
+									rel="noreferrer noopener"
+									target="_blank"
+									className="hover:text-white"
+								>
+									Torrentio Health
+								</a>
 							</h3>
 							<div className="mt-4">
 								<div className="flex items-baseline gap-2">
