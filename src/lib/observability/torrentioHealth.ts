@@ -12,6 +12,8 @@ import { SocksProxyAgent } from 'socks-proxy-agent';
 const REQUEST_TIMEOUT_MS = 10000;
 const TOR_MAX_RETRIES = 3;
 const MDBLIST_URL = 'https://mdblist.com/lists/linaspurinis/imdb-moviemeter-top-100/json/';
+const NUM_TESTS_WANTED = 3; // Number of successful movie tests we want
+const MAX_MOVIE_ATTEMPTS = 10; // Max movies to try per test slot
 
 /**
  * Creates a Tor SOCKS proxy agent for requests to Torrentio.
@@ -61,7 +63,6 @@ async function getWorkingTorAgent(): Promise<{ agent: SocksProxyAgent; ip: strin
 	console.error('[TorrentioHealth] All Tor circuits failed');
 	return null;
 }
-const NUM_TEST_MOVIES = 3;
 
 // Track if a check is currently running (to prevent concurrent runs)
 let checkInProgress = false;
@@ -124,7 +125,8 @@ interface TestMovie {
 }
 
 /**
- * Fetches popular movies from MDBList and picks random ones for testing.
+ * Fetches popular movies from MDBList (shuffled).
+ * Returns all valid movies so we can try alternatives if some have no streams.
  * Falls back to hardcoded movies if the API fails.
  */
 async function getTestMovies(): Promise<TestMovie[]> {
@@ -154,20 +156,15 @@ async function getTestMovies(): Promise<TestMovie[]> {
 			(m) => m.mediatype === 'movie' && m.imdb_id && m.imdb_id.startsWith('tt')
 		);
 
-		if (validMovies.length < NUM_TEST_MOVIES) {
+		if (validMovies.length < NUM_TESTS_WANTED) {
 			console.warn('[TorrentioHealth] Not enough valid movies from MDBList, using fallback');
 			return FALLBACK_MOVIES;
 		}
 
-		// Pick random movies from the list
+		// Shuffle and return all valid movies (we'll pick from them during testing)
 		const shuffled = validMovies.sort(() => Math.random() - 0.5);
-		const selected = shuffled.slice(0, NUM_TEST_MOVIES);
 
-		console.log(
-			`[TorrentioHealth] Testing with movies: ${selected.map((m) => m.title).join(', ')}`
-		);
-
-		return selected.map((m) => ({
+		return shuffled.map((m) => ({
 			imdbId: m.imdb_id,
 			name: m.title,
 		}));
@@ -330,30 +327,34 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 	const { agent: torAgent } = torResult;
 
 	// Fetch test movies from MDBList (or use fallback)
-	const testMovies = await getTestMovies();
+	const availableMovies = await getTestMovies();
+	let movieIndex = 0;
+	let successfulTests = 0;
+	const testedMovies: string[] = [];
 
-	// Process each movie: fetch manifest (unauthenticated), then test resolve (authenticated)
-	for (const movie of testMovies) {
+	// Try to get NUM_TESTS_WANTED successful tests, trying alternative movies if some have no streams
+	while (successfulTests < NUM_TESTS_WANTED && movieIndex < availableMovies.length) {
+		const movie = availableMovies[movieIndex];
+		movieIndex++;
+
 		const manifestUrl = `https://torrentio.strem.fun/stream/movie/${movie.imdbId}.json`;
 		const startTime = performance.now();
 		const manifestResult = await fetchRandomStreamFromManifest(movie.imdbId, torAgent);
 		const manifestLatency = performance.now() - startTime;
 
 		if (!manifestResult) {
-			// Manifest fetch failed
-			allResults.push({
-				url: manifestUrl,
-				ok: false,
-				status: null,
-				hasLocation: false,
-				locationValid: false,
-				latencyMs: manifestLatency,
-				error: `Failed to fetch manifest for ${movie.name}`,
-			});
+			// Movie has no streams or fetch failed - try another movie
+			// Only log if we've tried many movies for this slot
+			if (movieIndex > successfulTests * MAX_MOVIE_ATTEMPTS) {
+				console.warn(
+					`[TorrentioHealth] ${movie.name} has no streams, tried ${movieIndex - successfulTests * MAX_MOVIE_ATTEMPTS} movies for slot ${successfulTests + 1}`
+				);
+			}
 			continue;
 		}
 
-		// Manifest succeeded
+		// Manifest succeeded - record it
+		testedMovies.push(movie.name);
 		allResults.push({
 			url: manifestUrl,
 			ok: true,
@@ -371,6 +372,21 @@ async function runTorrentioCheck(rdKey: string): Promise<{
 			torAgent
 		);
 		allResults.push(resolveResult);
+		successfulTests++;
+	}
+
+	if (testedMovies.length > 0) {
+		console.log(`[TorrentioHealth] Testing with movies: ${testedMovies.join(', ')}`);
+	}
+
+	// If we couldn't get any successful tests, that's a failure
+	if (successfulTests === 0) {
+		return {
+			ok: false,
+			latencyMs: null,
+			error: `No movies with streams found after trying ${movieIndex} movies`,
+			urls: [],
+		};
 	}
 
 	const allOk = allResults.every((r) => r.ok);
