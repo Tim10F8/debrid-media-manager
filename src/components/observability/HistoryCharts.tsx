@@ -99,6 +99,16 @@ function formatShortTime(dateStr: string): string {
 	});
 }
 
+function formatDateAndTime(dateStr: string): string {
+	const date = parseUtcDate(dateStr);
+	return date.toLocaleDateString(FIXED_LOCALE, {
+		month: 'short',
+		day: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit',
+	});
+}
+
 function formatPercent(value: number): string {
 	return `${Math.round(value * 100)}%`;
 }
@@ -166,18 +176,30 @@ export function HistoryCharts() {
 		fetchHistory();
 	}, [fetchHistory]);
 
+	const isLongHourlyRange = granularity === 'hourly' && range !== '24h';
+
+	function formatLabel(time: string, isHourly: boolean): string {
+		if (!isHourly) return formatShortDate(time);
+		return isLongHourlyRange ? formatShortDate(time) : formatShortTime(time);
+	}
+
+	function formatTooltipLabel(time: string, isHourly: boolean): string {
+		if (!isHourly) return formatShortDate(time);
+		return isLongHourlyRange ? formatDateAndTime(time) : formatShortTime(time);
+	}
+
 	// Format stream data for chart
 	const streamChartData = (streamData ?? [])
 		.map((item) => {
 			const isHourly = 'hour' in item;
 			const time = isHourly ? item.hour : item.date;
-			const label = isHourly ? formatShortTime(time) : formatShortDate(time);
 
 			return {
 				time,
 				workingRate: 'avgWorkingRate' in item ? item.avgWorkingRate : item.workingRate,
 				avgLatencyMs: item.avgLatencyMs,
-				label,
+				label: formatLabel(time, isHourly),
+				tooltipLabel: formatTooltipLabel(time, isHourly),
 			};
 		})
 		.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
@@ -187,13 +209,13 @@ export function HistoryCharts() {
 		.map((item) => {
 			const isHourly = 'hour' in item;
 			const time = isHourly ? item.hour : item.date;
-			const label = isHourly ? formatShortTime(time) : formatShortDate(time);
 
 			return {
 				time,
 				successRate: 'avgSuccessRate' in item ? item.avgSuccessRate : item.successRate,
 				totalCount: item.totalCount,
-				label,
+				label: formatLabel(time, isHourly),
+				tooltipLabel: formatTooltipLabel(time, isHourly),
 			};
 		})
 		.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
@@ -203,13 +225,13 @@ export function HistoryCharts() {
 		.map((item) => {
 			const isHourly = 'hour' in item;
 			const time = isHourly ? item.hour : item.date;
-			const label = isHourly ? formatShortTime(time) : formatShortDate(time);
 
 			return {
 				time,
 				successRate: 'avgSuccessRate' in item ? item.avgSuccessRate : item.successRate,
 				avgLatencyMs: item.avgLatencyMs,
-				label,
+				label: formatLabel(time, isHourly),
+				tooltipLabel: formatTooltipLabel(time, isHourly),
 			};
 		})
 		.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
@@ -361,7 +383,7 @@ export function HistoryCharts() {
 										labelStyle={{ color: '#f1f5f9' }}
 										labelFormatter={(_, payload) => {
 											if (payload && payload.length > 0) {
-												return payload[0].payload.label;
+												return payload[0].payload.tooltipLabel;
 											}
 											return '';
 										}}
@@ -428,7 +450,7 @@ export function HistoryCharts() {
 										labelStyle={{ color: '#f1f5f9' }}
 										labelFormatter={(_, payload) => {
 											if (payload && payload.length > 0) {
-												return payload[0].payload.label;
+												return payload[0].payload.tooltipLabel;
 											}
 											return '';
 										}}
@@ -501,7 +523,7 @@ export function HistoryCharts() {
 										labelStyle={{ color: '#f1f5f9' }}
 										labelFormatter={(_, payload) => {
 											if (payload && payload.length > 0) {
-												return payload[0].payload.label;
+												return payload[0].payload.tooltipLabel;
 											}
 											return '';
 										}}

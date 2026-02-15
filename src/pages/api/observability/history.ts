@@ -42,11 +42,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	const range = (query.range ?? '24h') as HistoryRange;
 	const { hoursBack, daysBack } = parseRange(range);
 
+	// Max hourly retention is 7 days (168 hours)
+	const HOURLY_RETENTION_HOURS = 168;
+
 	try {
 		switch (type) {
 			case 'stream': {
-				// For short ranges, use hourly data; for longer ranges, use daily
-				if (hoursBack && hoursBack <= 168) {
+				if (hoursBack && hoursBack <= HOURLY_RETENTION_HOURS) {
 					const hourlyData = await repository.getStreamHourlyHistory(hoursBack);
 					return res.status(200).json({
 						type: 'stream',
@@ -55,12 +57,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 						data: hourlyData,
 					});
 				} else {
+					// Try daily data first, fall back to hourly if empty
 					const dailyData = await repository.getStreamDailyHistory(daysBack ?? 30);
+					if (dailyData.length > 0) {
+						return res.status(200).json({
+							type: 'stream',
+							granularity: 'daily',
+							range,
+							data: dailyData,
+						});
+					}
+					const hourlyData =
+						await repository.getStreamHourlyHistory(HOURLY_RETENTION_HOURS);
 					return res.status(200).json({
 						type: 'stream',
-						granularity: 'daily',
+						granularity: 'hourly',
 						range,
-						data: dailyData,
+						data: hourlyData,
 					});
 				}
 			}
@@ -78,8 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			}
 
 			case 'rd': {
-				// For short ranges, use hourly data; for longer ranges, use daily
-				if (hoursBack && hoursBack <= 168) {
+				if (hoursBack && hoursBack <= HOURLY_RETENTION_HOURS) {
 					const hourlyData = await repository.getRdHourlyHistory(hoursBack);
 					return res.status(200).json({
 						type: 'rd',
@@ -89,18 +101,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 					});
 				} else {
 					const dailyData = await repository.getRdDailyHistory(daysBack ?? 30);
+					if (dailyData.length > 0) {
+						return res.status(200).json({
+							type: 'rd',
+							granularity: 'daily',
+							range,
+							data: dailyData,
+						});
+					}
+					const hourlyData = await repository.getRdHourlyHistory(HOURLY_RETENTION_HOURS);
 					return res.status(200).json({
 						type: 'rd',
-						granularity: 'daily',
+						granularity: 'hourly',
 						range,
-						data: dailyData,
+						data: hourlyData,
 					});
 				}
 			}
 
 			case 'torrentio': {
-				// For short ranges, use hourly data; for longer ranges, use daily
-				if (hoursBack && hoursBack <= 168) {
+				if (hoursBack && hoursBack <= HOURLY_RETENTION_HOURS) {
 					const hourlyData = await repository.getTorrentioHourlyHistory(hoursBack);
 					return res.status(200).json({
 						type: 'torrentio',
@@ -110,11 +130,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 					});
 				} else {
 					const dailyData = await repository.getTorrentioDailyHistory(daysBack ?? 30);
+					if (dailyData.length > 0) {
+						return res.status(200).json({
+							type: 'torrentio',
+							granularity: 'daily',
+							range,
+							data: dailyData,
+						});
+					}
+					const hourlyData =
+						await repository.getTorrentioHourlyHistory(HOURLY_RETENTION_HOURS);
 					return res.status(200).json({
 						type: 'torrentio',
-						granularity: 'daily',
+						granularity: 'hourly',
 						range,
-						data: dailyData,
+						data: hourlyData,
 					});
 				}
 			}
