@@ -176,16 +176,16 @@ export function HistoryCharts() {
 		fetchHistory();
 	}, [fetchHistory]);
 
-	const isLongHourlyRange = granularity === 'hourly' && range !== '24h';
+	const isMultiDay = granularity === 'hourly' && range !== '24h';
 
-	function formatLabel(time: string, isHourly: boolean): string {
-		if (!isHourly) return formatShortDate(time);
-		return isLongHourlyRange ? formatShortDate(time) : formatShortTime(time);
+	function formatTickLabel(time: string): string {
+		if (granularity === 'daily') return formatShortDate(time);
+		return isMultiDay ? formatShortDate(time) : formatShortTime(time);
 	}
 
-	function formatTooltipLabel(time: string, isHourly: boolean): string {
-		if (!isHourly) return formatShortDate(time);
-		return isLongHourlyRange ? formatDateAndTime(time) : formatShortTime(time);
+	function formatTooltipLabel(time: string): string {
+		if (granularity === 'daily') return formatShortDate(time);
+		return isMultiDay ? formatDateAndTime(time) : formatShortTime(time);
 	}
 
 	// Format stream data for chart
@@ -198,8 +198,6 @@ export function HistoryCharts() {
 				time,
 				workingRate: 'avgWorkingRate' in item ? item.avgWorkingRate : item.workingRate,
 				avgLatencyMs: item.avgLatencyMs,
-				label: formatLabel(time, isHourly),
-				tooltipLabel: formatTooltipLabel(time, isHourly),
 			};
 		})
 		.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
@@ -214,8 +212,6 @@ export function HistoryCharts() {
 				time,
 				successRate: 'avgSuccessRate' in item ? item.avgSuccessRate : item.successRate,
 				totalCount: item.totalCount,
-				label: formatLabel(time, isHourly),
-				tooltipLabel: formatTooltipLabel(time, isHourly),
 			};
 		})
 		.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
@@ -230,8 +226,6 @@ export function HistoryCharts() {
 				time,
 				successRate: 'avgSuccessRate' in item ? item.avgSuccessRate : item.successRate,
 				avgLatencyMs: item.avgLatencyMs,
-				label: formatLabel(time, isHourly),
-				tooltipLabel: formatTooltipLabel(time, isHourly),
 			};
 		})
 		.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
@@ -244,6 +238,8 @@ export function HistoryCharts() {
 	];
 
 	const granularityLabel = granularity === 'hourly' ? 'Hourly' : 'Daily';
+	// Detect fallback: requested 30d/90d but got hourly data (max 7d retention)
+	const isFallback = (range === '30d' || range === '90d') && granularity === 'hourly';
 
 	if (loading) {
 		return (
@@ -298,7 +294,9 @@ export function HistoryCharts() {
 					<div>
 						<h2 className="text-lg font-semibold text-white">Historical Data</h2>
 						<p className="text-xs text-slate-400">
-							{granularityLabel} aggregates for the past {range}
+							{isFallback
+								? 'Showing available hourly data (up to 7 days)'
+								: `${granularityLabel} aggregates for the past ${range}`}
 						</p>
 					</div>
 				</div>
@@ -360,12 +358,13 @@ export function HistoryCharts() {
 									</defs>
 									<CartesianGrid strokeDasharray="3 3" stroke="#334155" />
 									<XAxis
-										dataKey="label"
+										dataKey="time"
 										tick={{ fill: '#94a3b8', fontSize: 10 }}
 										tickLine={false}
 										axisLine={{ stroke: '#475569' }}
 										interval="preserveStartEnd"
-										minTickGap={20}
+										minTickGap={40}
+										tickFormatter={formatTickLabel}
 									/>
 									<YAxis
 										tick={{ fill: '#94a3b8', fontSize: 10 }}
@@ -383,7 +382,7 @@ export function HistoryCharts() {
 										labelStyle={{ color: '#f1f5f9' }}
 										labelFormatter={(_, payload) => {
 											if (payload && payload.length > 0) {
-												return payload[0].payload.tooltipLabel;
+												return formatTooltipLabel(payload[0].payload.time);
 											}
 											return '';
 										}}
@@ -427,12 +426,13 @@ export function HistoryCharts() {
 									</defs>
 									<CartesianGrid strokeDasharray="3 3" stroke="#334155" />
 									<XAxis
-										dataKey="label"
+										dataKey="time"
 										tick={{ fill: '#94a3b8', fontSize: 10 }}
 										tickLine={false}
 										axisLine={{ stroke: '#475569' }}
 										interval="preserveStartEnd"
-										minTickGap={20}
+										minTickGap={40}
+										tickFormatter={formatTickLabel}
 									/>
 									<YAxis
 										tick={{ fill: '#94a3b8', fontSize: 10 }}
@@ -450,7 +450,7 @@ export function HistoryCharts() {
 										labelStyle={{ color: '#f1f5f9' }}
 										labelFormatter={(_, payload) => {
 											if (payload && payload.length > 0) {
-												return payload[0].payload.tooltipLabel;
+												return formatTooltipLabel(payload[0].payload.time);
 											}
 											return '';
 										}}
@@ -500,12 +500,13 @@ export function HistoryCharts() {
 									</defs>
 									<CartesianGrid strokeDasharray="3 3" stroke="#334155" />
 									<XAxis
-										dataKey="label"
+										dataKey="time"
 										tick={{ fill: '#94a3b8', fontSize: 10 }}
 										tickLine={false}
 										axisLine={{ stroke: '#475569' }}
 										interval="preserveStartEnd"
-										minTickGap={20}
+										minTickGap={40}
+										tickFormatter={formatTickLabel}
 									/>
 									<YAxis
 										tick={{ fill: '#94a3b8', fontSize: 10 }}
@@ -523,7 +524,7 @@ export function HistoryCharts() {
 										labelStyle={{ color: '#f1f5f9' }}
 										labelFormatter={(_, payload) => {
 											if (payload && payload.length > 0) {
-												return payload[0].payload.tooltipLabel;
+												return formatTooltipLabel(payload[0].payload.time);
 											}
 											return '';
 										}}
