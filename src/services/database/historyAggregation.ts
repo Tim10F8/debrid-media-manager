@@ -2,7 +2,7 @@ import { DatabaseClient } from './client';
 import { RdOperationalService } from './rdOperational';
 
 // Retention periods
-const HOURLY_RETENTION_DAYS = 7;
+const HOURLY_RETENTION_DAYS = 90;
 const DAILY_RETENTION_DAYS = 90;
 
 export interface StreamHourlyData {

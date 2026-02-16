@@ -12,16 +12,16 @@ interface HistoryQuery {
 	limit?: string;
 }
 
-function parseRange(range: HistoryRange): { hoursBack?: number; daysBack: number } {
+function parseRange(range: HistoryRange): { hoursBack: number; daysBack: number } {
 	switch (range) {
 		case '24h':
 			return { hoursBack: 24, daysBack: 1 };
 		case '7d':
 			return { hoursBack: 168, daysBack: 7 };
 		case '30d':
-			return { daysBack: 30 };
+			return { hoursBack: 720, daysBack: 30 };
 		case '90d':
-			return { daysBack: 90 };
+			return { hoursBack: 2160, daysBack: 90 };
 		default:
 			return { hoursBack: 24, daysBack: 1 };
 	}
@@ -42,111 +42,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	const range = (query.range ?? '24h') as HistoryRange;
 	const { hoursBack, daysBack } = parseRange(range);
 
-	// Max hourly retention is 7 days (168 hours)
-	const HOURLY_RETENTION_HOURS = 168;
-
 	try {
 		switch (type) {
 			case 'stream': {
-				if (hoursBack && hoursBack <= HOURLY_RETENTION_HOURS) {
-					const hourlyData = await repository.getStreamHourlyHistory(hoursBack);
-					return res.status(200).json({
-						type: 'stream',
-						granularity: 'hourly',
-						range,
-						data: hourlyData,
-					});
-				} else {
-					// Try daily data first, fall back to hourly if empty
-					const dailyData = await repository.getStreamDailyHistory(daysBack ?? 30);
-					if (dailyData.length > 0) {
-						return res.status(200).json({
-							type: 'stream',
-							granularity: 'daily',
-							range,
-							data: dailyData,
-						});
-					}
-					const hourlyData =
-						await repository.getStreamHourlyHistory(HOURLY_RETENTION_HOURS);
-					return res.status(200).json({
-						type: 'stream',
-						granularity: 'hourly',
-						range,
-						data: hourlyData,
-					});
-				}
+				const data = await repository.getStreamHourlyHistory(hoursBack);
+				return res.status(200).json({
+					type: 'stream',
+					granularity: 'hourly',
+					range,
+					data,
+				});
 			}
 
 			case 'servers': {
 				const sortBy = query.sortBy ?? 'reliability';
 				const limit = query.limit ? parseInt(query.limit, 10) : 50;
-				const serverData = await repository.getServerReliability(daysBack, sortBy, limit);
+				const data = await repository.getServerReliability(daysBack, sortBy, limit);
 				return res.status(200).json({
 					type: 'servers',
 					range,
 					sortBy,
-					data: serverData,
+					data,
 				});
 			}
 
 			case 'rd': {
-				if (hoursBack && hoursBack <= HOURLY_RETENTION_HOURS) {
-					const hourlyData = await repository.getRdHourlyHistory(hoursBack);
-					return res.status(200).json({
-						type: 'rd',
-						granularity: 'hourly',
-						range,
-						data: hourlyData,
-					});
-				} else {
-					const dailyData = await repository.getRdDailyHistory(daysBack ?? 30);
-					if (dailyData.length > 0) {
-						return res.status(200).json({
-							type: 'rd',
-							granularity: 'daily',
-							range,
-							data: dailyData,
-						});
-					}
-					const hourlyData = await repository.getRdHourlyHistory(HOURLY_RETENTION_HOURS);
-					return res.status(200).json({
-						type: 'rd',
-						granularity: 'hourly',
-						range,
-						data: hourlyData,
-					});
-				}
+				const data = await repository.getRdHourlyHistory(hoursBack);
+				return res.status(200).json({
+					type: 'rd',
+					granularity: 'hourly',
+					range,
+					data,
+				});
 			}
 
 			case 'torrentio': {
-				if (hoursBack && hoursBack <= HOURLY_RETENTION_HOURS) {
-					const hourlyData = await repository.getTorrentioHourlyHistory(hoursBack);
-					return res.status(200).json({
-						type: 'torrentio',
-						granularity: 'hourly',
-						range,
-						data: hourlyData,
-					});
-				} else {
-					const dailyData = await repository.getTorrentioDailyHistory(daysBack ?? 30);
-					if (dailyData.length > 0) {
-						return res.status(200).json({
-							type: 'torrentio',
-							granularity: 'daily',
-							range,
-							data: dailyData,
-						});
-					}
-					const hourlyData =
-						await repository.getTorrentioHourlyHistory(HOURLY_RETENTION_HOURS);
-					return res.status(200).json({
-						type: 'torrentio',
-						granularity: 'hourly',
-						range,
-						data: hourlyData,
-					});
-				}
+				const data = await repository.getTorrentioHourlyHistory(hoursBack);
+				return res.status(200).json({
+					type: 'torrentio',
+					granularity: 'hourly',
+					range,
+					data,
+				});
 			}
 
 			default:

@@ -238,8 +238,6 @@ export function HistoryCharts() {
 	];
 
 	const granularityLabel = granularity === 'hourly' ? 'Hourly' : 'Daily';
-	// Detect fallback: requested 30d/90d but got hourly data (max 7d retention)
-	const isFallback = (range === '30d' || range === '90d') && granularity === 'hourly';
 
 	if (loading) {
 		return (
@@ -294,9 +292,7 @@ export function HistoryCharts() {
 					<div>
 						<h2 className="text-lg font-semibold text-white">Historical Data</h2>
 						<p className="text-xs text-slate-400">
-							{isFallback
-								? 'Showing available hourly data (up to 7 days)'
-								: `${granularityLabel} aggregates for the past ${range}`}
+							{granularityLabel} aggregates for the past {range}
 						</p>
 					</div>
 				</div>

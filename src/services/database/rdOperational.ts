@@ -496,7 +496,7 @@ export class RdOperationalService extends DatabaseClient {
 		let dailyDeleted = 0;
 
 		try {
-			const hourlyKeepDays = 7;
+			const hourlyKeepDays = 90;
 			const dailyKeepDays = 90;
 
 			const hourlyCutoff = new Date();
