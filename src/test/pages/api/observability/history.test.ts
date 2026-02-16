@@ -102,7 +102,7 @@ describe('history API endpoint', () => {
 		);
 	});
 
-	it('returns hourly stream data for 90d range', async () => {
+	it('returns daily stream data for 90d range', async () => {
 		const req = createMockRequest({ type: 'stream', range: '90d' });
 		const res = createMockResponse();
 
@@ -112,7 +112,7 @@ describe('history API endpoint', () => {
 		expect(res.json).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'stream',
-				granularity: 'hourly',
+				granularity: 'daily',
 				range: '90d',
 				data: expect.any(Array),
 			})

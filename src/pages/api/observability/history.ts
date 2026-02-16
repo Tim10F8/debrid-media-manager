@@ -12,20 +12,27 @@ interface HistoryQuery {
 	limit?: string;
 }
 
-function parseRange(range: HistoryRange): { hoursBack: number; daysBack: number } {
+function parseRange(range: HistoryRange): {
+	hoursBack?: number;
+	daysBack: number;
+	useDaily: boolean;
+} {
 	switch (range) {
 		case '24h':
-			return { hoursBack: 24, daysBack: 1 };
+			return { hoursBack: 24, daysBack: 1, useDaily: false };
 		case '7d':
-			return { hoursBack: 168, daysBack: 7 };
+			return { hoursBack: 168, daysBack: 7, useDaily: false };
 		case '30d':
-			return { hoursBack: 720, daysBack: 30 };
+			return { daysBack: 30, useDaily: true };
 		case '90d':
-			return { hoursBack: 2160, daysBack: 90 };
+			return { daysBack: 90, useDaily: true };
 		default:
-			return { hoursBack: 24, daysBack: 1 };
+			return { hoursBack: 24, daysBack: 1, useDaily: false };
 	}
 }
+
+// Max hourly retention in hours (90 days)
+const MAX_HOURLY_HOURS = 2160;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	if (req.method !== 'GET') {
@@ -40,12 +47,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	const query = req.query as HistoryQuery;
 	const type = query.type ?? 'stream';
 	const range = (query.range ?? '24h') as HistoryRange;
-	const { hoursBack, daysBack } = parseRange(range);
+	const { hoursBack, daysBack, useDaily } = parseRange(range);
 
 	try {
 		switch (type) {
 			case 'stream': {
-				const data = await repository.getStreamHourlyHistory(hoursBack);
+				if (useDaily) {
+					const dailyData = await repository.getStreamDailyHistory(daysBack);
+					if (dailyData.length > 0) {
+						return res.status(200).json({
+							type: 'stream',
+							granularity: 'daily',
+							range,
+							data: dailyData,
+						});
+					}
+					// Fall back to hourly if daily rollup hasn't run yet
+					const hourlyData = await repository.getStreamHourlyHistory(MAX_HOURLY_HOURS);
+					return res.status(200).json({
+						type: 'stream',
+						granularity: 'hourly',
+						range,
+						data: hourlyData,
+					});
+				}
+				const data = await repository.getStreamHourlyHistory(hoursBack!);
 				return res.status(200).json({
 					type: 'stream',
 					granularity: 'hourly',
@@ -67,7 +93,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			}
 
 			case 'rd': {
-				const data = await repository.getRdHourlyHistory(hoursBack);
+				if (useDaily) {
+					const dailyData = await repository.getRdDailyHistory(daysBack);
+					if (dailyData.length > 0) {
+						return res.status(200).json({
+							type: 'rd',
+							granularity: 'daily',
+							range,
+							data: dailyData,
+						});
+					}
+					const hourlyData = await repository.getRdHourlyHistory(MAX_HOURLY_HOURS);
+					return res.status(200).json({
+						type: 'rd',
+						granularity: 'hourly',
+						range,
+						data: hourlyData,
+					});
+				}
+				const data = await repository.getRdHourlyHistory(hoursBack!);
 				return res.status(200).json({
 					type: 'rd',
 					granularity: 'hourly',
@@ -77,7 +121,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			}
 
 			case 'torrentio': {
-				const data = await repository.getTorrentioHourlyHistory(hoursBack);
+				if (useDaily) {
+					const dailyData = await repository.getTorrentioDailyHistory(daysBack);
+					if (dailyData.length > 0) {
+						return res.status(200).json({
+							type: 'torrentio',
+							granularity: 'daily',
+							range,
+							data: dailyData,
+						});
+					}
+					const hourlyData = await repository.getTorrentioHourlyHistory(MAX_HOURLY_HOURS);
+					return res.status(200).json({
+						type: 'torrentio',
+						granularity: 'hourly',
+						range,
+						data: hourlyData,
+					});
+				}
+				const data = await repository.getTorrentioHourlyHistory(hoursBack!);
 				return res.status(200).json({
 					type: 'torrentio',
 					granularity: 'hourly',

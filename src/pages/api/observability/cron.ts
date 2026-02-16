@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { runHealthCheckNow } from '@/lib/observability/streamServersHealth';
 import { runTorrentioHealthCheckNow } from '@/lib/observability/torrentioHealth';
+import { repository } from '@/services/repository';
 
 interface CronResponse {
 	success: boolean;
@@ -14,6 +15,11 @@ interface CronResponse {
 	};
 	torrentioHealth?: {
 		checked: boolean;
+	};
+	dailyRollup?: {
+		streamDailyRolled: boolean;
+		rdDailyRolled: boolean;
+		torrentioDailyRolled: boolean;
 	};
 	error?: string;
 }
@@ -46,6 +52,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 			runTorrentioHealthCheckNow(),
 		]);
 
+		// Roll up yesterday's hourly data into daily aggregates (idempotent)
+		let dailyRollup: CronResponse['dailyRollup'];
+		try {
+			dailyRollup = await repository.runDailyRollup();
+		} catch (e) {
+			console.error('[Cron] Daily rollup failed:', e);
+		}
+
 		return res.status(200).json({
 			success: true,
 			timestamp: new Date().toISOString(),
@@ -60,6 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 			torrentioHealth: {
 				checked: true,
 			},
+			dailyRollup,
 		});
 	} catch (error) {
 		console.error('[Cron] Job failed:', error);
