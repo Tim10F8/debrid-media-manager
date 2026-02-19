@@ -1,5 +1,5 @@
-import { TraktSearchResult, getSearchSuggestions } from '@/services/trakt';
-import getConfig from 'next/config';
+import { TraktSearchResult } from '@/services/trakt';
+import axios from 'axios';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
 import Poster from './poster';
@@ -30,7 +30,6 @@ export function SearchBar({
 	placeholder = 'Search movies & shows...',
 }: SearchBarProps) {
 	const router = useRouter();
-	const { publicRuntimeConfig: config } = getConfig();
 	const [typedQuery, setTypedQuery] = useState('');
 	const [suggestions, setSuggestions] = useState<TraktSearchResult[]>([]);
 	const [showSuggestions, setShowSuggestions] = useState(false);
@@ -58,12 +57,10 @@ export function SearchBar({
 			}
 
 			try {
-				const results = await getSearchSuggestions(
-					debouncedQuery,
-					['movie', 'show'],
-					config.traktClientId
+				const response = await axios.get<TraktSearchResult[]>(
+					`/api/trakt/search?query=${encodeURIComponent(debouncedQuery)}&types=movie,show`
 				);
-				setSuggestions(results.slice(0, 6));
+				setSuggestions(response.data.slice(0, 6));
 				setShowSuggestions(true);
 			} catch (error) {
 				console.error('Error fetching suggestions:', error);
@@ -71,7 +68,7 @@ export function SearchBar({
 		};
 
 		fetchSuggestions();
-	}, [debouncedQuery, config.traktClientId]);
+	}, [debouncedQuery]);
 
 	const handleSuggestionClick = (suggestion: TraktSearchResult) => {
 		const media = suggestion.movie || suggestion.show;

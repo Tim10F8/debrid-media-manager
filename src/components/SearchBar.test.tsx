@@ -1,24 +1,21 @@
 import type { TraktSearchResult } from '@/services/trakt';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import axios from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchBar } from './SearchBar';
 
 const push = vi.fn();
-const getSearchSuggestions = vi.fn();
 
 vi.mock('next/router', () => ({
 	useRouter: () => ({ push }),
 }));
 
-vi.mock('next/config', () => ({
+vi.mock('axios', () => ({
 	__esModule: true,
-	default: () => ({ publicRuntimeConfig: { traktClientId: 'client-id' } }),
+	default: { get: vi.fn() },
 }));
-
-vi.mock('@/services/trakt', () => ({
-	getSearchSuggestions: (...args: unknown[]) => getSearchSuggestions(...args),
-}));
+const mockedGet = axios.get as ReturnType<typeof vi.fn>;
 
 vi.mock('./poster', () => ({
 	__esModule: true,
@@ -28,7 +25,7 @@ vi.mock('./poster', () => ({
 describe('SearchBar', () => {
 	beforeEach(() => {
 		push.mockReset();
-		getSearchSuggestions.mockReset();
+		mockedGet.mockReset();
 	});
 
 	const typeQuery = async (user: ReturnType<typeof userEvent.setup>, value: string) => {
@@ -49,16 +46,14 @@ describe('SearchBar', () => {
 				ids: { imdb: 'tt1375666', trakt: 1 },
 			},
 		};
-		getSearchSuggestions.mockResolvedValue([suggestion]);
+		mockedGet.mockResolvedValue({ data: [suggestion] });
 
 		render(<SearchBar />);
 		await typeQuery(user, 'Inception');
 
 		await waitFor(() =>
-			expect(getSearchSuggestions).toHaveBeenCalledWith(
-				'Inception',
-				['movie', 'show'],
-				'client-id'
+			expect(mockedGet).toHaveBeenCalledWith(
+				expect.stringContaining('/api/trakt/search?query=Inception')
 			)
 		);
 
@@ -77,11 +72,11 @@ describe('SearchBar', () => {
 				ids: { trakt: 2 },
 			},
 		};
-		getSearchSuggestions.mockResolvedValue([suggestion]);
+		mockedGet.mockResolvedValue({ data: [suggestion] });
 
 		render(<SearchBar />);
 		await typeQuery(user, 'Severance');
-		await waitFor(() => expect(getSearchSuggestions).toHaveBeenCalled());
+		await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
 		await user.click(await screen.findByText('Severance'));
 		await waitFor(() => expect(push).toHaveBeenCalledWith('/search?query=Severance'));
@@ -103,25 +98,27 @@ describe('SearchBar', () => {
 
 	it('closes suggestions when clicking outside and ignores short queries', async () => {
 		const user = userEvent.setup();
-		getSearchSuggestions.mockResolvedValue([
-			{
-				type: 'movie',
-				score: 92,
-				movie: {
-					title: 'Dune',
-					year: 2021,
-					ids: { imdb: 'tt1160419', trakt: 3 },
-				},
-			} as TraktSearchResult,
-		]);
+		mockedGet.mockResolvedValue({
+			data: [
+				{
+					type: 'movie',
+					score: 92,
+					movie: {
+						title: 'Dune',
+						year: 2021,
+						ids: { imdb: 'tt1160419', trakt: 3 },
+					},
+				} as TraktSearchResult,
+			],
+		});
 
 		render(<SearchBar />);
 		await typeQuery(user, 'D');
 		await new Promise((resolve) => setTimeout(resolve, 350));
-		expect(getSearchSuggestions).not.toHaveBeenCalled();
+		expect(mockedGet).not.toHaveBeenCalled();
 
 		await typeQuery(user, 'Dune');
-		await waitFor(() => expect(getSearchSuggestions).toHaveBeenCalledTimes(1));
+		await waitFor(() => expect(mockedGet).toHaveBeenCalledTimes(1));
 
 		await screen.findByText('Dune');
 		fireEvent.mouseDown(document.body);

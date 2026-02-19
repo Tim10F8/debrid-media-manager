@@ -1,6 +1,6 @@
-import { TraktSearchResult, getSearchSuggestions } from '@/services/trakt';
+import { TraktSearchResult } from '@/services/trakt';
+import axios from 'axios';
 import { Film, Loader2, Search, Tv, X } from 'lucide-react';
-import getConfig from 'next/config';
 import { useEffect, useState } from 'react';
 import Poster from './poster';
 
@@ -38,7 +38,6 @@ export function CastSearchModal({
 	torrentInfo,
 	onSelectImdbId,
 }: CastSearchModalProps) {
-	const { publicRuntimeConfig: config } = getConfig();
 	const [searchQuery, setSearchQuery] = useState('');
 	const [suggestions, setSuggestions] = useState<TraktSearchResult[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
@@ -66,12 +65,10 @@ export function CastSearchModal({
 
 			setIsLoading(true);
 			try {
-				const results = await getSearchSuggestions(
-					debouncedQuery,
-					['movie', 'show'],
-					config.traktClientId
+				const response = await axios.get<TraktSearchResult[]>(
+					`/api/trakt/search?query=${encodeURIComponent(debouncedQuery)}&types=movie,show`
 				);
-				setSuggestions(results.slice(0, 10));
+				setSuggestions(response.data.slice(0, 10));
 			} catch (error) {
 				console.error('Error fetching suggestions:', error);
 				setSuggestions([]);
@@ -81,7 +78,7 @@ export function CastSearchModal({
 		};
 
 		fetchSuggestions();
-	}, [debouncedQuery, config.traktClientId]);
+	}, [debouncedQuery]);
 
 	const handleSuggestionClick = (suggestion: TraktSearchResult) => {
 		const media = suggestion.movie || suggestion.show;
