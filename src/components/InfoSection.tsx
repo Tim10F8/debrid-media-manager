@@ -10,7 +10,7 @@ export function InfoSection() {
 					<b>
 						<a
 							className="text-blue-300 underline hover:text-blue-200"
-							href="https://chromewebstore.google.com/detail/debrid-media-manager/fahmnboccjgkbeeianfdiohbbgmgoibb"
+							href="https://chromewebstore.google.com/detail/Debrid%20Media%20Manager/oeojlegjfhgefhnbjdnaebgdfkbipghm"
 							target="_blank"
 						>
 							Chrome
