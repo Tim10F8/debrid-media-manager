@@ -7,6 +7,7 @@ interface Stream {
 	};
 	width?: number;
 	height?: number;
+	channels?: number;
 	channel_layout?: string;
 	side_data_list?: {
 		dv_profile?: number;

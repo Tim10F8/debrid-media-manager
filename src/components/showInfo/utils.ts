@@ -93,6 +93,23 @@ export const fetchMediaInfo = async (hash: string): Promise<MediaInfoResponse | 
 	return null;
 };
 
+const getChannelLabel = (channels?: number, channelLayout?: string): string | undefined => {
+	if (channels) {
+		if (channels === 8) return '7.1';
+		if (channels === 6) return '5.1';
+		if (channels === 2) return '2.0';
+		if (channels === 1) return '1.0';
+		return `${channels}.0`;
+	}
+	const layout = channelLayout?.toLowerCase();
+	if (!layout) return undefined;
+	if (layout.includes('7.1')) return '7.1';
+	if (layout.includes('5.1')) return '5.1';
+	if (layout.includes('stereo') || layout.includes('2.0')) return '2.0';
+	if (layout.includes('mono')) return '1.0';
+	return undefined;
+};
+
 export const getStreamInfo = (mediaInfo: MediaInfoResponse | null) => {
 	if (!mediaInfo) return [];
 	const fileInfo = Object.values(mediaInfo.SelectedFiles)[0];
@@ -126,10 +143,14 @@ export const getStreamInfo = (mediaInfo: MediaInfoResponse | null) => {
 			value:
 				`${audioStreams.length} tracks: ` +
 				audioStreams
-					.map(
-						(stream) =>
-							`${stream.tags?.language ? `${languageEmojis[stream.tags.language] || stream.tags.language} ${stream.tags.language}` : '🌐'} (${stream.codec_name.toUpperCase()})`
-					)
+					.map((stream) => {
+						const lang = stream.tags?.language
+							? `${languageEmojis[stream.tags.language] || stream.tags.language} ${stream.tags.language}`
+							: '🌐';
+						const codec = stream.codec_name.toUpperCase();
+						const ch = getChannelLabel(stream.channels, stream.channel_layout);
+						return ch ? `${lang} (${codec} ${ch})` : `${lang} (${codec})`;
+					})
 					.join(', '),
 		});
 	}
