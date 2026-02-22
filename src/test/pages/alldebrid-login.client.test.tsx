@@ -64,7 +64,7 @@ describe('AllDebrid login page', () => {
 		await waitFor(() => screen.getByText(/enter this code/i));
 		expect(screen.getByText(/1234/)).toBeInTheDocument();
 		expect(navigator.clipboard.writeText).toHaveBeenCalledWith('1234');
-		expect(setApiKeyMock).toHaveBeenCalledWith('new-key', 86400);
+		expect(setApiKeyMock).toHaveBeenCalledWith('new-key');
 
 		fireEvent.click(screen.getByRole('button', { name: /authorize/i }));
 		expect(window.open).toHaveBeenCalledWith('https://alldebrid.com/pin', '_blank');

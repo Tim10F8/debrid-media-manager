@@ -39,7 +39,7 @@ export default function AllDebridLoginPage() {
 
 				const checkResponse = await checkPin(pinResponse.pin, pinResponse.check);
 				if (checkResponse && checkResponse.apikey) {
-					setApiKey(checkResponse.apikey, 86400);
+					setApiKey(checkResponse.apikey);
 					console.log('[AllDebridLogin] api key stored from pin flow');
 				}
 			}
