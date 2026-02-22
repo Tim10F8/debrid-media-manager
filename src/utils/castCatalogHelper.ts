@@ -68,7 +68,7 @@ export async function getDMMTorrent(userid: string, torrentID: string, token: st
 	}
 	const videos = selectedFiles.map((file, idx) => ({
 		id: `dmm:${torrentID}:${file.id}`,
-		title: `${file.path.split('/').pop()} - ${(file.bytes / 1024 / 1024 / 1024).toFixed(2)} GB`,
+		title: `${file.path.startsWith('/') ? file.path.substring(1) : file.path} - ${(file.bytes / 1024 / 1024 / 1024).toFixed(2)} GB`,
 		streams: [
 			{
 				url: `${process.env.DMM_ORIGIN}/api/stremio/${userid}/play/${info.links[idx].substring(26)}`,

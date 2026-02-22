@@ -14,12 +14,19 @@ export const renderTorrentInfo = (
 	if (isRd) {
 		const rdInfo = info;
 		const showCheckbox = !rdInfo.fake;
+		// Map each selected file to its link before sorting
 		let linkIndex = 0;
+		const fileLinkMap = new Map<number, string>();
+		for (const file of rdInfo.files) {
+			if (file.selected === 1) {
+				fileLinkMap.set(file.id, rdInfo.links[linkIndex++]);
+			}
+		}
 		rdInfo.files.sort((a: ApiTorrentFile, b: ApiTorrentFile) => a.path.localeCompare(b.path));
 		const filesList = rdInfo.files.map((file: ApiTorrentFile) => {
 			const actions = [];
 			if (file.selected === 1) {
-				const fileLink = rdInfo.links[linkIndex++];
+				const fileLink = fileLinkMap.get(file.id)!;
 				if (info.status === 'downloaded' && !rdInfo.fake) {
 					actions.push(
 						renderButton('download', {
