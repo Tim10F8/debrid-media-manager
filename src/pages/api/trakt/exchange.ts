@@ -20,6 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',
+				'user-agent': 'debridmediamanager/1.0',
 			},
 			body: JSON.stringify(requestBody),
 		});
