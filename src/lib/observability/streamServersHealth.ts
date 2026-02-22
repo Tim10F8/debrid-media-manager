@@ -1,5 +1,6 @@
 // Stream server health check module.
-// Tests a fixed list of Real-Debrid location-based servers to measure availability.
+// Tests Real-Debrid location-based servers by unrestricting a link with each server's IP,
+// then verifying the download URL works with a Range request.
 // Pass percentage = working servers / total servers.
 // All data is stored in MySQL.
 // Health checks are triggered by cron job, not in-memory scheduler.
@@ -7,43 +8,14 @@
 import { repository } from '@/services/repository';
 
 const REQUEST_TIMEOUT_MS = 5000;
-const ITERATIONS_PER_SERVER = 3;
-const MAX_RETRIES = 3;
-const RETRY_DELAYS_MS = [1000, 2000]; // 1s, then 2s between retries
-const DOMAIN = 'download.real-debrid.com';
-
-// Fixed list of location-based servers to test
-const SERVER_LOCATIONS = [
-	'rbx',
-	'akl1',
-	'bgt1',
-	'chi1',
-	'dal1',
-	'den1',
-	'fjr1',
-	'hkg1',
-	'jnb1',
-	'kul1',
-	'lax1',
-	'mia1',
-	'mum1',
-	'nyk1',
-	'qro1',
-	'sao1',
-	'scl1',
-	'sea1',
-	'sgp1',
-	'syd1',
-	'tlv1',
-	'tyo1',
-] as const;
+const UNRESTRICT_TIMEOUT_MS = 10000;
+const TEST_LINK = 'https://real-debrid.com/d/H757DI7ELP4NC';
+const RD_API_BASE = 'https://api.real-debrid.com/rest/1.0';
+const SERVERS_LIST_URL =
+	'https://nzimhzbfnannoxumremm.supabase.co/storage/v1/object/public/public-files/servers.txt';
 
 // Track if a check is currently running (to prevent concurrent runs)
 let checkInProgress = false;
-
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 export interface WorkingStreamServerStatus {
 	id: string;
@@ -57,139 +29,242 @@ export interface WorkingStreamServerStatus {
 }
 
 /**
- * Generates all server hosts from the fixed location list.
+ * Extracts the location base and instance number from a server prefix.
+ * e.g. "chi1" → { base: "chi", num: 1 }
+ *      "rbx"  → { base: "rbx", num: 0 }
+ * Returns null for non-location servers (purely numeric like "20", "21").
  */
-function generateServerHosts(): Array<{ id: string; host: string }> {
-	return SERVER_LOCATIONS.map((location) => {
-		const host = `${location}.${DOMAIN}`;
-		return { id: host, host };
-	});
+function parseServerPrefix(prefix: string): { base: string; num: number } | null {
+	// Location servers start with letters: "chi1", "akl1", "rbx"
+	const match = prefix.match(/^([a-z]+)(\d+)?$/);
+	if (!match) return null; // Purely numeric like "20", "86", "100"
+	return { base: match[1], num: match[2] ? parseInt(match[2], 10) : 0 };
 }
 
 /**
- * Builds a test URL for a given host using the speedtest path with random float.
+ * From a list of servers, picks the lowest-numbered instance per location.
+ * e.g. chi1, chi2, chi3 → only chi1; lax1, lax2 → only lax1
  */
-function buildTestUrl(host: string, randomFloat: number): string {
-	return `https://${host}/speedtest/test.rar/${randomFloat}`;
-}
+function pickLowestPerLocation(
+	servers: Array<{ id: string; host: string; ip: string }>
+): Array<{ id: string; host: string; ip: string }> {
+	const bestPerLocation = new Map<string, { server: (typeof servers)[0]; num: number }>();
 
-/**
- * Tests a single server's latency by making GET requests with Range header.
- * Makes multiple iterations and returns the average latency.
- *
- * Two possible outcomes:
- * 1. ok: false - Server is failing (timeout, HTTP error, DNS failure, etc.) → counted as failing
- * 2. ok: true - Server is working → counted as working
- */
-async function testServerLatency(
-	server: { id: string; host: string },
-	randomFloat: number,
-	randomByte: number
-): Promise<WorkingStreamServerStatus> {
-	const checkedAt = Date.now();
-	let totalLatencyMs = 0;
-	let successfulIterations = 0;
-	let lastStatus: number | null = null;
-	let lastContentLength: number | null = null;
-	let lastError: string | null = null;
+	for (const server of servers) {
+		// Extract prefix before "-4.download..."
+		const prefix = server.host.split('-4.')[0];
+		if (!prefix) continue;
 
-	for (let i = 0; i < ITERATIONS_PER_SERVER; i++) {
-		const testUrl = buildTestUrl(server.host, randomFloat);
-		let iterationSuccess = false;
+		const parsed = parseServerPrefix(prefix);
+		if (!parsed) continue; // Skip non-location servers (purely numeric)
 
-		// Retry loop for each iteration
-		for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-			// Wait before retry (not on first attempt)
-			if (attempt > 0) {
-				const delayMs = RETRY_DELAYS_MS[attempt - 1] ?? RETRY_DELAYS_MS.at(-1) ?? 1000;
-				await sleep(delayMs);
-			}
+		const { base, num } = parsed;
+		const existing = bestPerLocation.get(base);
 
-			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-			try {
-				const startTime = performance.now();
-				const response = await fetch(testUrl, {
-					method: 'GET',
-					headers: {
-						Range: `bytes=${randomByte}-${randomByte}`,
-					},
-					signal: controller.signal,
-				});
-				const endTime = performance.now();
-
-				clearTimeout(timeoutId);
-				lastStatus = response.status;
-
-				const header = response.headers.get('content-length');
-				lastContentLength = header ? Number(header) : null;
-
-				// 206 Partial Content is the expected response for Range requests
-				if (response.status === 206) {
-					totalLatencyMs += endTime - startTime;
-					successfulIterations++;
-					iterationSuccess = true;
-					break; // Success, no need to retry
-				} else {
-					lastError =
-						response.status === 200
-							? 'HTTP 200 (Range ignored)'
-							: `HTTP ${response.status}`;
-					// Non-206 response, retry
-				}
-			} catch (error) {
-				clearTimeout(timeoutId);
-				if (error instanceof Error) {
-					if (error.name === 'AbortError') {
-						lastError = 'Timeout';
-					} else {
-						lastError = error.message;
-					}
-				} else {
-					lastError = 'Unknown error';
-				}
-				// Error occurred, retry
-			}
-		}
-
-		// If all retries failed for this iteration, stop testing this server
-		if (!iterationSuccess) {
-			break;
+		if (!existing || num < existing.num) {
+			bestPerLocation.set(base, { server, num });
 		}
 	}
 
-	const ok = successfulIterations === ITERATIONS_PER_SERVER;
-	const avgLatencyMs = ok ? totalLatencyMs / ITERATIONS_PER_SERVER : null;
-
-	return {
-		id: server.id,
-		url: buildTestUrl(server.host, randomFloat),
-		status: lastStatus,
-		contentLength: lastContentLength,
-		ok,
-		checkedAt,
-		error: ok ? null : lastError,
-		latencyMs: avgLatencyMs,
-	};
+	return Array.from(bestPerLocation.values()).map((entry) => entry.server);
 }
 
 /**
- * Tests all servers from the fixed location list.
- * Returns results for all servers to calculate pass percentage.
+ * Fetches the server list from the remote servers.txt file.
+ * Parses lines like "akl1-4.download.real-debrid.com|79.127.173.209"
+ * Only includes IPv4 entries (host containing -4).
+ * Picks the lowest-numbered instance per location (e.g. chi1 over chi2).
+ */
+async function fetchServerList(): Promise<Array<{ id: string; host: string; ip: string }>> {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+	try {
+		const response = await fetch(SERVERS_LIST_URL, { signal: controller.signal });
+		clearTimeout(timeoutId);
+
+		if (!response.ok) {
+			console.error(`[StreamHealth] Failed to fetch server list: HTTP ${response.status}`);
+			return [];
+		}
+
+		const text = await response.text();
+		const allServers: Array<{ id: string; host: string; ip: string }> = [];
+
+		for (const line of text.split('\n')) {
+			const trimmed = line.trim();
+			if (!trimmed || trimmed.startsWith('generated|')) continue;
+
+			const [host, ip] = trimmed.split('|');
+			if (!host || !ip) continue;
+
+			// Only include IPv4 entries (host contains -4)
+			if (!host.includes('-4')) continue;
+
+			allServers.push({ id: host, host, ip });
+		}
+
+		return pickLowestPerLocation(allServers);
+	} catch (error) {
+		clearTimeout(timeoutId);
+		console.error('[StreamHealth] Failed to fetch server list:', error);
+		return [];
+	}
+}
+
+/**
+ * Unrestricts the test link routed to a specific server IP.
+ * Returns the download URL for that server.
+ */
+async function unrestrictForServer(
+	accessToken: string,
+	serverIp: string
+): Promise<{ download: string } | { error: string }> {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), UNRESTRICT_TIMEOUT_MS);
+
+	try {
+		const params = new URLSearchParams();
+		params.append('link', TEST_LINK);
+		params.append('ip', serverIp);
+
+		const response = await fetch(`${RD_API_BASE}/unrestrict/link`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Authorization: `Bearer ${accessToken}`,
+			},
+			body: params.toString(),
+			signal: controller.signal,
+		});
+
+		clearTimeout(timeoutId);
+
+		if (!response.ok) {
+			return { error: `Unrestrict HTTP ${response.status}` };
+		}
+
+		const data = (await response.json()) as { download: string };
+		return { download: data.download };
+	} catch (error) {
+		clearTimeout(timeoutId);
+		if (error instanceof Error && error.name === 'AbortError') {
+			return { error: 'Unrestrict timeout' };
+		}
+		return { error: error instanceof Error ? error.message : 'Unknown unrestrict error' };
+	}
+}
+
+/**
+ * Tests a single server by unrestricting a link routed to its IP,
+ * then making a Range request against the download URL.
+ */
+async function testServer(
+	server: { id: string; host: string; ip: string },
+	accessToken: string
+): Promise<WorkingStreamServerStatus> {
+	const checkedAt = Date.now();
+
+	// Step 1: Unrestrict to get a download URL routed to this server
+	const unrestrictResult = await unrestrictForServer(accessToken, server.ip);
+	if ('error' in unrestrictResult) {
+		return {
+			id: server.id,
+			url: TEST_LINK,
+			status: null,
+			contentLength: null,
+			ok: false,
+			checkedAt,
+			error: unrestrictResult.error,
+			latencyMs: null,
+		};
+	}
+
+	const downloadUrl = unrestrictResult.download;
+
+	// Step 2: Test the download URL with a Range request
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+	try {
+		const startTime = performance.now();
+		const response = await fetch(downloadUrl, {
+			method: 'GET',
+			headers: { Range: 'bytes=0-0' },
+			signal: controller.signal,
+		});
+		const endTime = performance.now();
+		clearTimeout(timeoutId);
+
+		const status = response.status;
+		const header = response.headers.get('content-length');
+		const contentLength = header ? Number(header) : null;
+		const latencyMs = endTime - startTime;
+
+		if (status === 206) {
+			return {
+				id: server.id,
+				url: downloadUrl,
+				status,
+				contentLength,
+				ok: true,
+				checkedAt,
+				error: null,
+				latencyMs,
+			};
+		}
+
+		return {
+			id: server.id,
+			url: downloadUrl,
+			status,
+			contentLength,
+			ok: false,
+			checkedAt,
+			error: status === 200 ? 'HTTP 200 (Range ignored)' : `HTTP ${status}`,
+			latencyMs: null,
+		};
+	} catch (error) {
+		clearTimeout(timeoutId);
+		const errorMsg =
+			error instanceof Error
+				? error.name === 'AbortError'
+					? 'Timeout'
+					: error.message
+				: 'Unknown error';
+
+		return {
+			id: server.id,
+			url: downloadUrl,
+			status: null,
+			contentLength: null,
+			ok: false,
+			checkedAt,
+			error: errorMsg,
+			latencyMs: null,
+		};
+	}
+}
+
+/**
+ * Tests all servers by unrestricting a link to each server's IP and checking the download URL.
  */
 async function inspectServers(): Promise<WorkingStreamServerStatus[]> {
-	const servers = generateServerHosts();
-	console.log(`[StreamHealth] Testing ${servers.length} servers`);
+	const accessToken = process.env.REALDEBRID_KEY;
+	if (!accessToken) {
+		console.error('[StreamHealth] REALDEBRID_KEY not set, skipping health check');
+		return [];
+	}
 
-	// Generate random values for this test run
-	const randomFloat = Math.random();
-	const randomByte = Math.floor(Math.random() * 1023) + 1;
+	const servers = await fetchServerList();
+	if (servers.length === 0) {
+		console.error('[StreamHealth] No servers found, skipping health check');
+		return [];
+	}
 
-	// Test all servers in parallel
-	const results = await Promise.all(
-		servers.map((server) => testServerLatency(server, randomFloat, randomByte))
-	);
+	console.log(`[StreamHealth] Testing ${servers.length} servers via unrestrict`);
+
+	const results = await Promise.all(servers.map((server) => testServer(server, accessToken)));
 
 	return results;
 }
@@ -322,10 +397,7 @@ export const __testing = {
 	async runNow() {
 		return runHealthCheckNow();
 	},
-	getServerList() {
-		return generateServerHosts();
-	},
-	getServerLocations() {
-		return SERVER_LOCATIONS;
+	async fetchServers() {
+		return fetchServerList();
 	},
 };
