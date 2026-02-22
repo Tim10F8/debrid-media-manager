@@ -16,7 +16,7 @@ To make this process even easier, I've developed this **free** and open source w
 
 ## Features
 
-This builds on top of the amazing service brought by [Real-Debrid](http://real-debrid.com/?id=440161), [AllDebrid](https://alldebrid.com/?uid=1kk5i&lang=en), and [TorBox](https://torbox.app/subscription?referral=74ffa560-7381-4a18-adb1-cef97378c670).
+This builds on top of the amazing service brought by [Real-Debrid](http://real-debrid.com/?id=11137529), [AllDebrid](https://alldebrid.com/?uid=1kk5i&lang=en), and [TorBox](https://torbox.app/subscription?referral=74ffa560-7381-4a18-adb1-cef97378c670).
 
 ### Library management
 

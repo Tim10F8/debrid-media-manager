@@ -18,7 +18,7 @@ export async function checkPremiumStatus(rdUser: RealDebridUser) {
 		});
 
 		if (result.isConfirmed) {
-			window.open('https://real-debrid.com/premium?id=440161', '_blank');
+			window.open('https://real-debrid.com/premium?id=11137529', '_blank');
 		}
 		return { shouldLogout: true };
 	}
@@ -38,7 +38,7 @@ export async function checkPremiumStatus(rdUser: RealDebridUser) {
 			});
 
 			if (result.isConfirmed) {
-				window.open('https://real-debrid.com/premium?id=440161', '_blank');
+				window.open('https://real-debrid.com/premium?id=11137529', '_blank');
 			}
 			localStorage.setItem('rd_premium_warning', now.toString());
 		}
