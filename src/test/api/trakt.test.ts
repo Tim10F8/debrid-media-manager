@@ -41,8 +41,8 @@ describe('API /api/trakt/exchange', () => {
 	});
 
 	it('proxies the token exchange response', async () => {
-		const json = vi.fn().mockResolvedValue({ access_token: 'tok' });
-		globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json } as any);
+		const text = vi.fn().mockResolvedValue(JSON.stringify({ access_token: 'tok' }));
+		globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, text } as any);
 		const res = createRes();
 
 		await exchangeHandler({ query: { code: 'abc', redirect: 'https://app' } } as any, res);

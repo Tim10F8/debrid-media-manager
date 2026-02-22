@@ -28,7 +28,7 @@ export default function TraktCallbackPage() {
 				setRefreshToken(data.refresh_token);
 				router.push('/');
 			})
-			.catch((err) => setErrorMessage(err));
+			.catch((err) => setErrorMessage(String(err)));
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [router]);
 
