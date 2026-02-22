@@ -97,7 +97,7 @@ describe('addMagnet utilities', () => {
 			await handleAddAsMagnetInRd(rdKey, hash, callback);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'RD slots full. Retrying in 5s...',
+				'RD slots full. Retrying in 5s... (1/5)',
 				expect.objectContaining({ duration: 5000 })
 			);
 			expect(addHashAsMagnet).toHaveBeenCalledTimes(2);
@@ -237,7 +237,7 @@ describe('addMagnet utilities', () => {
 			await handleAddTorrentFileInRd(rdKey, file);
 
 			expect(toast.error).toHaveBeenCalledWith(
-				'RD slots full. Retrying in 5s...',
+				'RD slots full. Retrying in 5s... (1/5)',
 				expect.objectContaining({ duration: 5000 })
 			);
 			expect(addTorrentFile).toHaveBeenCalledTimes(2);

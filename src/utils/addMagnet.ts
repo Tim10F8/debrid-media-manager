@@ -51,12 +51,14 @@ const getTbError = (error: unknown): string | null => {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const retryDelay = process.env.VITEST_WORKER_ID ? 0 : 5000;
+const MAX_509_RETRIES = 5;
 
 export const handleAddAsMagnetInRd = async (
 	rdKey: string,
 	hash: string,
 	callback?: (info: TorrentInfoResponse) => Promise<void>,
-	deleteIfNotInstant: boolean = false
+	deleteIfNotInstant: boolean = false,
+	retryCount: number = 0
 ) => {
 	try {
 		const id = await addHashAsMagnet(rdKey, hash);
@@ -74,12 +76,19 @@ export const handleAddAsMagnetInRd = async (
 		}
 	} catch (error: unknown) {
 		if (error instanceof AxiosError && error.response?.status === 509) {
-			toast.error('RD slots full. Retrying in 5s...', {
+			if (retryCount >= MAX_509_RETRIES) {
+				toast.error(
+					'RD slots full. Please free up a slot and try again.',
+					magnetToastOptions
+				);
+				return;
+			}
+			toast.error(`RD slots full. Retrying in 5s... (${retryCount + 1}/${MAX_509_RETRIES})`, {
 				...magnetToastOptions,
 				duration: 5000,
 			});
 			await delay(retryDelay);
-			await handleAddAsMagnetInRd(rdKey, hash, callback, deleteIfNotInstant);
+			await handleAddAsMagnetInRd(rdKey, hash, callback, deleteIfNotInstant, retryCount + 1);
 			return;
 		}
 		const rdError = getRdError(error);
@@ -94,7 +103,8 @@ export const handleAddAsMagnetInRd = async (
 export const handleAddTorrentFileInRd = async (
 	rdKey: string,
 	file: File,
-	callback?: (info: TorrentInfoResponse) => Promise<void>
+	callback?: (info: TorrentInfoResponse) => Promise<void>,
+	retryCount: number = 0
 ) => {
 	try {
 		const id = await addTorrentFile(rdKey, file);
@@ -108,12 +118,19 @@ export const handleAddTorrentFileInRd = async (
 		if (callback) await callback(response);
 	} catch (error: unknown) {
 		if (error instanceof AxiosError && error.response?.status === 509) {
-			toast.error('RD slots full. Retrying in 5s...', {
+			if (retryCount >= MAX_509_RETRIES) {
+				toast.error(
+					'RD slots full. Please free up a slot and try again.',
+					magnetToastOptions
+				);
+				return;
+			}
+			toast.error(`RD slots full. Retrying in 5s... (${retryCount + 1}/${MAX_509_RETRIES})`, {
 				...magnetToastOptions,
 				duration: 5000,
 			});
 			await delay(retryDelay);
-			await handleAddTorrentFileInRd(rdKey, file, callback);
+			await handleAddTorrentFileInRd(rdKey, file, callback, retryCount + 1);
 			return;
 		}
 		const rdError = getRdError(error);
