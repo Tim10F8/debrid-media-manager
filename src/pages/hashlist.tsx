@@ -210,8 +210,10 @@ function HashlistPage() {
 						...torrent,
 					};
 				})
-				// Filter out results without a valid year
-				.filter((t) => t.info.year && Number(t.info.year) > 0) as EnrichedHashlistTorrent[];
+				// Filter out movies without a valid year; TV shows don't need one
+				.filter(
+					(t) => t.mediaType === 'tv' || (t.info.year && Number(t.info.year) > 0)
+				) as EnrichedHashlistTorrent[];
 			if (!torrents.length) return;
 			setUserTorrentsList(torrents);
 
