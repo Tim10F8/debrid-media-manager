@@ -55,7 +55,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteRdTorrent(rdKey, torrentId);
 
 			expect(deleteRdTorrent).toHaveBeenCalledWith(rdKey, '123456');
-			expect(toast.error).toHaveBeenCalledWith('Failed to delete rd:123456 in RD.');
+			expect(toast.error).toHaveBeenCalledWith('RD error: Network error');
 		});
 
 		it('should handle errors with disableToast true', async () => {
@@ -65,7 +65,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteRdTorrent(rdKey, torrentId, true);
 
 			expect(deleteRdTorrent).toHaveBeenCalledWith(rdKey, '123456');
-			expect(toast.error).toHaveBeenCalledWith('Failed to delete rd:123456 in RD.');
+			expect(toast.error).toHaveBeenCalledWith('RD error: Network error');
 			expect(toast).not.toHaveBeenCalled();
 		});
 
@@ -131,7 +131,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteAdTorrent(adKey, torrentId);
 
 			expect(deleteAdTorrent).toHaveBeenCalledWith(adKey, '987654');
-			expect(toast.error).toHaveBeenCalledWith('Failed to delete ad:987654 in AD.');
+			expect(toast.error).toHaveBeenCalledWith('AD error: API error');
 		});
 
 		it('should handle errors with disableToast true', async () => {
@@ -141,7 +141,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteAdTorrent(adKey, torrentId, true);
 
 			expect(deleteAdTorrent).toHaveBeenCalledWith(adKey, '987654');
-			expect(toast.error).toHaveBeenCalledWith('Failed to delete ad:987654 in AD.');
+			expect(toast.error).toHaveBeenCalledWith('AD error: API error');
 			expect(toast).not.toHaveBeenCalled();
 		});
 
@@ -210,7 +210,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteTbTorrent(tbKey, torrentId);
 
 			expect(deleteTbTorrent).toHaveBeenCalledWith(tbKey, 456789);
-			expect(toast.error).toHaveBeenCalledWith('Failed to delete tb:456789 in TorBox.');
+			expect(toast.error).toHaveBeenCalledWith('TorBox error: Connection failed');
 		});
 
 		it('should handle errors with disableToast true', async () => {
@@ -220,7 +220,7 @@ describe('deleteTorrent utilities', () => {
 			await handleDeleteTbTorrent(tbKey, torrentId, true);
 
 			expect(deleteTbTorrent).toHaveBeenCalledWith(tbKey, 456789);
-			expect(toast.error).toHaveBeenCalledWith('Failed to delete tb:456789 in TorBox.');
+			expect(toast.error).toHaveBeenCalledWith('TorBox error: Connection failed');
 			expect(toast).not.toHaveBeenCalled();
 		});
 

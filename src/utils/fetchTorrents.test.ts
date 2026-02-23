@@ -146,10 +146,7 @@ describe('fetchTorrents utilities', () => {
 			await fetchRealDebrid(rdKey, callback);
 
 			expect(callback).toHaveBeenCalledWith([]);
-			expect(toast.error).toHaveBeenCalledWith(
-				'Failed to fetch Real-Debrid torrents.',
-				expect.any(Object)
-			);
+			expect(toast.error).toHaveBeenCalledWith('RD error: API Error', expect.any(Object));
 		});
 
 		it('should handle partial pagination failures', async () => {
@@ -426,10 +423,7 @@ describe('fetchTorrents utilities', () => {
 			await fetchAllDebrid(adKey, callback);
 
 			expect(callback).toHaveBeenCalledWith([]);
-			expect(toast.error).toHaveBeenCalledWith(
-				'Failed to fetch AllDebrid torrents.',
-				expect.any(Object)
-			);
+			expect(toast.error).toHaveBeenCalledWith('AD error: API Error', expect.any(Object));
 		});
 
 		it('should handle magnets with hash as filename', async () => {
@@ -932,10 +926,7 @@ describe('fetchTorrents utilities', () => {
 
 			await fetchTorBox(tbKey, callback);
 
-			expect(toast.error).toHaveBeenCalledWith(
-				'Failed to fetch TorBox torrents.',
-				expect.any(Object)
-			);
+			expect(toast.error).toHaveBeenCalledWith('TorBox error: API Error', expect.any(Object));
 			expect(callback).toHaveBeenCalledWith([]);
 		});
 

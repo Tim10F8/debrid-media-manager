@@ -330,7 +330,7 @@ export const getPin = async (): Promise<PinData> => {
 };
 
 export const checkPin = async (pin: string, check: string): Promise<PinCheckData> => {
-	const endpoint = `${config.allDebridHostname}/v4/pin/check`;
+	const endpoint = `${config.allDebridHostname}/v4.1/pin/check`;
 	try {
 		const params = new URLSearchParams();
 		params.append('pin', pin);
@@ -369,7 +369,7 @@ export const checkPin = async (pin: string, check: string): Promise<PinCheckData
 
 // Authenticated endpoints
 export const getAllDebridUser = async (apikey: string) => {
-	const endpoint = `${config.allDebridHostname}/v4/user`;
+	const endpoint = `${config.allDebridHostname}/v4.1/user`;
 	try {
 		const response = await allDebridAxios.get<ApiResponse<UserData>>(endpoint, {
 			headers: { Authorization: `Bearer ${apikey}` },
@@ -388,7 +388,7 @@ export const getAllDebridUser = async (apikey: string) => {
 
 export const uploadMagnet = async (apikey: string, hashes: string[]): Promise<MagnetUploadData> => {
 	try {
-		const endpoint = `${config.allDebridHostname}/v4/magnet/upload`;
+		const endpoint = `${config.allDebridHostname}/v4.1/magnet/upload`;
 
 		// Convert hashes to magnets (handles both formats)
 		const magnets = hashes
@@ -551,7 +551,7 @@ export const getMagnetFiles = async (
 	apikey: string,
 	magnetIds: number[]
 ): Promise<MagnetFilesData> => {
-	const endpoint = `${config.allDebridHostname}/v4/magnet/files`;
+	const endpoint = `${config.allDebridHostname}/v4.1/magnet/files`;
 
 	// Filter out invalid IDs before making the request
 	const validIds = magnetIds.filter((id) => id && id > 0);
@@ -587,7 +587,7 @@ export const getMagnetFiles = async (
 };
 
 export const deleteMagnet = async (apikey: string, id: string): Promise<MagnetDeleteData> => {
-	const endpoint = `${config.allDebridHostname}/v4/magnet/delete`;
+	const endpoint = `${config.allDebridHostname}/v4.1/magnet/delete`;
 	try {
 		// AllDebrid expects form-encoded data
 		const params = new URLSearchParams();
@@ -616,7 +616,7 @@ export const deleteMagnet = async (apikey: string, id: string): Promise<MagnetDe
 };
 
 export const restartMagnet = async (apikey: string, id: string): Promise<MagnetRestartData> => {
-	const endpoint = `${config.allDebridHostname}/v4/magnet/restart`;
+	const endpoint = `${config.allDebridHostname}/v4.1/magnet/restart`;
 	try {
 		// AllDebrid expects form-encoded data
 		const params = new URLSearchParams();
@@ -678,7 +678,7 @@ export const uploadMagnetAd = async (apiKey: string, hash: string): Promise<Magn
 		throw new Error(`Invalid SHA40 hash: ${hash}`);
 	}
 
-	const endpoint = `${config.allDebridHostname}/v4/magnet/upload`;
+	const endpoint = `${config.allDebridHostname}/v4.1/magnet/upload`;
 	const params = new URLSearchParams();
 	params.append('magnets[]', `magnet:?xt=urn:btih:${hash}`);
 
@@ -748,7 +748,7 @@ export const getMagnetStatusAd = async (
  * Uses axios interceptor for retry logic on 429/5xx errors
  */
 export const deleteMagnetAd = async (apiKey: string, magnetId: number): Promise<void> => {
-	const endpoint = `${config.allDebridHostname}/v4/magnet/delete`;
+	const endpoint = `${config.allDebridHostname}/v4.1/magnet/delete`;
 	const params = new URLSearchParams();
 	params.append('id', magnetId.toString());
 
@@ -826,7 +826,7 @@ interface UnlockLinkData {
  * @returns The unlocked link data including the direct download URL
  */
 export const unlockLink = async (apiKey: string, link: string): Promise<UnlockLinkData> => {
-	const endpoint = `${config.allDebridHostname}/v4/link/unlock`;
+	const endpoint = `${config.allDebridHostname}/v4.1/link/unlock`;
 
 	try {
 		const params = new URLSearchParams();

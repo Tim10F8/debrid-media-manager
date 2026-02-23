@@ -5,28 +5,19 @@ import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { magnetToastOptions } from './toastOptions';
 
-// RD: { error: "infringing_file", error_code: 35 }
-const getRdError = (error: unknown): string | null => {
-	if (error instanceof AxiosError) {
-		return error.response?.data?.error || null;
-	}
-	return null;
-};
-
-// AD: { status: "error", error: { code: "...", message: "..." } }
-const getAdError = (error: unknown): string | null => {
+// Extract error message from any error type
+// API-level errors are thrown as plain Error by service functions,
+// while HTTP-level errors are AxiosError instances
+const getErrorMessage = (error: unknown): string | null => {
 	if (error instanceof AxiosError) {
 		const data = error.response?.data;
-		return data?.error?.message || data?.error || null;
+		// AD format: { error: { message: "..." } }
+		// RD format: { error: "infringing_file" }
+		// TB format: { detail: "...", error: "..." }
+		return data?.error?.message || data?.detail || data?.error || null;
 	}
-	return null;
-};
-
-// TB: { success: false, error: "BOZO_TORRENT", detail: "Invalid Magnet Link..." }
-const getTbError = (error: unknown): string | null => {
-	if (error instanceof AxiosError) {
-		const data = error.response?.data;
-		return data?.detail || data?.error || null;
+	if (error instanceof Error) {
+		return error.message;
 	}
 	return null;
 };
@@ -50,7 +41,7 @@ export const handleDeleteRdTorrent = async (
 			'Error deleting RD torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		const apiError = getRdError(error);
+		const apiError = getErrorMessage(error);
 		toast.error(apiError ? `RD error: ${apiError}` : `Failed to delete ${id} in RD.`);
 	}
 };
@@ -68,7 +59,7 @@ export const handleDeleteAdTorrent = async (
 			'Error deleting AD torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		const apiError = getAdError(error);
+		const apiError = getErrorMessage(error);
 		toast.error(apiError ? `AD error: ${apiError}` : `Failed to delete ${id} in AD.`);
 	}
 };
@@ -86,7 +77,7 @@ export const handleDeleteTbTorrent = async (
 			'Error deleting TB torrent:',
 			error instanceof Error ? error.message : 'Unknown error'
 		);
-		const apiError = getTbError(error);
+		const apiError = getErrorMessage(error);
 		toast.error(apiError ? `TorBox error: ${apiError}` : `Failed to delete ${id} in TorBox.`);
 	}
 };

@@ -12,28 +12,14 @@ import { getTypeByNameAndFileCount } from './mediaType';
 import { checkArithmeticSequenceInFilenames, isVideo } from './selectable';
 import { genericToastOptions } from './toastOptions';
 
-// RD: { error: "infringing_file", error_code: 35 }
-const getRdError = (error: unknown): string | null => {
-	if (error instanceof AxiosError) {
-		return error.response?.data?.error || null;
-	}
-	return null;
-};
-
-// AD: { status: "error", error: { code: "...", message: "..." } }
-const getAdError = (error: unknown): string | null => {
+// Extract error message from any error type
+const getErrorMessage = (error: unknown): string | null => {
 	if (error instanceof AxiosError) {
 		const data = error.response?.data;
-		return data?.error?.message || data?.error || null;
+		return data?.error?.message || data?.detail || data?.error || null;
 	}
-	return null;
-};
-
-// TB: { success: false, error: "BOZO_TORRENT", detail: "Invalid Magnet Link..." }
-const getTbError = (error: unknown): string | null => {
-	if (error instanceof AxiosError) {
-		const data = error.response?.data;
-		return data?.detail || data?.error || null;
+	if (error instanceof Error) {
+		return error.message;
 	}
 	return null;
 };
@@ -138,7 +124,7 @@ export const fetchRealDebrid = async (
 		await callback(torrents);
 	} catch (error) {
 		await callback([]);
-		const apiError = getRdError(error);
+		const apiError = getErrorMessage(error);
 		toast.error(
 			apiError ? `RD error: ${apiError}` : 'Failed to fetch Real-Debrid torrents.',
 			genericToastOptions
@@ -251,7 +237,7 @@ export const fetchAllDebrid = async (
 		});
 	} catch (error) {
 		await callback([]);
-		const apiError = getAdError(error);
+		const apiError = getErrorMessage(error);
 		toast.error(
 			apiError ? `AD error: ${apiError}` : 'Failed to fetch AllDebrid torrents.',
 			genericToastOptions
@@ -599,7 +585,7 @@ export const fetchTorBox = async (
 		});
 	} catch (error) {
 		await callback([]);
-		const apiError = getTbError(error);
+		const apiError = getErrorMessage(error);
 		toast.error(
 			apiError ? `TorBox error: ${apiError}` : 'Failed to fetch TorBox torrents.',
 			genericToastOptions
