@@ -1118,6 +1118,34 @@ function HashlistPage() {
 					</tbody>
 				</table>
 			</div>
+			{/* Bottom pagination */}
+			<div className="mt-4 flex items-center">
+				<button
+					className={`mr-1 rounded border-2 border-indigo-500 bg-indigo-900/30 px-1 py-1 text-indigo-100 transition-colors hover:bg-indigo-800/50 ${
+						currentPage <= 1 ? 'cursor-not-allowed opacity-60' : ''
+					}`}
+					onClick={handlePrevPage}
+					disabled={currentPage <= 1}
+				>
+					<ChevronLeft className="h-4 w-4" />
+				</button>
+				<span className="w-16 text-center">
+					{currentPage}/{Math.max(1, Math.ceil(sortedData().length / ITEMS_PER_PAGE))}
+				</span>
+				<button
+					className={`ml-1 rounded border-2 border-indigo-500 bg-indigo-900/30 px-1 py-1 text-xs text-indigo-100 transition-colors hover:bg-indigo-800/50 ${
+						currentPage >= Math.ceil(sortedData().length / ITEMS_PER_PAGE)
+							? 'cursor-not-allowed opacity-60'
+							: ''
+					}`}
+					onClick={handleNextPage}
+					disabled={currentPage >= Math.ceil(sortedData().length / ITEMS_PER_PAGE)}
+				>
+					<ChevronRight className="h-4 w-4" />
+				</button>
+			</div>
+			{/* Spacer for floating library indicator */}
+			<div className="pb-20" />
 		</div>
 	);
 }
