@@ -132,8 +132,8 @@ export const getAllDebridStreamUrl = async (
 		if (mediaType === 'tv' || mediaType === 'series') {
 			const filename = targetFile.path.split('/').pop() || '';
 			const info = ptt.parse(filename);
-			seasonNumber = info.season || -1;
-			episodeNumber = info.episode || -1;
+			seasonNumber = info.season ?? -1;
+			episodeNumber = info.episode ?? -1;
 		}
 
 		// Note: AllDebrid links work even after magnet deletion
@@ -278,8 +278,8 @@ export const getAllDebridStreamUrlKeepMagnet = async (
 		// 5. Parse season/episode from filename if TV
 		if (mediaType === 'tv' || mediaType === 'series') {
 			const info = ptt.parse(filename);
-			seasonNumber = info.season || -1;
-			episodeNumber = info.episode || -1;
+			seasonNumber = info.season ?? -1;
+			episodeNumber = info.episode ?? -1;
 		}
 	} catch (error) {
 		throw error;

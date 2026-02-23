@@ -111,8 +111,8 @@ export const getTorBoxStreamUrl = async (
 			if (mediaType === 'tv' || mediaType === 'series') {
 				const filename = file.name || file.short_name || '';
 				const info = ptt.parse(filename.split('/').pop() || '');
-				seasonNumber = info.season || -1;
-				episodeNumber = info.episode || -1;
+				seasonNumber = info.season ?? -1;
+				episodeNumber = info.episode ?? -1;
 			}
 
 			fileSize = Math.round((file.size || 0) / 1024 / 1024);
@@ -195,7 +195,10 @@ export const getFileByNameTorBoxStreamUrl = async (
 				matchedFile = torrent.files.find((f) => {
 					const name = f.name || f.short_name || '';
 					const shortName = name.split('/').pop() || name;
-					return shortName.toLowerCase() === lowerTarget || name.toLowerCase() === lowerTarget;
+					return (
+						shortName.toLowerCase() === lowerTarget ||
+						name.toLowerCase() === lowerTarget
+					);
 				});
 			}
 
@@ -387,8 +390,8 @@ export const getTorBoxStreamUrlKeepTorrent = async (
 		// Parse season/episode from filename if TV
 		if (mediaType === 'tv' || mediaType === 'series') {
 			const info = ptt.parse(filename.split('/').pop() || '');
-			seasonNumber = info.season || -1;
-			episodeNumber = info.episode || -1;
+			seasonNumber = info.season ?? -1;
+			episodeNumber = info.episode ?? -1;
 		}
 
 		fileSize = Math.round((file.size || 0) / 1024 / 1024);

@@ -49,8 +49,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		let season_names = [];
 		let imdb_score;
 
-		let cineSeasons =
-			cinemetaResponse.meta?.videos.filter((video: any) => video.season > 0) || [];
+		const allCineVideos =
+			cinemetaResponse.meta?.videos.filter((video: any) => video.season >= 0) || [];
+		let cineSeasons = allCineVideos.filter((video: any) => video.season > 0);
 		const uniqueSeasons: number[] = Array.from(
 			new Set(cineSeasons.map((video: any) => video.season))
 		);
@@ -107,10 +108,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 		const title = mdbResponse?.title ?? cinemetaResponse?.meta?.name ?? 'Unknown';
 
+		// Check if specials (season 0) exist
+		const has_specials =
+			allCineVideos.some((video: any) => video.season === 0) ||
+			(isShowType(mdbResponse) &&
+				mdbResponse.seasons?.some((season) => season.season_number === 0));
+
 		const season_episode_counts: Record<number, number> = {};
 
-		// Get counts from cinemeta
-		cineSeasons.forEach((video: any) => {
+		// Get counts from cinemeta (including season 0)
+		allCineVideos.forEach((video: any) => {
 			if (!season_episode_counts[video.season]) {
 				season_episode_counts[video.season] = 1;
 			} else {
@@ -121,7 +128,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		// Merge with mdb data if available
 		if (isShowType(mdbResponse) && mdbResponse.seasons) {
 			mdbResponse.seasons.forEach((season) => {
-				if (season.episode_count && season.season_number) {
+				if (season.episode_count && season.season_number != null) {
 					// Use the larger count between the two sources
 					season_episode_counts[season.season_number] = Math.max(
 						season_episode_counts[season.season_number] || 0,
@@ -166,6 +173,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				'https://source.unsplash.com/random/1800x300?' + title,
 			season_count,
 			season_names,
+			has_specials,
 			imdb_score: imdb_score ?? 0,
 			season_episode_counts,
 			trailer,

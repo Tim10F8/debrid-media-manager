@@ -54,6 +54,7 @@ type ShowInfo = {
 	backdrop: string;
 	season_count: number;
 	season_names: string[];
+	has_specials: boolean;
 	imdb_score: number;
 	season_episode_counts: Record<number, number>;
 	trailer: string;
@@ -174,7 +175,12 @@ const TvSearch: FunctionComponent = () => {
 				const response = await axiosWithRetry.get(`/api/info/show?imdbid=${imdbid}`);
 				setShowInfo(response.data);
 
-				if (parseInt(seasonNum as string) > response.data.season_count) {
+				const requestedSeason = parseInt(seasonNum as string);
+				if (
+					requestedSeason > response.data.season_count ||
+					(requestedSeason === 0 && !response.data.has_specials) ||
+					requestedSeason < 0
+				) {
 					router.push(`/show/${imdbid}/1`);
 				}
 			} catch (error) {
@@ -906,6 +912,15 @@ const TvSearch: FunctionComponent = () => {
 
 	const seasonNavigation = (
 		<div className="flex items-center overflow-x-auto" data-testid="media-header-season-nav">
+			{showInfo.has_specials && (
+				<Link
+					href={`/show/${imdbId}/0`}
+					className={`inline-flex items-center border-2 p-1 text-xs border-${selectedSeason === 0 ? 'red' : 'yellow'}-500 bg-${selectedSeason === 0 ? 'red' : 'yellow'}-900/30 text-${selectedSeason === 0 ? 'red' : 'yellow'}-100 hover:bg-${selectedSeason === 0 ? 'red' : 'yellow'}-800/50 mb-1 mr-2 rounded transition-colors`}
+				>
+					<Tv className="mr-2 h-3 w-3 text-cyan-500" />
+					<span className="whitespace-nowrap">Specials</span>
+				</Link>
+			)}
 			{Array.from({ length: showInfo.season_count }, (_, i) => showInfo.season_count - i).map(
 				(season, idx) => {
 					const color = selectedSeason === season ? 'red' : 'yellow';

@@ -41,8 +41,8 @@ export const getStreamUrl = async (
 
 			if (mediaType === 'tv') {
 				const info = ptt.parse(resp.filename.split('/').pop() || '');
-				seasonNumber = info.season || -1;
-				episodeNumber = info.episode || -1;
+				seasonNumber = info.season ?? -1;
+				episodeNumber = info.episode ?? -1;
 			}
 
 			fileSize = Math.round(resp.filesize / 1024 / 1024);

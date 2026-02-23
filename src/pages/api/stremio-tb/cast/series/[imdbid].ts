@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				if (streamUrl) {
 					// Build imdbId with season:episode suffix
 					let episodeImdbId = imdbid;
-					if (seasonNumber > 0 && episodeNumber > 0) {
+					if (seasonNumber >= 0 && episodeNumber >= 0) {
 						episodeImdbId = `${imdbid}:${seasonNumber}:${episodeNumber}`;
 					}
 

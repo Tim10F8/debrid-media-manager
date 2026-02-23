@@ -82,6 +82,7 @@ describe('/api/info/show', () => {
 			backdrop: 'mdb-backdrop',
 			season_count: 3,
 			season_names: ['Season 1', 'Season 2', 'Season 3'],
+			has_specials: false,
 			imdb_score: 9.1,
 			season_episode_counts: {
 				1: 8,
