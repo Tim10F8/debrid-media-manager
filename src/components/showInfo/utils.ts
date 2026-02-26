@@ -26,14 +26,6 @@ export const getEpisodeInfo = (
 	return { isTvEpisode };
 };
 
-export const generatePasswordHash = async (hash: string): Promise<string> => {
-	const salt = 'debridmediamanager.com';
-	const msgBuffer = new TextEncoder().encode(hash + salt);
-	const hashBuffer = await crypto.subtle.digest('SHA-1', msgBuffer);
-	const hashArray = Array.from(new Uint8Array(hashBuffer));
-	return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-};
-
 const formatDuration = (seconds: string) => {
 	const duration = parseFloat(seconds);
 	const hours = Math.floor(duration / 3600);
@@ -68,23 +60,6 @@ export const fetchMediaInfo = async (hash: string): Promise<MediaInfoResponse | 
 		console.info('Torrent snapshot media info missing stream details', { hash });
 	} catch (error) {
 		console.info('Failed to load torrent media info from snapshot', {
-			hash,
-			error: loggableError(error),
-		});
-	}
-
-	try {
-		const password = await generatePasswordHash(hash);
-		const response = await axiosWithRetry.get<MediaInfoResponse>(
-			'https://debridmediamanager.com/mediainfo',
-			{ params: { hash, password } }
-		);
-		if (hasMediaInfoPayload(response.data)) {
-			return response.data;
-		}
-		console.info('Media info fallback response missing stream details', { hash });
-	} catch (error) {
-		console.error('Failed to load media info from fallback endpoint', {
 			hash,
 			error: loggableError(error),
 		});

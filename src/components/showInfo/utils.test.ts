@@ -57,36 +57,24 @@ describe('fetchMediaInfo', () => {
 		});
 	});
 
-	it('falls back to remote endpoint when snapshot lacks media info', async () => {
-		axiosGetMock
-			.mockResolvedValueOnce({ data: { SelectedFiles: {} } })
-			.mockResolvedValueOnce({ data: sampleMediaInfo });
+	it('returns null when snapshot lacks media info', async () => {
+		axiosGetMock.mockResolvedValueOnce({ data: { SelectedFiles: {} } });
 		const hash = 'abcdef1234567890abcdef1234567890abcdef12';
 
 		const result = await utils.fetchMediaInfo(hash);
-		const derivedPassword = await utils.generatePasswordHash(hash);
 
-		expect(result).toEqual(sampleMediaInfo);
-		expect(axiosGetMock).toHaveBeenNthCalledWith(1, '/api/torrents/mediainfo', {
-			params: { hash },
-		});
-		expect(axiosGetMock).toHaveBeenNthCalledWith(
-			2,
-			'https://debridmediamanager.com/mediainfo',
-			{
-				params: { hash, password: derivedPassword },
-			}
-		);
+		expect(result).toBeNull();
+		expect(axiosGetMock).toHaveBeenCalledTimes(1);
 	});
 
-	it('returns null when both sources fail', async () => {
+	it('returns null when snapshot request fails', async () => {
 		axiosGetMock.mockRejectedValue(new Error('network error'));
 		const hash = 'abcdef1234567890abcdef1234567890abcdef12';
 
 		const result = await utils.fetchMediaInfo(hash);
 
 		expect(result).toBeNull();
-		expect(axiosGetMock).toHaveBeenCalledTimes(2);
+		expect(axiosGetMock).toHaveBeenCalledTimes(1);
 	});
 
 	afterAll(() => {
