@@ -551,7 +551,7 @@ model ImdbTitleBasics {
   @@index([titleType], map: "idx_title_type")
   @@index([isAdult], map: "idx_is_adult")
   @@index([startYear], map: "idx_start_year")
-  @@fulltext([primaryTitle], map: "ft_primary_title")
+  @@fulltext([primaryTitle], map: "ft_ngram_primary_title")
   @@map("imdb_title_basics")
 }
 
@@ -717,6 +717,15 @@ model Sponsors {
 
   @@index([githubSponsoring, patreonAmount])
   @@index([updatedAt])
+}
+
+model DiscordUser {
+  id             String   @id @db.VarChar(30)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  discordUserId  String   @unique
+  discordUsername String?
+  rdApiToken     String?
 }
 
 model TempAuthData {
