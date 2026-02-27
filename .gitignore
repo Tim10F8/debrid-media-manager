@@ -43,8 +43,6 @@ src/utils/parser.ts
 tmp/
 temp/
 
-pscale_dump_dmm_main/
-
 *.sqlite
 
 src/pages/api/importers/yts.json
