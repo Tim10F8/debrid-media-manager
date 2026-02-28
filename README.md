@@ -8,19 +8,17 @@ Start building your media library with truly unlimited storage size!
 
 Do you want a movie and TV show library that has unlimited size? Consider using a Debrid service, like Real-Debrid, AllDebrid, or TorBox. These services work like a shared storage space for downloading torrents. You can download as much as you want without worrying about storage limits, because the files are shared among all users. You only "own" the file when you download it to your account.
 
-These Debrid services also offer a WebDAV API that lets you connect your media library to different devices or software — like your own cloud drive for media.
-
-You can connect your media library to players like [Infuse](https://firecore.com/infuse) (Mac, iPhone, Apple TV, iPad) or media server software like Plex, Emby, or Jellyfin. This way, your media library can be accessed and played from anywhere!
+These Debrid services also offer a WebDAV interface that lets you mount your library as a network drive. You can connect it to media players like [Infuse](https://firecore.com/infuse) (Mac, iPhone, Apple TV, iPad) or media server software like Plex, Emby, or Jellyfin. This way, your media library can be accessed and played from anywhere!
 
 [Debrid Media Manager](https://debridmediamanager.com/) is a **free** and open source web app that makes it easy to download movies and TV shows directly to your Debrid library. Build and curate your media collection without ever worrying about storage limits.
 
 ## Features
 
-This builds on top of the amazing service brought by [Real-Debrid](http://real-debrid.com/?id=11137529), [AllDebrid](https://alldebrid.com/?uid=1kk5i&lang=en), and [TorBox](https://torbox.app/subscription?referral=74ffa560-7381-4a18-adb1-cef97378c670).
+This builds on top of the amazing service brought by [Real-Debrid](https://real-debrid.com/?id=11137529), [AllDebrid](https://alldebrid.com/?uid=1kk5i&lang=en), and [TorBox](https://torbox.app/subscription?referral=74ffa560-7381-4a18-adb1-cef97378c670).
 
 ### Library management
 
-See all your torrents in one page, sort them by name, size, or quality score. It groups torrents by title and helps you delete duplicates. It can show you failed or slow downloads and delete them.
+See all your torrents in one page, sort them by name, size, status, or date added. It groups torrents by title and helps you delete duplicates. It can show you failed or slow downloads and delete them.
 
 ### Torrent search
 
