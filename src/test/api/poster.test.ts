@@ -122,6 +122,64 @@ describe('/api/poster', () => {
 		expect(mockRes.json).toHaveBeenCalledWith({ error: 'Poster not found' });
 	});
 
+	it('should return poster URL from Fanart.tv when FANART_KEY is set', async () => {
+		process.env.FANART_KEY = 'test-fanart-key';
+		mockReq.method = 'GET';
+		mockReq.query = { imdbid: 'tt1234567' };
+
+		mockedAxios.get.mockResolvedValueOnce({
+			data: {
+				movieposter: [
+					{
+						id: '1',
+						url: 'https://assets.fanart.tv/fanart/movie-poster.jpg',
+						lang: 'en',
+						likes: '5',
+					},
+					{
+						id: '2',
+						url: 'https://assets.fanart.tv/fanart/movie-poster2.jpg',
+						lang: 'de',
+						likes: '10',
+					},
+				],
+			},
+		});
+
+		await handler(mockReq, mockRes);
+
+		expect(mockRes.json).toHaveBeenCalledWith({
+			url: 'https://assets.fanart.tv/fanart/movie-poster.jpg',
+		});
+		expect(mockedAxios.get).toHaveBeenCalledWith(
+			expect.stringContaining('webservice.fanart.tv/v3/movies/tt1234567')
+		);
+		delete process.env.FANART_KEY;
+	});
+
+	it('should fall through to TMDB when Fanart.tv has no posters', async () => {
+		process.env.FANART_KEY = 'test-fanart-key';
+		mockReq.method = 'GET';
+		mockReq.query = { imdbid: 'tt1234567' };
+
+		// Fanart.tv returns empty
+		mockedAxios.get.mockResolvedValueOnce({ data: {} });
+		// TMDB returns poster
+		mockedAxios.get.mockResolvedValueOnce({
+			data: {
+				movie_results: [{ poster_path: '/tmdb-poster.jpg' }],
+				tv_results: [],
+			},
+		});
+
+		await handler(mockReq, mockRes);
+
+		expect(mockRes.json).toHaveBeenCalledWith({
+			url: 'https://image.tmdb.org/t/p/w500/tmdb-poster.jpg',
+		});
+		delete process.env.FANART_KEY;
+	});
+
 	it('should handle different HTTP methods', async () => {
 		const methods = ['GET', 'POST', 'PUT', 'DELETE'];
 
