@@ -47,7 +47,7 @@ You can share your whole collection or select specific items you want to share. 
 0. Have a MySQL database ready
 1. Have Tor running at `127.0.0.1:9050` (needed for DHT search; if you don't need your own search database then refer to the section `External Search API`)
 2. Clone this repository and go to the directory
-3. Create a copy of the `.env` file `cp .env .env.local` and fill in the details
+3. Create your local env file: `cp .env.example .env.local` and fill in the details
 4. Fill in required settings in `.env.local`:
     - `PROXY=socks5h://127.0.0.1:9050` (if tor is running on your host machine)
     - `DATABASE_URL` - Your MySQL connection string
@@ -68,7 +68,8 @@ If you don't want to build your own library, edit the config `EXTERNAL_SEARCH_AP
 ### Docker Swarm
 
 ```
-cp .env .env.local
+cp .env.example .env.local
+# Fill in your settings in .env.local
 docker swarm init
 docker stack deploy -c docker-compose.yml dmm
 ```
