@@ -90,6 +90,85 @@ model AvailableMusicFile {
   @@index([hash])
 }
 
+// ═══════════════════════════════════════════════════════════════
+// DHT CONTENT TABLES (Bitmagnet Integration, keyed by info_hash)
+// ═══════════════════════════════════════════════════════════════
+
+model ScrapedXxx {
+  hash            String   @id @db.VarChar(40)
+  name            String   @db.Text
+  size            BigInt
+  filesCount      Int?
+  seeders         Int?
+  leechers        Int?
+  videoResolution String?  @db.VarChar(20)  // e.g. "2160p", "1080p", "720p"
+  videoCodec      String?  @db.VarChar(20)  // e.g. "h264", "h265", "hevc"
+  videoSource     String?  @db.VarChar(20)  // e.g. "web", "bluray"
+  languages       Json?                      // e.g. ["en", "ja"]
+  publishedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@index([size])
+  @@index([seeders])
+  @@fulltext([name])
+}
+
+model ScrapedAudiobook {
+  hash        String   @id @db.VarChar(40)
+  name        String   @db.Text
+  size        BigInt
+  filesCount  Int?
+  seeders     Int?
+  leechers    Int?
+  languages   Json?                          // e.g. ["en"]
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@index([size])
+  @@index([seeders])
+  @@fulltext([name])
+}
+
+model ScrapedComic {
+  hash        String   @id @db.VarChar(40)
+  name        String   @db.Text
+  size        BigInt
+  filesCount  Int?
+  seeders     Int?
+  leechers    Int?
+  languages   Json?                          // e.g. ["en"]
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@index([size])
+  @@index([seeders])
+  @@fulltext([name])
+}
+
+model ScrapedEbook {
+  hash        String   @id @db.VarChar(40)
+  name        String   @db.Text
+  size        BigInt
+  filesCount  Int?
+  seeders     Int?
+  leechers    Int?
+  languages   Json?                          // e.g. ["en"]
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@index([size])
+  @@index([seeders])
+  @@fulltext([name])
+}
+
 model Search {
   key       String   @id
   value     Json
